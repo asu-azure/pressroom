@@ -3,6 +3,7 @@
   import { requireSession, watchSignOut } from '../../lib/authGuard';
   import Arranger from './Arranger.svelte';
   import PdfUploader from './PdfUploader.svelte';
+  import RichTextEditor from './RichTextEditor.svelte';
   import type { Work, PageRow, Chapter } from '../../lib/types';
 
   let { workId }: { workId: string } = $props();
@@ -170,14 +171,14 @@
         <span class="mono">DESCRIPTION (SHORT — SHOWN NEXT TO THE COVER)</span>
         <textarea bind:value={meta.description} rows="3"></textarea>
       </label>
-      <label class="we__field we__field--wide">
+      <div class="we__field we__field--wide">
         <span class="mono">FOREWORD / はじめに (LONG — ITS OWN PAGE BETWEEN COVER AND CONTENT)</span>
-        <textarea
-          bind:value={meta.foreword}
-          rows="12"
-          placeholder="Write as much as you like — blank lines split paragraphs; readers see each paragraph rise in as they scroll."
-        ></textarea>
-      </label>
+        <RichTextEditor
+          value={meta.foreword}
+          onChange={(html) => (meta.foreword = html)}
+          placeholder="Write as much as you like — bold, italics, fonts, alignment. Readers see each block rise in as they scroll."
+        />
+      </div>
       <label class="we__field">
         <span class="mono">STATUS</span>
         <select bind:value={meta.status}>

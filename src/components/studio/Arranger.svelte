@@ -412,10 +412,20 @@
               {/if}
               {#each unit.pages as page (page.id)}
                 {@const rec = toPageRec(page)}
-                <button
+                <!-- NOT a <button>: svelte-dnd-action refuses to start drags
+                     from interactive elements, which made reordering impossible. -->
+                <div
                   class="arr__card"
                   class:is-selected={selected.includes(page.id)}
+                  role="button"
+                  tabindex="0"
                   onclick={() => toggleSelect(page.id)}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleSelect(page.id);
+                    }
+                  }}
                 >
                   <img src={rec.thumbUrl} alt={`Page ${pageNo(page)}`} loading="lazy" draggable="false" />
                   <span class="mono arr__num">{String(pageNo(page)).padStart(2, '0')}</span>
@@ -427,7 +437,7 @@
                   {#if page.note}
                     <span class="arr__noteDot" title="Has note"></span>
                   {/if}
-                </button>
+                </div>
               {/each}
               {#if split}
                 <span class="mono arr__splitWarn">PAIR SPLIT — READER PULLS THESE TOGETHER</span>

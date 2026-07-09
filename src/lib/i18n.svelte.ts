@@ -9,6 +9,7 @@ const STORAGE_KEY = 'pressroom:lang';
 const dict = {
   ja: {
     'lib.sub': '同人誌・校正刷り・欄外の注 — 綴じたままのかたちで。',
+    'lib.devnote': '※ 本サイトは開発中です — 校正・確認用の公開です。',
     'lib.loading': '校正刷りを取得中…',
     'lib.empty': 'まだ何も刷られていません',
     'lib.offline': '印刷所オフライン',
@@ -45,6 +46,7 @@ const dict = {
   },
   en: {
     'lib.sub': 'Doujinshi, proofs & margin notes — read them the way they were bound.',
+    'lib.devnote': '※ THIS SITE IS UNDER DEVELOPMENT — PUBLISHED FOR PROOFREADING & CHECKING.',
     'lib.loading': 'PULLING PROOFS…',
     'lib.empty': 'NOTHING ON THE PRESS YET',
     'lib.offline': 'PRESS OFFLINE',

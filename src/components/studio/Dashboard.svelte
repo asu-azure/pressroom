@@ -78,6 +78,7 @@
 <div class="dash">
   <header class="dash__head">
     <div>
+      <a class="mono dash__site" href="/">← LIBRARY</a>
       <p class="mono">ASU AZURE · STUDIO</p>
       <h1 class="serif dash__title">Pressroom desk</h1>
     </div>
@@ -144,6 +145,14 @@
   .dash__title {
     font-size: clamp(2rem, 5vw, 3rem);
     margin-top: 0.4rem;
+  }
+  .dash__site {
+    display: inline-block;
+    margin-bottom: 0.9rem;
+    color: var(--fg-faint);
+  }
+  .dash__site:hover {
+    color: var(--accent);
   }
   .dash__signout,
   .dash__pub,

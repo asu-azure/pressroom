@@ -6,6 +6,7 @@
   import { sortedChapters } from '../../lib/chapterOrder';
   import { loadProgress } from '../../lib/persistence';
   import { decode } from '../../scripts/text';
+  import { toRichHtml } from '../../lib/richtext';
   import { i18n } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import type { Work, PageRec, Chapter } from '../../lib/types';
@@ -40,12 +41,7 @@
       }))
       .filter((c) => c.pages.length > 0),
   );
-  const paragraphs = $derived(
-    (work?.foreword ?? '')
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter(Boolean),
-  );
+  const forewordHtml = $derived(work ? toRichHtml(work.foreword) : '');
   const statusKey = $derived(
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
@@ -106,6 +102,36 @@
     decode(node, text, 900);
   }
 
+  /** Reveal each rendered rich-text block as it scrolls in (reversible). */
+  function revealChildren(node: HTMLElement) {
+    if (reduced) return;
+    const tweens = [...node.children].map((child) =>
+      gsap.fromTo(
+        child,
+        { opacity: 0, y: 30 },
+        {
+          opacity: 1,
+          y: 0,
+          duration: 0.85,
+          ease: 'power3.out',
+          scrollTrigger: {
+            trigger: child,
+            start: 'top 90%',
+            toggleActions: 'play none none reverse',
+          },
+        },
+      ),
+    );
+    return {
+      destroy() {
+        for (const t of tweens) {
+          t.scrollTrigger?.kill();
+          t.kill();
+        }
+      },
+    };
+  }
+
   const readHref = $derived(`/w/${slug}/read`);
   const continueHref = $derived(
     continueAt ? `/w/${slug}/read?p=${encodeURIComponent(continueAt)}` : readHref,
@@ -113,6 +139,10 @@
 </script>
 
 <LangBar />
+
+{#if status === 'ready'}
+  <a class="ov-backchip mono" href="/" data-magnetic>← {i18n.t('rd.library')}</a>
+{/if}
 
 {#if status === 'loading'}
   <div class="ov-status spread spread--ink"><p class="mono">{i18n.t('lib.loading')}</p></div>
@@ -165,7 +195,7 @@
   </section>
 
   <!-- ACT II: foreword — the buffer leaf between cover and content (paper) -->
-  {#if paragraphs.length}
+  {#if forewordHtml}
     <section class="ov-fore spread spread--paper">
       <div class="paper-grid" aria-hidden="true"></div>
       <div class="crop crop--tl" aria-hidden="true"></div>
@@ -175,13 +205,11 @@
       <div class="regmark ov-fore__reg" aria-hidden="true"></div>
       <div class="ov-fore__inner">
         <p class="mono ov-fore__label" use:reveal>✳ {i18n.t('ov.foreword')}</p>
-        <div class="ov-fore__body">
-          {#each paragraphs as para, i (i)}
-            <p class="serif ov-fore__para" use:reveal={{ y: 30, delay: 0.05 }}>{para}</p>
-          {/each}
+        <div class="ov-fore__body serif" use:revealChildren>
+          {@html forewordHtml}
         </div>
         <div class="ov-fore__sig">
-          <span class="hanko" aria-hidden="true">亜</span>
+          <span class="sig-mark serif" aria-hidden="true">A</span>
           <span class="mono">ASU AZURE</span>
         </div>
       </div>
@@ -411,16 +439,59 @@
     display: grid;
     gap: 1.4rem;
   }
-  .ov-fore__para {
+  .ov-fore__body {
     font-size: clamp(1.02rem, 1.5vw, 1.18rem);
     line-height: 2;
-    white-space: pre-wrap;
+  }
+  .ov-fore__body :global(p) {
+    margin: 0 0 1.2em;
+  }
+  .ov-fore__body :global(h1),
+  .ov-fore__body :global(h2),
+  .ov-fore__body :global(h3),
+  .ov-fore__body :global(h4) {
+    font-family: var(--font-serif);
+    line-height: 1.35;
+    margin: 1.2em 0 0.5em;
+  }
+  .ov-fore__body :global(blockquote) {
+    border-left: 2px solid var(--accent);
+    padding-left: 1.1em;
+    color: var(--paper-fg-dim);
+    margin: 1.2em 0;
   }
   .ov-fore__sig {
     display: flex;
     align-items: center;
     gap: 1rem;
     margin-top: 0.6rem;
+  }
+  .sig-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 2.6rem;
+    aspect-ratio: 1;
+    background: var(--accent);
+    color: var(--ink-fg);
+    font-style: italic;
+    font-size: 1.5rem;
+    border-radius: 8px;
+    rotate: -4deg;
+    box-shadow: 0 4px 18px -8px rgba(39, 66, 240, 0.6);
+    user-select: none;
+  }
+  .ov-backchip {
+    position: fixed;
+    top: calc(0.9rem + env(safe-area-inset-top));
+    left: var(--pad);
+    z-index: 90;
+    mix-blend-mode: difference;
+    color: #fff;
+    opacity: 0.65;
+    transition: opacity 0.25s var(--ease);
+  }
+  .ov-backchip:hover {
+    opacity: 1;
   }
 
   /* ---- contents ---- */

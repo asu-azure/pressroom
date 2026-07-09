@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Work, ReaderSettings, Sheet, ChapterMark } from '../../lib/types';
   import { i18n } from '../../lib/i18n.svelte';
-  import NoteMargin from './NoteMargin.svelte';
 
   let {
     work,
@@ -30,17 +29,13 @@
   } = $props();
 
   let panelOpen = $state(false);
-  let noteOpen = $state(false);
   let tocOpen = $state(false);
 
   export function togglePanel() {
     panelOpen = !panelOpen;
   }
 
-  // Close the mobile note sheet when moving to a sheet without a note.
-  $effect(() => {
-    if (!hasNote) noteOpen = false;
-  });
+  const rtl = $derived(work.direction === 'rtl');
 
   function fullscreen() {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -53,9 +48,7 @@
   <span class="mono rc-top__title">{work.title}</span>
   <div class="rc-top__actions">
     {#if hasNote}
-      <button class="mono rc-btn rc-btn--note" onclick={() => (noteOpen = !noteOpen)}>
-        ✳ {i18n.t('rd.note')}
-      </button>
+      <span class="mono rc-noteflag" aria-hidden="true">✳ {i18n.t('rd.note')}</span>
     {/if}
     {#if chapterMarks.length}
       <button
@@ -81,17 +74,18 @@
       {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       {#if currentChapter}<span class="rc-bottom__ch">· {currentChapter}</span>{/if}
     </span>
-    <span class="rc-bottom__dir">{work.direction === 'rtl' ? '◀ RTL' : 'LTR ▶'}</span>
+    <span class="rc-bottom__dir">{rtl ? '◀ RTL' : 'LTR ▶'}</span>
   </span>
+  <!-- RTL books fill the bar right→left so it moves the way the pages do -->
   <div class="rc-bottom__bar">
     <div
       class="rc-bottom__fill"
-      style={`transform: scaleX(${total > 1 ? cur / (total - 1) : 1})`}
+      style={`transform: scaleX(${total > 1 ? cur / (total - 1) : 1}); transform-origin: ${rtl ? 'right' : 'left'} center`}
     ></div>
     {#each chapterMarks as mark (mark.id)}
       <span
         class="rc-bottom__tick"
-        style={`left: ${total > 1 ? (mark.sheet / (total - 1)) * 100 : 0}%`}
+        style={`${rtl ? 'right' : 'left'}: ${total > 1 ? (mark.sheet / (total - 1)) * 100 : 0}%`}
         title={mark.title}
       ></span>
     {/each}
@@ -165,15 +159,6 @@
   </div>
 {/if}
 
-{#if noteOpen && currentSheet}
-  <div class="rc-note">
-    <button class="rc-note__scrim" aria-label="Close note" onclick={() => (noteOpen = false)}></button>
-    <div class="rc-note__body">
-      <div class="rc-note__grip" aria-hidden="true"></div>
-      <NoteMargin sheet={currentSheet} {pageNumberOf} variant="sheet" />
-    </div>
-  </div>
-{/if}
 
 <style>
   .rc-top {
@@ -222,9 +207,10 @@
     color: var(--fg);
     border-color: var(--accent);
   }
-  .rc-btn--note {
+  .rc-noteflag {
+    align-self: center;
     color: #e8a31a;
-    border-color: rgba(232, 163, 26, 0.5);
+    font-size: 0.6rem;
   }
   .rc-bottom {
     position: fixed;
@@ -383,42 +369,5 @@
   .rc-toc__title {
     font-size: 1.05rem;
     line-height: 1.25;
-  }
-  .rc-note {
-    position: fixed;
-    inset: 0;
-    z-index: 60;
-    display: grid;
-    align-items: end;
-  }
-  .rc-note__scrim {
-    position: absolute;
-    inset: 0;
-    background: rgba(8, 8, 10, 0.55);
-    border: 0;
-    cursor: pointer;
-  }
-  .rc-note__body {
-    position: relative;
-    max-height: 55svh;
-    overflow-y: auto;
-    background: var(--ink-bg-soft);
-    border-top: 1px solid var(--line-strong);
-    padding: 1rem var(--pad) calc(1.6rem + env(safe-area-inset-bottom));
-  }
-  .rc-note__grip {
-    width: 2.4rem;
-    height: 3px;
-    margin: 0 auto 1rem;
-    background: var(--line-strong);
-  }
-  @media (min-width: 1150px) {
-    /* Desktop already shows margin notes in the gutter (scroll) or panel; the
-       bottom sheet stays available for flip mode. */
-    .rc-note__body {
-      max-width: 34rem;
-      margin-left: auto;
-      border-left: 1px solid var(--line-strong);
-    }
   }
 </style>

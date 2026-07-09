@@ -8,6 +8,7 @@
   import ScrollSurface from './ScrollSurface.svelte';
   import FlipSurface from './FlipSurface.svelte';
   import ReaderChrome from './ReaderChrome.svelte';
+  import NoteRail from './NoteRail.svelte';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
@@ -208,6 +209,9 @@
         />
       {/if}
     {/key}
+    {#if hasNote && currentSheet}
+      <NoteRail sheet={currentSheet} mode={settings.mode} {pageNumberOf} />
+    {/if}
     <ReaderChrome
       bind:this={chrome}
       {work}

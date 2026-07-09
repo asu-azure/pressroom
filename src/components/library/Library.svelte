@@ -26,11 +26,13 @@
     void load();
   });
 
-  // The hero sub-line lives in the static Astro shell — swap it on language
-  // change (same data-i18n spirit as the art site).
+  // Hero text lives in the static Astro shell — swap it on language change
+  // (same data-i18n spirit as the art site).
   $effect(() => {
     const sub = document.getElementById('lib-sub');
     if (sub) sub.textContent = i18n.t('lib.sub');
+    const dev = document.getElementById('lib-devnote');
+    if (dev) dev.textContent = i18n.t('lib.devnote');
   });
 
   /** Reversible scroll entrance for each card (Editorial FUI house rule). */
