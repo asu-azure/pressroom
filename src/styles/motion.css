@@ -1,0 +1,257 @@
+/* ============================================================================
+   editorial-fui-motion · motion.css
+   Copy-paste CSS techniques harvested from three projects (art site, DS
+   portfolio, Oresama-sensei). Framework-agnostic — works in Astro, Next, plain
+   HTML. Pair the scroll/JS-driven ones with assets/*.ts (kinetic, text, gallery,
+   displacement). Everything here is GPU-safe (transform/opacity/filter) and has
+   a prefers-reduced-motion fallback at the bottom.
+   ============================================================================ */
+
+:root {
+  --accent: #2742f0;                 /* one cobalt "azure" accent, reads on dark+light */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --flow-grad: linear-gradient(100deg, #2742f0, #18c4d6, #6aa0ff, #e8a31a, #2742f0);
+}
+
+/* ---- 1. Signature spreads: a section flips its own ink/paper tone ----------
+   Make sections full-bleed (padding, not max-width) so tone blocks span edge to
+   edge. Child CSS should reference the semantic vars, never hardcoded hex. */
+.spread { transition: background-color .6s var(--ease), color .6s var(--ease); }
+.spread--ink   { --bg:#0c0c0d; --fg:#f4f1ea; --fg-dim:#9a968c; --fg-faint:#57544c; --line:rgba(244,241,234,.10); --line-strong:rgba(244,241,234,.22); background:var(--bg); color:var(--fg); }
+.spread--paper { --bg:#e9e4d8; --fg:#16140f; --fg-dim:#5f5a4e; --fg-faint:#a8a08e; --line:rgba(22,20,15,.14);  --line-strong:rgba(22,20,15,.30);  background:var(--bg); color:var(--fg); }
+
+/* ---- 2. Mask-reveal: a line of text rises out from behind a clip -----------
+   Wrap each line: <span class="reveal-mask"><span>Text</span></span>
+   then GSAP: gsap.to('.reveal-mask > span', { yPercent: 0 }) from a 110% start.
+   NOTE: overflow:hidden clips BOTH axes — keep each word/line shorter than its
+   box or it gets cropped horizontally. For unpredictable single long words use
+   the per-character assemble() in kinetic.ts instead. */
+.reveal-mask { display: block; overflow: hidden; }
+.reveal-mask > * { display: block; will-change: transform; }
+
+/* ---- 3. Sweeping highlight box (emphasis) ---------------------------------
+   A gradient box wipes across a phrase on first view. Toggle .is-on via
+   ScrollTrigger. background-size animates so the text stays crisp on top. */
+.hl { --grad: linear-gradient(90deg,#2742f0,#6aa0ff); --hl-on:#fff;
+  padding:.02em .28em; background-image:var(--grad); background-repeat:no-repeat;
+  background-size:0% 100%; background-position:left center;
+  box-decoration-break:clone; -webkit-box-decoration-break:clone;
+  transition: background-size .7s var(--ease), color .3s .2s var(--ease); }
+.hl.is-on { background-size:100% 100%; color:var(--hl-on); }
+.hl--cyan  { --grad: linear-gradient(90deg,#2742f0,#18c4d6); }
+.hl--amber { --grad: linear-gradient(90deg,#d9930f,#ffd666); --hl-on:#1a1407; }
+
+/* ---- 4. Gradient underline that draws + shimmers (gline) -------------------
+   <span class="gline gline--blue"></span> under a heading; toggle .is-on. */
+.gline { display:block; height:3px; width:clamp(64px,16vw,180px); transform:scaleX(0);
+  transform-origin:left; transition:transform .9s var(--ease); background-size:200% 100%; }
+.gline.is-on { transform:scaleX(1); animation:shimmer 3.6s linear infinite; }
+.gline--blue { background:linear-gradient(90deg,#2742f0,#6aa0ff); }
+.gline--mix  { background:linear-gradient(90deg,#2742f0,#18c4d6,#e8a31a); }
+
+/* ---- 5. Flowing-gradient text (display words only, never body) ------------- */
+.flow-text { background:var(--flow-grad); background-size:280% 100%;
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  -webkit-text-fill-color:transparent; animation:flow 9s linear infinite; }
+
+/* ---- 6. Geometry MASKS: shapes drift and invert what's under them ----------
+   mix-blend-mode:difference makes a colored rect/circle recolor whatever it
+   passes over. Put shapes in a .geo layer (overflow:hidden) so they're clipped
+   to the section while content sits at a higher z-index. */
+.geo { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:1; }
+.geo__shape { position:absolute; mix-blend-mode:difference; will-change:transform; opacity:.85; }
+.geo__rect   { background:var(--accent); border-radius:6px; }
+.geo__circle { background:#18c4d6; border-radius:50%; }
+@keyframes drift-a { 0%,100%{transform:translate3d(0,0,0) rotate(0)} 50%{transform:translate3d(-4vw,3vh,0) rotate(24deg)} }
+@keyframes drift-b { 0%,100%{transform:translate3d(0,0,0) rotate(0)} 50%{transform:translate3d(3.5vw,-2.5vh,0) rotate(-18deg)} }
+
+/* Mouse-follow difference spotlight (DS portfolio): one circle, blend difference,
+   moved with gsap.quickTo on pointermove — inverts whatever it hovers. */
+.spotlight { position:fixed; width:26vmin; height:26vmin; border-radius:50%;
+  background:radial-gradient(circle,#fff 0%,#fff 42%,rgba(255,255,255,.35) 68%,transparent 78%);
+  mix-blend-mode:difference; pointer-events:none; transform:translate(-50%,-50%); z-index:40; }
+
+/* ---- 7. RGB chromatic divider line ---------------------------------------- */
+.rgb-line { position:relative; height:2px; background:currentColor; opacity:.9; }
+.rgb-line::before, .rgb-line::after { content:''; position:absolute; inset:0; mix-blend-mode:screen; }
+.rgb-line::before { background:#18c4d6; animation:rgb-jit 3.2s ease-in-out infinite; }
+.rgb-line::after  { background:#ff3d8b; animation:rgb-jit 3.2s ease-in-out infinite reverse; }
+@keyframes rgb-jit { 0%,100%{transform:translateX(-2px)} 50%{transform:translateX(2px)} }
+
+/* ---- 8. Glitch-in: RGB-split + clip-path slice text reveal (Oresama) -------
+   Add the .glitch-in class when a card/word reveals. text-shadow drives the
+   chromatic split; clip-path slices for a digital "tearing" settle. */
+.glitch-in { animation: glitch-in .42s steps(2,end) both; }
+@keyframes glitch-in {
+  0%   { opacity:0; transform:translate3d(-9px,0,0); text-shadow:5px 0 #ff3366,-5px 0 #00bcd4; clip-path:inset(0 0 62% 0); }
+  10%  { opacity:1; transform:translate3d(9px,0,0);  text-shadow:-7px 0 #ff3366,7px 0 #00bcd4; clip-path:inset(58% 0 0 0); }
+  34%  { transform:translate3d(6px,0,0); text-shadow:-5px 0 #ff3366,5px 0 #00bcd4; clip-path:inset(46% 0 8% 0); }
+  62%  { opacity:1; transform:translate3d(3px,0,0); text-shadow:2px 0 #ff3366,-2px 0 #00bcd4; }
+  100% { opacity:1; transform:translate3d(0,0,0); text-shadow:none; clip-path:inset(0 0 0 0); }
+}
+
+/* ---- 9. Skewed blurred light-bar sweep across a card/title (Oresama) -------
+   <div class="sweep"></div> as an absolute cover; fires once. */
+.sweep { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:5; }
+.sweep::before { content:''; position:absolute; top:-12%; bottom:-12%; width:42%; left:-55%;
+  transform:skewX(-16deg); filter:blur(3px);
+  background:linear-gradient(90deg,transparent 0%,
+    color-mix(in srgb,#00bcd4 75%,transparent) 35%,#fff 50%,
+    color-mix(in srgb,#ff3366 75%,transparent) 65%,transparent 100%);
+  animation:sweep .45s ease-out both; }
+@keyframes sweep { 0%{left:-55%;opacity:0} 18%{opacity:.9} 100%{left:115%;opacity:0} }
+
+/* ---- 10. Pop-art utilities (Oresama): sticker card, rainbow rule, halftone -- */
+.pop-card { border:2px solid var(--accent); box-shadow:6px 6px 0 0 var(--accent);
+  transition:transform .12s ease, box-shadow .12s ease; }
+.pop-card:hover  { transform:translate(-1px,-1px); box-shadow:8px 8px 0 0 var(--accent); }
+.pop-card:active { transform:translate(3px,3px);   box-shadow:2px 2px 0 0 var(--accent); }
+.pop-divider { height:4px; border:0; border-radius:9999px;
+  background:linear-gradient(90deg,#ff3366,#ffd600 25%,#16a34a 50%,#00bcd4 75%,#a855f7 100%); }
+.halftone { background-image:radial-gradient(currentColor 1.5px,transparent 1.6px); background-size:12px 12px; }
+
+/* ---- 11. Azure bokeh glow blobs (atmosphere) ------------------------------- */
+.bokeh { position:absolute; border-radius:50%; filter:blur(8px); pointer-events:none; }
+.bokeh--azure { background:radial-gradient(circle,rgba(39,66,240,.30),transparent 70%); }
+.bokeh--cyan  { background:radial-gradient(circle,rgba(24,196,214,.22),transparent 70%); }
+@keyframes bokeh-drift { 0%,100%{transform:translate3d(0,0,0)} 33%{transform:translate3d(2.5vw,-1.6vh,0)} 66%{transform:translate3d(-1.8vw,1.4vh,0)} }
+
+/* ---- shared keyframes ----------------------------------------------------- */
+@keyframes flow      { to { background-position:280% 50%; } }
+@keyframes shimmer   { 0%{background-position:-150% 0} 100%{background-position:250% 0} }
+@keyframes pulse-glow{ 0%,100%{filter:drop-shadow(0 0 0 transparent)} 50%{filter:drop-shadow(0 0 4px var(--accent))} }
+
+/* ---- reduced motion: always provide a static, legible fallback ------------ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation:none !important; transition:none !important; }
+  .flow-text { -webkit-text-fill-color:currentColor; color:var(--fg); background:none; }
+  .hl, .gline { background-size:100% 100% !important; }
+  .gline { transform:scaleX(1); }
+}
+
+/* ⚠ BUILD GOTCHA (Tailwind v4 / Lightning CSS): @keyframes only referenced via
+   INLINE styles in JS get tree-shaken out and animations silently die. Keep a
+   never-rendered rule listing every such name to mark them "used":
+   .keep-keyframes-alive { animation-name: drift-a, drift-b, bokeh-drift, sweep; } */
+
+/* ============================================================
+   PASS 2 — niconico-MV act techniques
+   selection-invert sweep, pillarbox + staggered side letters,
+   sweep-in clip reveals, drawn-geometry styling, blueprint grid,
+   invert-blend scatter shards. Pair with select.ts + draw.ts.
+   ============================================================ */
+
+/* Selection-invert sweep box (drag-to-select look). SOLID ink fill behind cream text —
+   a pseudo (::before, not a child) sweeps L→R via --sw (set by select.ts) and holds as a
+   box. ::before (not a child) survives i18n textContent swaps.
+   ⚠ PASS-3 CHANGE: this used to be a white `mix-blend-mode:difference` ::after, but over a
+   colored heading (cobalt) the difference blend produced an ugly yellow. A SOLID fill behind
+   the text (z-index:-1) gives the exact "selected text" look with EXACT colors — no blend, no
+   surprise hues. Use solid-fill (not difference) whenever the text under it is colored. */
+.selsweep { position: relative; display: inline-block; z-index: 0; --sw: 0; color: #f4f1ea; }
+.selsweep::before {
+  content: ''; position: absolute; inset: 0.04em -0.24em 0.08em;
+  background: #0b0b0d;
+  transform: scaleX(var(--sw, 0)); transform-origin: left center;
+  pointer-events: none; z-index: -1;
+}
+
+/* Pillarbox bars (left/right cinematic black bars; width via --pbr 0→1 scrub) */
+.pillarbox__bar { position: absolute; top: 0; bottom: 0; width: calc(var(--pb-w, 12vw) * var(--pbr, 1)); background: #000; z-index: 3; pointer-events: none; }
+.pillarbox__bar--left { left: 0; } .pillarbox__bar--right { right: 0; }
+
+/* Staggered side letters (non-aligned baselines via nth-child nudges) */
+.sidecol { position: absolute; top: 0; bottom: 0; width: var(--pb-w, 12vw); z-index: 5; display: flex; flex-direction: column; justify-content: center; gap: 1.2rem; pointer-events: none; color: #f4f1ea; }
+.sidecol--left { left: 0; align-items: flex-start; } .sidecol--right { right: 0; align-items: flex-end; text-align: right; }
+.sidecol__item:nth-child(3n+1) { transform: translateY(-1.4em); }
+.sidecol__item:nth-child(3n+2) { transform: translateY(0.9em); }
+.sidecol__item:nth-child(3n)   { transform: translateY(-0.3em); }
+.sidecol__item--v { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.22em; }
+
+/* Sweep-in clip reveal (toggle .is-revealed on enter; draw.ts handles batching) */
+.sweep-in { clip-path: inset(0 100% 0 0); transition: clip-path 0.7s cubic-bezier(0.22,1,0.36,1); }
+.sweep-in.is-revealed { clip-path: inset(0 0 0 0); }
+.sweep-in--down { clip-path: inset(0 0 100% 0); } .sweep-in--up { clip-path: inset(100% 0 0 0); }
+.sweep-in--down.is-revealed, .sweep-in--up.is-revealed { clip-path: inset(0 0 0 0); }
+
+/* Drawn geometry overlay — DrawSVG strokes (draw.ts animates [data-draw] 0→100%) */
+.draw-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; overflow: visible; }
+.draw-svg [data-draw] { fill: none; stroke: #2742f0; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.draw-svg [data-draw].is-ink { stroke: rgba(244,241,234,0.7); }
+.draw-svg [data-draw].is-red { stroke: #ff3d4d; }
+
+/* Visible blueprint grid overlay (above a photo backdrop, below content) */
+.act__grid { position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background-image: linear-gradient(rgba(244,241,234,0.13) 1px, transparent 1px), linear-gradient(90deg, rgba(244,241,234,0.13) 1px, transparent 1px);
+  background-size: clamp(40px,6vw,80px) clamp(40px,6vw,80px);
+  mask-image: linear-gradient(180deg, transparent, #000 28%, #000 72%, transparent); }
+.act__grid--blue { background-image: linear-gradient(rgba(39,66,240,0.22) 1px, transparent 1px), linear-gradient(90deg, rgba(39,66,240,0.22) 1px, transparent 1px); }
+
+/* Invert-blend scatter shards — white, invert whatever they pass over */
+.shard--glyph { color: #fff; mix-blend-mode: difference; }
+.shard--card  { background: #fff; mix-blend-mode: difference; }
+
+/* ============================================================
+   PASS 3 — alive, reversible, redesigned
+   ambient constellation, idle kinetic loops, channel-switch glitch,
+   editorial reveal-row gallery. Pair with ambient.ts + channel.ts.
+   Reversibility is JS-side (toggleActions/scrub) — see the modules.
+   ============================================================ */
+
+/* Ambient constellation canvas (ambient.ts appends it). Faint, behind content,
+   IntersectionObserver-paused offscreen. Sits at z-index 1 above the backdrop. */
+.constellation { position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.55; }
+
+/* Idle kinetic loops — small-amplitude CSS so sections read ALIVE, never busy.
+   Keep amplitude tiny; reduced-motion kills them below. */
+.node { animation: node-pulse 3.4s ease-in-out infinite; }
+@keyframes node-pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+.bracket { animation: bracket-breathe 4.5s ease-in-out infinite; }
+@keyframes bracket-breathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 0.9; } }
+
+/* Channel-switch backdrop (ACT I). Stack N <img> in .act__bg; channel.ts cycles their
+   opacity and toggles .is-glitching on the act for a glitch / RGB-split + scanline cut. */
+.act__bg img { transition: opacity 0.28s linear; }            /* channel-switch crossfade */
+#act-film .act__bg img:not(:first-child) { opacity: 0; }       /* first photo only until JS runs */
+.act.is-glitching .act__bg { animation: ch-glitch 0.34s steps(3, end) 1; }
+@keyframes ch-glitch {
+  0%   { transform: translate3d(0,0,0); filter: none; }
+  25%  { transform: translate3d(-7px,0,0); filter: drop-shadow(7px 0 rgba(255,45,120,0.85)) drop-shadow(-7px 0 rgba(24,196,214,0.85)); }
+  50%  { transform: translate3d(6px,0,0); filter: none; }
+  75%  { transform: translate3d(-3px,0,0); filter: drop-shadow(-6px 0 rgba(255,45,120,0.85)) drop-shadow(6px 0 rgba(24,196,214,0.85)); }
+  100% { transform: translate3d(0,0,0); filter: none; }
+}
+.channel-scan {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0;
+  mix-blend-mode: screen;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 3px);
+}
+.act.is-glitching .channel-scan { animation: scan-flick 0.34s steps(2) 1; }
+@keyframes scan-flick { 0% { opacity: 0; } 30% { opacity: 0.9; } 60% { opacity: 0.35; } 100% { opacity: 0; } }
+
+/* Editorial reveal-row gallery — alternating big image + index/medium/title. Each row's
+   image + meta carry [data-reveal] and mask in on scroll (reversible via toggleActions in JS).
+   Hover keeps the image zoom; pair with displacement.ts for the WebGL ripple on [data-art]. */
+.rows { position: relative; z-index: 2; display: grid; gap: clamp(3rem, 9vw, 7rem); }
+.row { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: clamp(1.5rem, 5vw, 4rem); align-items: center; }
+.row--rev { grid-template-columns: 0.85fr 1.15fr; }
+.row--rev .row__img { order: 2; }
+.row--rev .row__meta { order: 1; text-align: right; align-items: flex-end; }
+.row__img { position: relative; margin: 0; aspect-ratio: 4 / 5; overflow: hidden; border: 1px solid var(--line); background: var(--bg-soft); }
+.row__img img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.7s var(--ease); }
+.row__img:hover img { transform: scale(1.05); }
+.row__meta { display: flex; flex-direction: column; gap: 0.5rem; }
+.row__num { font-family: var(--font-serif); font-weight: 300; font-size: clamp(3rem, 9vw, 7rem); line-height: 0.8; color: var(--accent); }
+.row__title { font-size: clamp(1.6rem, 4vw, 3rem); line-height: 1.04; letter-spacing: -0.02em; max-width: 16ch; }
+@media (max-width: 760px) {
+  .row, .row--rev { grid-template-columns: 1fr; }
+  .row--rev .row__img { order: 0; }
+  .row--rev .row__meta { order: 0; text-align: left; align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sweep-in { clip-path: inset(0 0 0 0) !important; }
+  .selsweep { --sw: 1 !important; }
+  .node, .bracket { animation: none !important; }
+  /* channel-switch shows the first photo only — channel.ts returns early under reduced-motion */
+}

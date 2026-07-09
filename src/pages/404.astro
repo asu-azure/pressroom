@@ -1,0 +1,30 @@
+---
+import Base from '../layouts/Base.astro';
+
+export const prerender = true;
+---
+
+<Base title="404 — Pressroom">
+  <main class="spread spread--ink nf">
+    <p class="mono">REGISTRATION ERROR</p>
+    <h1 class="mega">404</h1>
+    <p class="serif nf__sub">This proof was never bound.</p>
+    <a class="mono nf__back" href="/" data-magnetic>← BACK TO THE LIBRARY</a>
+  </main>
+</Base>
+
+<style>
+  .nf {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1rem;
+    padding: var(--pad);
+  }
+  .nf__sub { color: var(--fg-dim); font-size: 1.1rem; }
+  .nf__back { margin-top: 1.5rem; display: inline-block; }
+  .nf__back:hover { color: var(--accent); }
+</style>

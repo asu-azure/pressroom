@@ -1,0 +1,61 @@
+---
+import Base from '../layouts/Base.astro';
+import Library from '../components/library/Library.svelte';
+
+export const prerender = true;
+---
+
+<Base>
+  <main class="spread spread--ink lib-shell">
+    <header class="lib-hero">
+      <p class="mono lib-hero__kicker">ASU AZURE · PRESSROOM</p>
+      <h1 class="mega lib-hero__title" data-vel>Press<span class="flow-text">room</span></h1>
+      <p class="serif lib-hero__sub">Doujinshi, proofs &amp; margin notes — read them the way they were bound.</p>
+      <div class="rgb-line" aria-hidden="true"></div>
+    </header>
+    <Library client:only="svelte" />
+    <footer class="lib-foot">
+      <span class="mono">© ASU AZURE</span>
+      <a class="mono" href="https://x.com/asukonpeki" data-magnetic>X — @ASUKONPEKI</a>
+    </footer>
+  </main>
+</Base>
+
+<style>
+  .lib-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+  }
+  .lib-hero {
+    padding: clamp(5rem, 14vh, 9rem) var(--pad) clamp(2rem, 5vh, 3.5rem);
+  }
+  .lib-hero__kicker { margin-bottom: 1.2rem; }
+  .lib-hero__title { color: var(--fg); }
+  .lib-hero__sub {
+    margin-top: 1.4rem;
+    max-width: 34em;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    color: var(--fg-dim);
+  }
+  .rgb-line {
+    margin-top: clamp(1.6rem, 4vh, 2.6rem);
+    height: 2px;
+    background: var(--accent);
+    position: relative;
+  }
+  .rgb-line::before, .rgb-line::after { content: ''; position: absolute; inset: 0; mix-blend-mode: screen; }
+  .rgb-line::before { background: #18c4d6; animation: rgb-jit 3.2s ease-in-out infinite; }
+  .rgb-line::after  { background: #ff3d8b; animation: rgb-jit 3.2s ease-in-out infinite reverse; }
+  .lib-foot {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: clamp(2rem, 5vh, 3rem) var(--pad);
+    border-top: 1px solid var(--line);
+  }
+  .lib-foot a:hover { color: var(--accent); }
+</style>

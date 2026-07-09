@@ -1,0 +1,52 @@
+/* Self-hosted, subsetted webfonts (replaces the Google Fonts <link>; the
+   Stack Sans / Prompt / Ekkamai / Royal Institute faces stay declared in
+   global.css). Latin faces carry broad Latin ranges so copy edits are safe;
+   the Noto JP faces are per-glyph subsets of the kanji that actually appear
+   in src/ — if new kanji are added (e.g. new JA dict copy), regenerate the
+   subsets (they fall back to system JP fonts until then).
+   Kanit + Anuphan were dropped: their tokens were never consumed. */
+
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/Fraunces-var.woff2') format('woff2');
+  font-weight: 300 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/Fraunces-Italic-var.woff2') format('woff2');
+  font-weight: 300 500;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/SpaceGrotesk-var.woff2') format('woff2');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-var.woff2') format('woff2');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Noto Sans JP';
+  src: url('/fonts/NotoSansJP-var.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}
+@font-face {
+  font-family: 'Noto Serif JP';
+  src: url('/fonts/NotoSerifJP-var.woff2') format('woff2');
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+3000-30FF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
+}

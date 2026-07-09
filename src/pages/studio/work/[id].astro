@@ -1,0 +1,21 @@
+---
+import Base from '../../../layouts/Base.astro';
+import WorkEditor from '../../../components/studio/WorkEditor.svelte';
+
+const { id } = Astro.params;
+---
+
+<Base title="Work editor — Pressroom">
+  <main class="spread spread--ink editor-shell">
+    <WorkEditor client:only="svelte" workId={id!} />
+  </main>
+</Base>
+
+<style>
+  .editor-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    padding: clamp(4rem, 10vh, 6rem) var(--pad) clamp(3rem, 8vh, 5rem);
+  }
+</style>

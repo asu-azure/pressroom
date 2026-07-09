@@ -1,0 +1,21 @@
+---
+import Base from '../../layouts/Base.astro';
+import Dashboard from '../../components/studio/Dashboard.svelte';
+
+export const prerender = true;
+---
+
+<Base title="Studio — Pressroom">
+  <main class="spread spread--ink studio-shell">
+    <Dashboard client:only="svelte" />
+  </main>
+</Base>
+
+<style>
+  .studio-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    padding: clamp(4rem, 10vh, 6rem) var(--pad) clamp(3rem, 8vh, 5rem);
+  }
+</style>

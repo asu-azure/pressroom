@@ -1,0 +1,23 @@
+---
+import Base from '../../layouts/Base.astro';
+import LoginForm from '../../components/studio/LoginForm.svelte';
+
+export const prerender = true;
+---
+
+<Base title="Sign in — Pressroom">
+  <main class="spread spread--ink login-shell">
+    <LoginForm client:only="svelte" />
+  </main>
+</Base>
+
+<style>
+  .login-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+    display: grid;
+    place-items: center;
+    padding: var(--pad);
+  }
+</style>
