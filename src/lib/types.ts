@@ -23,6 +23,7 @@ export interface Work {
   default_layout: Layout;
   default_mode: Mode;
   tags: string[];
+  foreword: string;
   cover_page_id: string | null;
   published: boolean;
   created_at: string;

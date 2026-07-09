@@ -19,6 +19,7 @@
     title: '',
     slug: '',
     description: '',
+    foreword: '',
     status: 'oneshot' as Work['status'],
     direction: 'rtl' as Work['direction'],
     default_layout: 'double' as Work['default_layout'],
@@ -57,6 +58,7 @@
       title: work.title,
       slug: work.slug,
       description: work.description,
+      foreword: work.foreword,
       status: work.status,
       direction: work.direction,
       default_layout: work.default_layout,
@@ -87,6 +89,7 @@
         title: meta.title.trim(),
         slug: meta.slug.trim(),
         description: meta.description,
+        foreword: meta.foreword,
         status: meta.status,
         direction: meta.direction,
         default_layout: meta.default_layout,
@@ -164,8 +167,16 @@
         <input type="text" bind:value={meta.slug} pattern="[a-z0-9\-]+" required />
       </label>
       <label class="we__field we__field--wide">
-        <span class="mono">DESCRIPTION</span>
-        <textarea bind:value={meta.description} rows="4"></textarea>
+        <span class="mono">DESCRIPTION (SHORT — SHOWN NEXT TO THE COVER)</span>
+        <textarea bind:value={meta.description} rows="3"></textarea>
+      </label>
+      <label class="we__field we__field--wide">
+        <span class="mono">FOREWORD / はじめに (LONG — ITS OWN PAGE BETWEEN COVER AND CONTENT)</span>
+        <textarea
+          bind:value={meta.foreword}
+          rows="12"
+          placeholder="Write as much as you like — blank lines split paragraphs; readers see each paragraph rise in as they scroll."
+        ></textarea>
       </label>
       <label class="we__field">
         <span class="mono">STATUS</span>

@@ -3,6 +3,7 @@
   import { toPageRec } from '../../lib/storagePaths';
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
+  import { i18n } from '../../lib/i18n.svelte';
   import { loadSettings, saveSettings, loadProgress, saveProgress } from '../../lib/persistence';
   import ScrollSurface from './ScrollSurface.svelte';
   import FlipSurface from './FlipSurface.svelte';
@@ -79,12 +80,13 @@
     pages = (rows ?? []).map(toPageRec);
     chapters = (chRows ?? []) as Chapter[];
 
-    // Resume at the last-read page (stored as pageId — survives reorders).
-    const savedPage = loadProgress(work.id);
-    if (savedPage) {
+    // Deep link (?p=pageId from the overview page) wins over saved progress.
+    const requested = new URLSearchParams(location.search).get('p');
+    const target = requested ?? loadProgress(work.id);
+    if (target) {
       const idx = sheetIndexOf(
         resolveSheets(pages, { layout: settings.layout, coverSolo: true }),
-        savedPage,
+        target,
       );
       if (idx > 0) cur = idx;
     }
@@ -173,16 +175,16 @@
 
 <div class="reader spread spread--ink">
   {#if status === 'loading'}
-    <p class="mono reader__status">PULLING THE PROOF…</p>
+    <p class="mono reader__status">{i18n.t('rd.loading')}</p>
   {:else if status === 'missing' || !work}
     <div class="reader__status">
-      <p class="mono">REGISTRATION ERROR — THIS PROOF WAS NEVER BOUND.</p>
-      <a class="mono reader__back" href="/">← BACK TO THE LIBRARY</a>
+      <p class="mono">{i18n.t('rd.missing')}</p>
+      <a class="mono reader__back" href="/">← {i18n.t('ov.back')}</a>
     </div>
   {:else if pages.length === 0}
     <div class="reader__status">
-      <p class="mono">NO PAGES IN THIS PROOF YET.</p>
-      <a class="mono reader__back" href="/">← BACK TO THE LIBRARY</a>
+      <p class="mono">{i18n.t('rd.noPages')}</p>
+      <a class="mono reader__back" href="/">← {i18n.t('ov.back')}</a>
     </div>
   {:else}
     {#key `${settings.mode}-${settings.layout}-${work.direction}`}

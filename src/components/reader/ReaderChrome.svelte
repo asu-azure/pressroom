@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Work, ReaderSettings, Sheet, ChapterMark } from '../../lib/types';
+  import { i18n } from '../../lib/i18n.svelte';
   import NoteMargin from './NoteMargin.svelte';
 
   let {
@@ -48,12 +49,12 @@
 </script>
 
 <header class="rc-top">
-  <a class="mono rc-top__back" href="/" data-hover>← LIBRARY</a>
+  <a class="mono rc-top__back" href={`/w/${work.slug}`} data-hover>← {i18n.t('rd.overview')}</a>
   <span class="mono rc-top__title">{work.title}</span>
   <div class="rc-top__actions">
     {#if hasNote}
       <button class="mono rc-btn rc-btn--note" onclick={() => (noteOpen = !noteOpen)}>
-        ✳ NOTE
+        ✳ {i18n.t('rd.note')}
       </button>
     {/if}
     {#if chapterMarks.length}
@@ -61,8 +62,8 @@
         class="mono rc-btn"
         class:is-active={tocOpen}
         onclick={() => (tocOpen = !tocOpen)}
-        title="Chapters"
-      >TOC</button>
+        title={i18n.t('rd.toc')}
+      >{i18n.t('rd.toc')}</button>
     {/if}
     <button class="mono rc-btn" onclick={fullscreen} title="Fullscreen (f)">⛶</button>
     <button
@@ -99,26 +100,33 @@
 
 {#if panelOpen}
   <div class="rc-panel">
-    <p class="mono rc-panel__head">READER SETTINGS</p>
+    <p class="mono rc-panel__head">{i18n.t('rd.settings')}</p>
     <div class="rc-panel__group">
-      <span class="mono rc-panel__label">LAYOUT</span>
+      <span class="mono rc-panel__label">{i18n.t('rd.layout')}</span>
       <div class="rc-panel__opts">
-        <button class="mono rc-opt" class:is-on={settings.layout === 'single'} onclick={() => onSettings({ layout: 'single' })}>SINGLE</button>
-        <button class="mono rc-opt" class:is-on={settings.layout === 'double'} onclick={() => onSettings({ layout: 'double' })}>SPREAD</button>
+        <button class="mono rc-opt" class:is-on={settings.layout === 'single'} onclick={() => onSettings({ layout: 'single' })}>{i18n.t('rd.single')}</button>
+        <button class="mono rc-opt" class:is-on={settings.layout === 'double'} onclick={() => onSettings({ layout: 'double' })}>{i18n.t('rd.spread')}</button>
       </div>
     </div>
     <div class="rc-panel__group">
-      <span class="mono rc-panel__label">MODE</span>
+      <span class="mono rc-panel__label">{i18n.t('rd.mode')}</span>
       <div class="rc-panel__opts">
-        <button class="mono rc-opt" class:is-on={settings.mode === 'flip'} onclick={() => onSettings({ mode: 'flip' })}>FLIP</button>
-        <button class="mono rc-opt" class:is-on={settings.mode === 'scroll'} onclick={() => onSettings({ mode: 'scroll' })}>SCROLL</button>
+        <button class="mono rc-opt" class:is-on={settings.mode === 'flip'} onclick={() => onSettings({ mode: 'flip' })}>{i18n.t('rd.flip')}</button>
+        <button class="mono rc-opt" class:is-on={settings.mode === 'scroll'} onclick={() => onSettings({ mode: 'scroll' })}>{i18n.t('rd.scroll')}</button>
       </div>
     </div>
     <div class="rc-panel__group">
-      <span class="mono rc-panel__label">FIT</span>
+      <span class="mono rc-panel__label">{i18n.t('rd.fit')}</span>
       <div class="rc-panel__opts">
-        <button class="mono rc-opt" class:is-on={settings.fit === 'height'} onclick={() => onSettings({ fit: 'height' })}>HEIGHT</button>
-        <button class="mono rc-opt" class:is-on={settings.fit === 'width'} onclick={() => onSettings({ fit: 'width' })}>WIDTH</button>
+        <button class="mono rc-opt" class:is-on={settings.fit === 'height'} onclick={() => onSettings({ fit: 'height' })}>{i18n.t('rd.fitHeight')}</button>
+        <button class="mono rc-opt" class:is-on={settings.fit === 'width'} onclick={() => onSettings({ fit: 'width' })}>{i18n.t('rd.fitWidth')}</button>
+      </div>
+    </div>
+    <div class="rc-panel__group">
+      <span class="mono rc-panel__label">{i18n.t('rd.lang')}</span>
+      <div class="rc-panel__opts">
+        <button class="mono rc-opt" class:is-on={i18n.lang === 'ja'} onclick={() => i18n.set('ja')}>日本語</button>
+        <button class="mono rc-opt" class:is-on={i18n.lang === 'en'} onclick={() => i18n.set('en')}>EN</button>
       </div>
     </div>
   </div>
@@ -128,7 +136,7 @@
   <div class="rc-toc">
     <button class="rc-toc__scrim" aria-label="Close chapters" onclick={() => (tocOpen = false)}></button>
     <nav class="rc-toc__body">
-      <p class="mono rc-toc__head">CHAPTERS</p>
+      <p class="mono rc-toc__head">{i18n.t('ov.chapters')}</p>
       <ul class="rc-toc__list">
         {#each chapterMarks as mark, i (mark.id)}
           <li>

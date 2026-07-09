@@ -29,6 +29,7 @@ create table works (
   default_layout text not null default 'double' check (default_layout in ('single','double')),
   default_mode   text not null default 'flip'   check (default_mode in ('scroll','flip')),
   tags           text[] not null default '{}',
+  foreword       text not null default '',  -- long-form intro on the overview page
   cover_page_id  uuid,  -- FK added after pages exists (circular reference)
   published      boolean not null default false,
   created_at     timestamptz not null default now(),

@@ -1,8 +1,17 @@
 <script lang="ts">
+  import { gsap } from 'gsap';
+  import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { supabase } from '../../lib/supabase';
   import { publicUrl } from '../../lib/storagePaths';
+  import { i18n } from '../../lib/i18n.svelte';
   import WorkCard from './WorkCard.svelte';
+  import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
+
+  gsap.registerPlugin(ScrollTrigger);
+  const reduced =
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   interface CardData {
     work: Work;
@@ -16,6 +25,36 @@
   $effect(() => {
     void load();
   });
+
+  // The hero sub-line lives in the static Astro shell — swap it on language
+  // change (same data-i18n spirit as the art site).
+  $effect(() => {
+    const sub = document.getElementById('lib-sub');
+    if (sub) sub.textContent = i18n.t('lib.sub');
+  });
+
+  /** Reversible scroll entrance for each card (Editorial FUI house rule). */
+  function rise(node: HTMLElement, index: number) {
+    if (reduced) return;
+    const tween = gsap.fromTo(
+      node,
+      { opacity: 0, y: 30 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.75,
+        ease: 'power3.out',
+        delay: (index % 4) * 0.06,
+        scrollTrigger: { trigger: node, start: 'top 92%', toggleActions: 'play none none reverse' },
+      },
+    );
+    return {
+      destroy() {
+        tween.scrollTrigger?.kill();
+        tween.kill();
+      },
+    };
+  }
 
   async function load() {
     const { data: works, error: err } = await supabase
@@ -51,17 +90,21 @@
   }
 </script>
 
+<LangBar />
+
 <section class="lib">
   {#if error}
-    <p class="mono lib__status">PRESS OFFLINE — {error}</p>
+    <p class="mono lib__status">{i18n.t('lib.offline')} — {error}</p>
   {:else if cards === null}
-    <p class="mono lib__status">PULLING PROOFS…</p>
+    <p class="mono lib__status">{i18n.t('lib.loading')}</p>
   {:else if cards.length === 0}
-    <p class="mono lib__status">NOTHING ON THE PRESS YET</p>
+    <p class="mono lib__status">{i18n.t('lib.empty')}</p>
   {:else}
     <div class="lib__grid">
       {#each cards as card, i (card.work.id)}
-        <WorkCard work={card.work} coverUrl={card.coverUrl} pageCount={card.pageCount} index={i} />
+        <div use:rise={i}>
+          <WorkCard work={card.work} coverUrl={card.coverUrl} pageCount={card.pageCount} index={i} />
+        </div>
       {/each}
     </div>
   {/if}

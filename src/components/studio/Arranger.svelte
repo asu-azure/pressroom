@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { dndzone, type DndEvent } from 'svelte-dnd-action';
   import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
   import { supabase } from '../../lib/supabase';
@@ -42,10 +43,15 @@
   let error = $state<string | null>(null);
   let busy = $state(false);
 
-  // Rebuild sections whenever the parent reloads pages/chapters.
+  // Rebuild sections whenever the parent reloads pages/chapters. The selected
+  // cleanup must not be tracked: reading AND writing `selected` here would
+  // retrigger the effect forever and freeze the page.
   $effect(() => {
     sections = buildSections(pages, chapters);
-    selected = selected.filter((id) => pages.some((p) => p.id === id));
+    untrack(() => {
+      const kept = selected.filter((id) => pages.some((p) => p.id === id));
+      if (kept.length !== selected.length) selected = kept;
+    });
   });
 
   function buildUnits(rows: PageRow[]): Unit[] {

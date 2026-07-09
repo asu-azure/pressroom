@@ -1,12 +1,21 @@
 ---
 import Base from '../../layouts/Base.astro';
-import Reader from '../../components/reader/Reader.svelte';
+import BookOverview from '../../components/overview/BookOverview.svelte';
 
 // Server-output shell: the slug is only passed into the island; all data is
 // fetched client-side with the anon key (public read via RLS).
 const { slug } = Astro.params;
 ---
 
-<Base title={`Reading — Pressroom`} chromeless>
-  <Reader client:only="svelte" slug={slug!} />
+<Base title="Pressroom — Asu Azure">
+  <main class="ov-shell">
+    <BookOverview client:only="svelte" slug={slug!} />
+  </main>
 </Base>
+
+<style>
+  .ov-shell {
+    position: relative;
+    z-index: 1;
+  }
+</style>

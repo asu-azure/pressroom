@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { i18n } from '../../lib/i18n.svelte';
   import type { Work } from '../../lib/types';
 
   let {
@@ -8,9 +9,7 @@
     index,
   }: { work: Work; coverUrl: string | null; pageCount: number; index: number } = $props();
 
-  const statusLabel = $derived(
-    { ongoing: 'ONGOING', complete: 'COMPLETE', oneshot: 'ONE-SHOT' }[work.status],
-  );
+  const statusLabel = $derived(i18n.t(`status.${work.status}`));
 </script>
 
 <a class="card tile" href={`/w/${work.slug}`} data-cursor="READ">
