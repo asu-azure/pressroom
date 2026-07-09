@@ -14,9 +14,14 @@ insert into storage.buckets (id, name, public)
 values ('pages', 'pages', true), ('originals', 'originals', false)
 on conflict (id) do nothing;
 
--- NOTE: no SELECT policy on the public bucket — public URL access doesn't
--- need one, and adding one would let clients LIST every file (including
--- draft pages). Supabase linter 0025.
+-- NOTE: no broad SELECT policy on the public bucket — public URL access
+-- doesn't need one, and it would let anyone LIST every file, including
+-- draft pages (Supabase linter 0025). The author DOES need SELECT: the
+-- upload upsert (INSERT ... ON CONFLICT) must read the conflicting row,
+-- or every upload fails with an RLS violation.
+create policy pages_storage_read_author on storage.objects for select
+  to authenticated
+  using (bucket_id = 'pages' and is_author());
 
 create policy pages_storage_ins on storage.objects for insert
   with check (bucket_id = 'pages' and is_author());
