@@ -4,7 +4,9 @@
   import Arranger from './Arranger.svelte';
   import PdfUploader from './PdfUploader.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
-  import type { Work, PageRow, Chapter } from '../../lib/types';
+  import type { Work, PageRow, Chapter, Character } from '../../lib/types';
+
+  const CAST_COLORS = ['#2742f0', '#e8a31a', '#18c4d6', '#d6455f', '#6aa0ff', '#4caf7d', '#b06ad6'];
 
   let { workId }: { workId: string } = $props();
 
@@ -26,7 +28,18 @@
     default_layout: 'double' as Work['default_layout'],
     default_mode: 'flip' as Work['default_mode'],
     tagsText: '',
+    characters: [] as Character[],
   });
+
+  function addCharacter() {
+    meta.characters = [
+      ...meta.characters,
+      { id: crypto.randomUUID(), name: '', color: CAST_COLORS[meta.characters.length % CAST_COLORS.length] },
+    ];
+  }
+  function removeCharacter(id: string) {
+    meta.characters = meta.characters.filter((c) => c.id !== id);
+  }
 
   $effect(() => {
     void init();
@@ -65,6 +78,7 @@
       default_layout: work.default_layout,
       default_mode: work.default_mode,
       tagsText: work.tags.join(', '),
+      characters: (work.characters ?? []).map((c) => ({ ...c })),
     };
   }
 
@@ -96,6 +110,9 @@
         default_layout: meta.default_layout,
         default_mode: meta.default_mode,
         tags: meta.tagsText.split(',').map((t) => t.trim()).filter(Boolean),
+        characters: meta.characters
+          .map((c) => ({ ...c, name: c.name.trim() }))
+          .filter((c) => c.name),
       })
       .eq('id', workId);
     if (err) {
@@ -149,6 +166,7 @@
           {workId}
           direction={work.direction}
           coverPageId={work.cover_page_id}
+          characters={work.characters ?? []}
           {chapters}
           {pages}
           onChanged={reload}
@@ -175,8 +193,9 @@
         <span class="mono">FOREWORD / はじめに (LONG — ITS OWN PAGE BETWEEN COVER AND CONTENT)</span>
         <RichTextEditor
           value={meta.foreword}
+          {workId}
           onChange={(html) => (meta.foreword = html)}
-          placeholder="Write as much as you like — bold, italics, fonts, alignment. Readers see each block rise in as they scroll."
+          placeholder="Write as much as you like — bold, italics, fonts, alignment, images. Readers see each block rise in as they scroll."
         />
       </div>
       <label class="we__field">
@@ -212,6 +231,19 @@
         <span class="mono">TAGS (COMMA-SEPARATED)</span>
         <input type="text" bind:value={meta.tagsText} placeholder="fantasy, one-shot, colour" />
       </label>
+      <div class="we__field we__field--wide">
+        <span class="mono">CAST (SPEAKERS FOR TRANSLATED BUBBLES — NAME + COLOUR)</span>
+        <div class="we__cast">
+          {#each meta.characters as ch (ch.id)}
+            <div class="we__castRow">
+              <input class="we__castColor" type="color" bind:value={ch.color} aria-label="Colour" />
+              <input class="we__castName" type="text" bind:value={ch.name} placeholder="Character name" />
+              <button type="button" class="mono we__castDel" onclick={() => removeCharacter(ch.id)} title="Remove">✕</button>
+            </div>
+          {/each}
+          <button type="button" class="mono we__castAdd" onclick={addCharacter}>+ ADD CHARACTER</button>
+        </div>
+      </div>
       <button class="we__save mono" type="submit">
         {savedFlash ? 'SAVED ✓' : 'SAVE META'}
       </button>
@@ -297,6 +329,50 @@
   .we__field textarea:focus {
     outline: none;
     border-color: var(--accent);
+  }
+  .we__cast {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .we__castRow {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .we__castColor {
+    width: 2.2rem;
+    height: 2.2rem;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-soft);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .we__castName {
+    flex: 1;
+  }
+  .we__castDel {
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--fg-dim);
+    padding: 0.5em 0.8em;
+    cursor: pointer;
+  }
+  .we__castDel:hover {
+    color: #e8a31a;
+    border-color: #e8a31a;
+  }
+  .we__castAdd {
+    justify-self: start;
+    background: none;
+    border: 1px dashed var(--line-strong);
+    color: var(--fg-dim);
+    padding: 0.6em 1em;
+    cursor: pointer;
+  }
+  .we__castAdd:hover {
+    color: var(--fg);
+    border-color: var(--fg-dim);
   }
   .we__save {
     grid-column: 1 / -1;

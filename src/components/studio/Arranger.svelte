@@ -6,12 +6,14 @@
   import { toPageRec } from '../../lib/storagePaths';
   import { sortedChapters, flattenPages } from '../../lib/chapterOrder';
   import NotePanel from './NotePanel.svelte';
-  import type { PageRow, Chapter, Direction } from '../../lib/types';
+  import BubbleEditor from './BubbleEditor.svelte';
+  import type { PageRow, Chapter, Direction, Character, Bubble } from '../../lib/types';
 
   let {
     workId,
     direction,
     coverPageId,
+    characters,
     chapters,
     pages,
     onChanged,
@@ -19,6 +21,7 @@
     workId: string;
     direction: Direction;
     coverPageId: string | null;
+    characters: Character[];
     chapters: Chapter[];
     pages: PageRow[];
     onChanged: () => void;
@@ -332,6 +335,14 @@
     onChanged();
   }
 
+  let bubblePage = $state<PageRow | null>(null);
+  async function saveBubbles(pageId: string, bubbles: Bubble[]) {
+    const { error: err } = await supabase.from('pages').update({ bubbles }).eq('id', pageId);
+    if (err) error = err.message;
+    bubblePage = null;
+    onChanged();
+  }
+
   const gridRtl = $derived(direction === 'rtl' && !viewLtr);
   const notePage = $derived(selectedPages.length === 1 ? selectedPages[0] : null);
 </script>
@@ -362,6 +373,9 @@
         </button>
         <button class="mono arr__btn" onclick={setChapterCover} disabled={!chapterCoverable}>
           CH. COVER
+        </button>
+        <button class="mono arr__btn" onclick={() => (bubblePage = selectedPages[0] ?? null)} disabled={selectedPages.length !== 1}>
+          ◫ TRANSLATE
         </button>
         <button class="mono arr__btn arr__btn--danger" onclick={removeSelected} disabled={!selectedPages.length}>
           DELETE
@@ -437,6 +451,9 @@
                   {#if page.note}
                     <span class="arr__noteDot" title="Has note"></span>
                   {/if}
+                  {#if page.bubbles?.length}
+                    <span class="mono arr__transDot" title="Has translations">T</span>
+                  {/if}
                 </div>
               {/each}
               {#if split}
@@ -461,6 +478,16 @@
     />
   {/if}
 </div>
+
+{#if bubblePage}
+  <BubbleEditor
+    page={toPageRec(bubblePage)}
+    pageNumber={pageNo(bubblePage)}
+    {characters}
+    onSave={(bubbles) => saveBubbles(bubblePage!.id, bubbles)}
+    onClose={() => (bubblePage = null)}
+  />
+{/if}
 
 <style>
   .arr {
@@ -637,6 +664,17 @@
     height: 7px;
     border-radius: 50%;
     background: #e8a31a;
+  }
+  .arr__transDot {
+    position: absolute;
+    top: 3px;
+    right: 14px;
+    font-size: 0.5rem;
+    line-height: 1;
+    padding: 0.15em 0.3em;
+    background: var(--accent);
+    color: var(--ink-fg);
+    direction: ltr;
   }
   .arr__splitWarn {
     position: absolute;

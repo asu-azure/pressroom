@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Sheet, Direction, FitMode } from '../../lib/types';
+  import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
   import NoteMargin from './NoteMargin.svelte';
 
@@ -11,6 +11,10 @@
     startIndex,
     pageNumberOf,
     onCurrent,
+    translateOn = false,
+    characters = [],
+    highlightId = null,
+    onHighlight,
   }: {
     sheets: Sheet[];
     direction: Direction;
@@ -18,6 +22,10 @@
     startIndex: number;
     pageNumberOf: (pageId: string) => number;
     onCurrent: (index: number) => void;
+    translateOn?: boolean;
+    characters?: Character[];
+    highlightId?: string | null;
+    onHighlight?: (id: string | null) => void;
   } = $props();
 
   let rows: HTMLElement[] = [];
@@ -80,12 +88,16 @@
             eager={i < 2}
             sizes={sheet.kind === 'spread' ? '(max-width: 760px) 50vw, 40vw' : '(max-width: 760px) 100vw, 62vw'}
             alt={`Page ${pageNumberOf(page.id)}`}
+            {translateOn}
+            {characters}
+            {highlightId}
+            {onHighlight}
           />
         {/each}
       </div>
       <aside class="ss__gutter">
         <div class="ss__gutterInner">
-          <NoteMargin {sheet} {pageNumberOf} variant="gutter" />
+          <NoteMargin {sheet} {pageNumberOf} variant="gutter" {translateOn} {characters} {highlightId} {onHighlight} />
         </div>
       </aside>
     </section>

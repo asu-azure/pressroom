@@ -16,6 +16,7 @@ function page(sortKey: string, spreadPairId: string | null = null): PageRec {
     medUrl: '',
     thumbUrl: '',
     note: null,
+    bubbles: [],
   };
 }
 

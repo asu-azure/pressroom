@@ -435,13 +435,17 @@
   .ov-fore__label {
     color: var(--accent);
   }
+  /* Block flow (not grid) so author figures can float and wrap text.
+     Blocks carry their own margins for rhythm. */
   .ov-fore__body {
-    display: grid;
-    gap: 1.4rem;
-  }
-  .ov-fore__body {
+    display: block;
     font-size: clamp(1.02rem, 1.5vw, 1.18rem);
     line-height: 2;
+  }
+  .ov-fore__body::after {
+    content: '';
+    display: block;
+    clear: both;
   }
   .ov-fore__body :global(p) {
     margin: 0 0 1.2em;
@@ -459,6 +463,55 @@
     padding-left: 1.1em;
     color: var(--paper-fg-dim);
     margin: 1.2em 0;
+  }
+  /* Author-inserted figures: text wraps around side floats (no overlap). Each
+     figure is a top-level child of .ov-fore__body, so revealChildren animates
+     it in on scroll for free. The grid parent would ignore float, so figures
+     opt out of the grid flow via display:block wrappers below. */
+  .ov-fore__body :global(figure.fore-fig) {
+    margin: 0.4em 0 1.2em;
+    padding: 0;
+  }
+  .ov-fore__body :global(.fore-fig--left) {
+    float: left;
+    width: 48%;
+    margin: 0.2rem 1.6rem 1rem 0;
+  }
+  .ov-fore__body :global(.fore-fig--right) {
+    float: right;
+    width: 48%;
+    margin: 0.2rem 0 1rem 1.6rem;
+  }
+  .ov-fore__body :global(.fore-fig--center) {
+    float: none;
+    margin: 1.6rem auto;
+  }
+  .ov-fore__body :global(.fore-fig--sm) { width: 30%; }
+  .ov-fore__body :global(.fore-fig--md) { width: 48%; }
+  .ov-fore__body :global(.fore-fig--lg) { width: 66%; }
+  .ov-fore__body :global(.fore-fig img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-soft);
+  }
+  .ov-fore__body :global(.fore-fig figcaption) {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    color: var(--paper-fg-dim, var(--fg-faint));
+    padding-top: 0.4rem;
+  }
+  @media (max-width: 640px) {
+    .ov-fore__body :global(figure.fore-fig),
+    .ov-fore__body :global(.fore-fig--sm),
+    .ov-fore__body :global(.fore-fig--md),
+    .ov-fore__body :global(.fore-fig--lg) {
+      float: none;
+      width: 100%;
+      margin: 1.2rem 0;
+    }
   }
   .ov-fore__sig {
     display: flex;

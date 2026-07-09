@@ -1,6 +1,6 @@
 <script lang="ts">
   import { gsap } from 'gsap';
-  import type { Sheet, Direction, FitMode } from '../../lib/types';
+  import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
 
   let {
@@ -10,6 +10,10 @@
     cur,
     pageNumberOf,
     onNavigate,
+    translateOn = false,
+    characters = [],
+    highlightId = null,
+    onHighlight,
   }: {
     sheets: Sheet[];
     direction: Direction;
@@ -17,6 +21,10 @@
     cur: number;
     pageNumberOf: (pageId: string) => number;
     onNavigate: (index: number) => void;
+    translateOn?: boolean;
+    characters?: Character[];
+    highlightId?: string | null;
+    onHighlight?: (id: string | null) => void;
   } = $props();
 
   // Direction sign: sheet i sits at x = i · width · s, so in RTL the story
@@ -64,6 +72,9 @@
 
   function onPointerDown(e: PointerEvent) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Let a translation hotspot own the gesture (hover/tap for its tooltip)
+    // instead of turning the page.
+    if ((e.target as HTMLElement).closest('[data-bub]')) return;
     dragging = true;
     startX = e.clientX;
     startT = performance.now();
@@ -143,6 +154,10 @@
               eager
               sizes={sheet.kind === 'spread' ? '50vw' : '100vw'}
               alt={`Page ${pageNumberOf(page.id)}`}
+              {translateOn}
+              {characters}
+              {highlightId}
+              {onHighlight}
             />
           {/each}
         </div>
@@ -202,5 +217,25 @@
   .is-fit-width .fs__pages :global(.si) {
     height: auto;
     width: min(100%, 62rem);
+  }
+
+  /* Phones / portrait: pinning the page height turned each page into a tall,
+     unreadable stripe (esp. spreads at max-width:50%). Size by WIDTH instead so
+     the full spread fits the screen width; tall pages scroll vertically. */
+  @media (max-width: 700px), (orientation: portrait) {
+    .fs__sheet:not(.is-fit-width) {
+      overflow-y: auto;
+      place-items: start center;
+    }
+    .fs__pages :global(.si) {
+      height: auto;
+      width: 100%;
+      max-width: 100%;
+    }
+    .fs__pages.is-spread :global(.si) {
+      width: 50%;
+      max-width: 50%;
+      height: auto;
+    }
   }
 </style>

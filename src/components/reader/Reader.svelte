@@ -17,15 +17,20 @@
   let pages = $state<PageRec[]>([]);
   let chapters = $state<Chapter[]>([]);
   let status = $state<'loading' | 'ready' | 'missing'>('loading');
-  let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height' });
+  let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height', translate: false });
   let cur = $state(0);
   let chrome = $state<ReaderChrome | null>(null);
+  let highlightId = $state<string | null>(null);
 
   const sheets = $derived(
     resolveSheets(pages, { layout: settings.layout, coverSolo: true }),
   );
   const currentSheet = $derived(sheets[cur] ?? null);
   const hasNote = $derived(Boolean(currentSheet?.pages.some((p) => p.note)));
+  const characters = $derived(work?.characters ?? []);
+  const anyBubbles = $derived(pages.some((p) => p.bubbles?.length));
+  const hasBubbles = $derived(Boolean(currentSheet?.pages.some((p) => p.bubbles?.length)));
+  const showRail = $derived(hasNote || (settings.translate && hasBubbles));
   const dirSign = $derived(work?.direction === 'rtl' ? -1 : 1);
 
   const pageOrder = $derived(
@@ -72,6 +77,7 @@
       layout: work.default_layout,
       mode: work.default_mode,
       fit: work.default_mode === 'flip' ? 'height' : 'width',
+      translate: false,
     });
 
     const [{ data: rows }, { data: chRows }] = await Promise.all([
@@ -197,6 +203,10 @@
           startIndex={cur}
           {pageNumberOf}
           onCurrent={setCur}
+          translateOn={settings.translate}
+          {characters}
+          {highlightId}
+          onHighlight={(id) => (highlightId = id)}
         />
       {:else}
         <FlipSurface
@@ -206,11 +216,23 @@
           {cur}
           {pageNumberOf}
           onNavigate={setCur}
+          translateOn={settings.translate}
+          {characters}
+          {highlightId}
+          onHighlight={(id) => (highlightId = id)}
         />
       {/if}
     {/key}
-    {#if hasNote && currentSheet}
-      <NoteRail sheet={currentSheet} mode={settings.mode} {pageNumberOf} />
+    {#if showRail && currentSheet}
+      <NoteRail
+        sheet={currentSheet}
+        mode={settings.mode}
+        {pageNumberOf}
+        translateOn={settings.translate}
+        {characters}
+        {highlightId}
+        onHighlight={(id) => (highlightId = id)}
+      />
     {/if}
     <ReaderChrome
       bind:this={chrome}
@@ -220,6 +242,7 @@
       total={sheets.length}
       {currentSheet}
       {hasNote}
+      hasBubbles={anyBubbles}
       {chapterMarks}
       {currentChapter}
       {pageNumberOf}

@@ -2,14 +2,24 @@
   import type { Sheet, Mode } from '../../lib/types';
   import NoteMargin from './NoteMargin.svelte';
 
+  import type { Character } from '../../lib/types';
+
   let {
     sheet,
     mode,
     pageNumberOf,
+    translateOn = false,
+    characters = [],
+    highlightId = null,
+    onHighlight,
   }: {
     sheet: Sheet;
     mode: Mode;
     pageNumberOf: (pageId: string) => number;
+    translateOn?: boolean;
+    characters?: Character[];
+    highlightId?: string | null;
+    onHighlight?: (id: string | null) => void;
   } = $props();
 </script>
 
@@ -22,7 +32,7 @@
 {#key sheet.pages[0].id}
   <aside class="rail" class:rail--flip={mode === 'flip'} class:rail--scroll={mode === 'scroll'}>
     <div class="rail__inner">
-      <NoteMargin {sheet} {pageNumberOf} variant="gutter" />
+      <NoteMargin {sheet} {pageNumberOf} variant="gutter" {translateOn} {characters} {highlightId} {onHighlight} />
     </div>
   </aside>
 {/key}

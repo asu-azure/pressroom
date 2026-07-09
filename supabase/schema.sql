@@ -30,6 +30,7 @@ create table works (
   default_mode   text not null default 'flip'   check (default_mode in ('scroll','flip')),
   tags           text[] not null default '{}',
   foreword       text not null default '',  -- long-form intro on the overview page
+  characters     jsonb not null default '[]'::jsonb,  -- reusable cast for bubble translations
   cover_page_id  uuid,  -- FK added after pages exists (circular reference)
   published      boolean not null default false,
   created_at     timestamptz not null default now(),
@@ -47,6 +48,7 @@ create table pages (
   med_path       text not null,
   thumb_path     text not null,
   note           text,            -- author margin note, readers see it
+  bubbles        jsonb not null default '[]'::jsonb,  -- translated speech bubbles (normalized rects)
   created_at     timestamptz not null default now(),
   unique (work_id, sort_key)
 );

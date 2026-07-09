@@ -4,6 +4,29 @@ export type Layout = 'single' | 'double';
 export type Mode = 'scroll' | 'flip';
 export type FitMode = 'height' | 'width';
 
+/** A named speaker in a work's cast — reused across every bubble. */
+export interface Character {
+  id: string;
+  name: string;
+  color: string; // hex accent, colour-codes the bubble + tooltip
+}
+
+/**
+ * One translated speech bubble on a page. Coordinates are normalized 0..1 of
+ * the page's intrinsic width/height, so they survive any resize/layout — the
+ * reader maps them straight onto the aspect-ratio-locked `.si` box.
+ */
+export interface Bubble {
+  id: string;
+  panel: number; // 1-based panel grouping — drives the side-list headings
+  charId: string | null; // → Work.characters[].id
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  text: string; // the translation
+}
+
 export interface Series {
   id: string;
   title: string;
@@ -24,6 +47,7 @@ export interface Work {
   default_mode: Mode;
   tags: string[];
   foreword: string;
+  characters: Character[];
   cover_page_id: string | null;
   published: boolean;
   created_at: string;
@@ -52,6 +76,7 @@ export interface PageRow {
   med_path: string;
   thumb_path: string;
   note: string | null;
+  bubbles: Bubble[];
   created_at: string;
 }
 
@@ -67,6 +92,7 @@ export interface PageRec {
   medUrl: string;
   thumbUrl: string;
   note: string | null;
+  bubbles: Bubble[];
 }
 
 export type Sheet =
@@ -77,6 +103,7 @@ export interface ReaderSettings {
   layout: Layout;
   mode: Mode;
   fit: FitMode;
+  translate: boolean;
 }
 
 /** A chapter's entry point in the resolved sheet list (reader TOC). */

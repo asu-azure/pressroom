@@ -9,6 +9,7 @@
     total,
     currentSheet,
     hasNote,
+    hasBubbles,
     chapterMarks,
     currentChapter,
     pageNumberOf,
@@ -21,6 +22,7 @@
     total: number;
     currentSheet: Sheet | null;
     hasNote: boolean;
+    hasBubbles: boolean;
     chapterMarks: ChapterMark[];
     currentChapter: string | null;
     pageNumberOf: (pageId: string) => number;
@@ -49,6 +51,9 @@
   <div class="rc-top__actions">
     {#if hasNote}
       <span class="mono rc-noteflag" aria-hidden="true">✳ {i18n.t('rd.note')}</span>
+    {/if}
+    {#if hasBubbles && settings.translate}
+      <span class="mono rc-transflag" aria-hidden="true">◫ {i18n.t('rd.translate')}</span>
     {/if}
     {#if chapterMarks.length}
       <button
@@ -116,6 +121,15 @@
         <button class="mono rc-opt" class:is-on={settings.fit === 'width'} onclick={() => onSettings({ fit: 'width' })}>{i18n.t('rd.fitWidth')}</button>
       </div>
     </div>
+    {#if hasBubbles}
+      <div class="rc-panel__group">
+        <span class="mono rc-panel__label">{i18n.t('rd.translate')}</span>
+        <div class="rc-panel__opts">
+          <button class="mono rc-opt" class:is-on={settings.translate} onclick={() => onSettings({ translate: true })}>{i18n.t('rd.on')}</button>
+          <button class="mono rc-opt" class:is-on={!settings.translate} onclick={() => onSettings({ translate: false })}>{i18n.t('rd.off')}</button>
+        </div>
+      </div>
+    {/if}
     <div class="rc-panel__group">
       <span class="mono rc-panel__label">{i18n.t('rd.lang')}</span>
       <div class="rc-panel__opts">
@@ -210,6 +224,11 @@
   .rc-noteflag {
     align-self: center;
     color: #e8a31a;
+    font-size: 0.6rem;
+  }
+  .rc-transflag {
+    align-self: center;
+    color: var(--accent);
     font-size: 0.6rem;
   }
   .rc-bottom {
