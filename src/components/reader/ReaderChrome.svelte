@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Work, ReaderSettings, Sheet } from '../../lib/types';
+  import type { Work, ReaderSettings, Sheet, ChapterMark } from '../../lib/types';
   import NoteMargin from './NoteMargin.svelte';
 
   let {
@@ -9,8 +9,11 @@
     total,
     currentSheet,
     hasNote,
+    chapterMarks,
+    currentChapter,
     pageNumberOf,
     onSettings,
+    onJump,
   }: {
     work: Work;
     settings: ReaderSettings;
@@ -18,12 +21,16 @@
     total: number;
     currentSheet: Sheet | null;
     hasNote: boolean;
+    chapterMarks: ChapterMark[];
+    currentChapter: string | null;
     pageNumberOf: (pageId: string) => number;
     onSettings: (patch: Partial<ReaderSettings>) => void;
+    onJump: (sheet: number) => void;
   } = $props();
 
   let panelOpen = $state(false);
   let noteOpen = $state(false);
+  let tocOpen = $state(false);
 
   export function togglePanel() {
     panelOpen = !panelOpen;
@@ -49,6 +56,14 @@
         ✳ NOTE
       </button>
     {/if}
+    {#if chapterMarks.length}
+      <button
+        class="mono rc-btn"
+        class:is-active={tocOpen}
+        onclick={() => (tocOpen = !tocOpen)}
+        title="Chapters"
+      >TOC</button>
+    {/if}
     <button class="mono rc-btn" onclick={fullscreen} title="Fullscreen (f)">⛶</button>
     <button
       class="mono rc-btn"
@@ -61,7 +76,10 @@
 
 <footer class="rc-bottom">
   <span class="mono rc-bottom__counter">
-    {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+    <span>
+      {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+      {#if currentChapter}<span class="rc-bottom__ch">· {currentChapter}</span>{/if}
+    </span>
     <span class="rc-bottom__dir">{work.direction === 'rtl' ? '◀ RTL' : 'LTR ▶'}</span>
   </span>
   <div class="rc-bottom__bar">
@@ -69,6 +87,13 @@
       class="rc-bottom__fill"
       style={`transform: scaleX(${total > 1 ? cur / (total - 1) : 1})`}
     ></div>
+    {#each chapterMarks as mark (mark.id)}
+      <span
+        class="rc-bottom__tick"
+        style={`left: ${total > 1 ? (mark.sheet / (total - 1)) * 100 : 0}%`}
+        title={mark.title}
+      ></span>
+    {/each}
   </div>
 </footer>
 
@@ -96,6 +121,39 @@
         <button class="mono rc-opt" class:is-on={settings.fit === 'width'} onclick={() => onSettings({ fit: 'width' })}>WIDTH</button>
       </div>
     </div>
+  </div>
+{/if}
+
+{#if tocOpen}
+  <div class="rc-toc">
+    <button class="rc-toc__scrim" aria-label="Close chapters" onclick={() => (tocOpen = false)}></button>
+    <nav class="rc-toc__body">
+      <p class="mono rc-toc__head">CHAPTERS</p>
+      <ul class="rc-toc__list">
+        {#each chapterMarks as mark, i (mark.id)}
+          <li>
+            <button
+              class="rc-toc__item"
+              class:is-current={currentChapter === mark.title}
+              onclick={() => {
+                onJump(mark.sheet);
+                tocOpen = false;
+              }}
+            >
+              {#if mark.coverUrl}
+                <img class="rc-toc__cover" src={mark.coverUrl} alt="" loading="lazy" />
+              {:else}
+                <span class="rc-toc__cover rc-toc__cover--blank"></span>
+              {/if}
+              <span class="rc-toc__meta">
+                <span class="mono rc-toc__num">{String(i + 1).padStart(2, '0')}</span>
+                <span class="serif rc-toc__title">{mark.title}</span>
+              </span>
+            </button>
+          </li>
+        {/each}
+      </ul>
+    </nav>
   </div>
 {/if}
 
@@ -174,14 +232,27 @@
   .rc-bottom__counter {
     display: flex;
     justify-content: space-between;
+    gap: 1rem;
     color: var(--fg-dim);
+  }
+  .rc-bottom__ch {
+    color: var(--fg-faint);
   }
   .rc-bottom__dir {
     color: var(--fg-faint);
+    flex-shrink: 0;
   }
   .rc-bottom__bar {
+    position: relative;
     height: 2px;
     background: var(--line);
+  }
+  .rc-bottom__tick {
+    position: absolute;
+    top: -2px;
+    width: 1px;
+    height: 6px;
+    background: var(--fg-dim);
   }
   .rc-bottom__fill {
     height: 100%;
@@ -229,6 +300,81 @@
     background: var(--accent);
     border-color: var(--accent);
     color: var(--ink-fg);
+  }
+  .rc-toc {
+    position: fixed;
+    inset: 0;
+    z-index: 55;
+    display: grid;
+    justify-items: end;
+  }
+  .rc-toc__scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 8, 10, 0.55);
+    border: 0;
+    cursor: pointer;
+  }
+  .rc-toc__body {
+    position: relative;
+    width: min(21rem, 88vw);
+    height: 100%;
+    overflow-y: auto;
+    background: var(--ink-bg-soft);
+    border-left: 1px solid var(--line-strong);
+    padding: calc(3.6rem + env(safe-area-inset-top)) 1.2rem 2rem;
+  }
+  .rc-toc__head {
+    margin-bottom: 1rem;
+  }
+  .rc-toc__list {
+    list-style: none;
+    display: grid;
+    gap: 0.4rem;
+  }
+  .rc-toc__item {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    width: 100%;
+    background: none;
+    border: 1px solid transparent;
+    color: var(--fg);
+    padding: 0.5rem;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.25s var(--ease), background-color 0.25s var(--ease);
+  }
+  .rc-toc__item:hover {
+    border-color: var(--line-strong);
+    background: rgba(244, 241, 234, 0.04);
+  }
+  .rc-toc__item.is-current {
+    border-color: var(--accent);
+  }
+  .rc-toc__cover {
+    width: 2.6rem;
+    aspect-ratio: 1131 / 1600;
+    object-fit: cover;
+    border: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  .rc-toc__cover--blank {
+    display: block;
+    background: var(--bg);
+  }
+  .rc-toc__meta {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+  .rc-toc__num {
+    font-size: 0.55rem;
+    color: var(--fg-faint);
+  }
+  .rc-toc__title {
+    font-size: 1.05rem;
+    line-height: 1.25;
   }
   .rc-note {
     position: fixed;

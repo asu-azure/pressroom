@@ -1,11 +1,21 @@
 <script lang="ts">
   import { importPdf, uploadOriginal } from '../../lib/pdfImport';
+  import { appendBounds } from '../../lib/chapterOrder';
+  import { supabase } from '../../lib/supabase';
+  import type { Chapter, PageRow } from '../../lib/types';
 
-  let { workId, onDone }: { workId: string; onDone: () => void } = $props();
+  let {
+    workId,
+    chapters,
+    pages,
+    onDone,
+  }: { workId: string; chapters: Chapter[]; pages: PageRow[]; onDone: () => void } = $props();
 
-  let file = $state<File | null>(null);
+  let files = $state<File[]>([]);
+  let chapterId = $state<string | 'none'>('none');
   let keepOriginal = $state(false);
   let busy = $state(false);
+  let fileNo = $state(0);
   let done = $state(0);
   let total = $state(0);
   let thumbs = $state<string[]>([]);
@@ -14,36 +24,54 @@
 
   function pick(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
-    file = input.files?.[0] ?? null;
+    files = [...(input.files ?? [])];
     error = null;
   }
 
+  function clearThumbs() {
+    for (const t of thumbs) URL.revokeObjectURL(t);
+    thumbs = [];
+  }
+
   async function start() {
-    if (!file || busy) return;
+    if (!files.length || busy) return;
     busy = true;
     error = null;
-    done = 0;
-    total = 0;
-    thumbs = [];
+    clearThumbs();
     aborter = new AbortController();
     try {
-      const result = await importPdf(file, workId, {
-        signal: aborter.signal,
-        onPage: (d, t, thumbUrl) => {
-          done = d;
-          total = t;
-          thumbs = [...thumbs, thumbUrl];
-        },
-      });
-      if (keepOriginal && !result.aborted) await uploadOriginal(file, workId);
-      onDone();
-      if (!result.aborted) file = null;
+      // Multiple PDFs import as consecutive blocks of the same book/chapter.
+      // Fresh page rows land after each file, so recompute bounds per file.
+      for (let f = 0; f < files.length; f++) {
+        fileNo = f + 1;
+        done = 0;
+        total = 0;
+        const { data: rows } = await supabase
+          .from('pages')
+          .select('*')
+          .eq('work_id', workId);
+        const placement = {
+          chapterId: chapterId === 'none' ? null : chapterId,
+          ...appendBounds((rows ?? []) as PageRow[], chapters, chapterId === 'none' ? null : chapterId),
+        };
+        const result = await importPdf(files[f], workId, placement, {
+          signal: aborter.signal,
+          onPage: (d, t, thumbUrl) => {
+            done = d;
+            total = t;
+            thumbs = [...thumbs, thumbUrl];
+          },
+        });
+        if (keepOriginal && !result.aborted) await uploadOriginal(files[f], workId);
+        if (result.aborted) break;
+      }
+      files = [];
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
-      onDone(); // partial pages are committed — refresh the arranger anyway
     } finally {
       busy = false;
       aborter = null;
+      onDone(); // partial pages are committed — refresh the arranger either way
     }
   }
 
@@ -55,15 +83,28 @@
 <div class="up">
   <div class="up__row">
     <label class="up__file mono" data-hover>
-      <input type="file" accept="application/pdf" onchange={pick} disabled={busy} />
-      {file ? file.name : 'SELECT PDF…'}
+      <input type="file" accept="application/pdf" multiple onchange={pick} disabled={busy} />
+      {files.length === 0
+        ? 'SELECT PDF(S)…'
+        : files.length === 1
+          ? files[0].name
+          : `${files.length} PDFS AS ONE BOOK`}
+    </label>
+    <label class="up__target mono">
+      INTO
+      <select bind:value={chapterId} disabled={busy}>
+        <option value="none">FRONT / NO CHAPTER</option>
+        {#each chapters as ch (ch.id)}
+          <option value={ch.id}>{ch.title}</option>
+        {/each}
+      </select>
     </label>
     <label class="up__keep mono">
       <input type="checkbox" bind:checked={keepOriginal} disabled={busy} />
       KEEP ORIGINAL
     </label>
     {#if !busy}
-      <button class="up__go mono" onclick={start} disabled={!file}>RASTERIZE →</button>
+      <button class="up__go mono" onclick={start} disabled={!files.length}>RASTERIZE →</button>
     {:else}
       <button class="up__go up__go--stop mono" onclick={abort}>ABORT</button>
     {/if}
@@ -72,11 +113,12 @@
   {#if busy || done > 0}
     <div class="up__progress">
       <span class="mono up__counter">
+        {#if files.length > 1}FILE {fileNo}/{files.length} · {/if}
         RASTERIZING {String(done).padStart(3, '0')}/{String(total || 0).padStart(3, '0')}
       </span>
       <div class="up__bar"><div class="up__fill" style={`transform: scaleX(${total ? done / total : 0})`}></div></div>
       <div class="up__strip">
-        {#each thumbs as t, i (i)}
+        {#each thumbs as t, i (t)}
           <img src={t} alt={`page ${i + 1}`} />
         {/each}
       </div>
@@ -117,6 +159,21 @@
   .up__file:hover {
     border-color: var(--fg-dim);
     color: var(--fg);
+  }
+  .up__target {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6em;
+  }
+  .up__target select {
+    background: var(--bg-soft);
+    border: 1px solid var(--line-strong);
+    color: var(--fg);
+    font: inherit;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    padding: 0.5em 0.6em;
+    max-width: 12rem;
   }
   .up__keep {
     display: inline-flex;

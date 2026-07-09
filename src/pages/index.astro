@@ -16,7 +16,10 @@ export const prerender = true;
     <Library client:only="svelte" />
     <footer class="lib-foot">
       <span class="mono">© ASU AZURE</span>
-      <a class="mono" href="https://x.com/asukonpeki" data-magnetic>X — @ASUKONPEKI</a>
+      <span class="lib-foot__links">
+        <a class="mono" href="https://x.com/asukonpeki" data-magnetic>X — @ASUKONPEKI</a>
+        <a class="mono lib-foot__studio" href="/studio" data-magnetic>STUDIO ⌘</a>
+      </span>
     </footer>
   </main>
 </Base>
@@ -58,4 +61,6 @@ export const prerender = true;
     border-top: 1px solid var(--line);
   }
   .lib-foot a:hover { color: var(--accent); }
+  .lib-foot__links { display: flex; gap: 1.6rem; }
+  .lib-foot__studio { color: var(--fg-faint); }
 </style>

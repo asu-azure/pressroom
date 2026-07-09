@@ -2,16 +2,18 @@
   import { supabase } from '../../lib/supabase';
   import { toPageRec } from '../../lib/storagePaths';
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
+  import { sortedChapters } from '../../lib/chapterOrder';
   import { loadSettings, saveSettings, loadProgress, saveProgress } from '../../lib/persistence';
   import ScrollSurface from './ScrollSurface.svelte';
   import FlipSurface from './FlipSurface.svelte';
   import ReaderChrome from './ReaderChrome.svelte';
-  import type { Work, PageRec, ReaderSettings } from '../../lib/types';
+  import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
 
   let work = $state<Work | null>(null);
   let pages = $state<PageRec[]>([]);
+  let chapters = $state<Chapter[]>([]);
   let status = $state<'loading' | 'ready' | 'missing'>('loading');
   let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height' });
   let cur = $state(0);
@@ -30,6 +32,26 @@
   function pageNumberOf(pageId: string): number {
     return pageOrder.indexOf(pageId) + 1;
   }
+
+  const chapterMarks: ChapterMark[] = $derived(
+    sortedChapters(chapters)
+      .map((ch) => {
+        const first = pageOrder
+          .map((id) => pages.find((p) => p.id === id)!)
+          .find((p) => p.chapterId === ch.id);
+        const cover = pages.find((p) => p.id === ch.cover_page_id) ?? first;
+        return {
+          id: ch.id,
+          title: ch.title,
+          sheet: first ? sheetIndexOf(sheets, first.id) : -1,
+          coverUrl: cover?.thumbUrl ?? null,
+        };
+      })
+      .filter((m) => m.sheet >= 0),
+  );
+  const currentChapter = $derived(
+    chapterMarks.filter((m) => m.sheet <= cur).at(-1)?.title ?? null,
+  );
 
   $effect(() => {
     void load();
@@ -50,12 +72,12 @@
       fit: work.default_mode === 'flip' ? 'height' : 'width',
     });
 
-    const { data: rows } = await supabase
-      .from('pages')
-      .select('*')
-      .eq('work_id', work.id)
-      .order('sort_key');
+    const [{ data: rows }, { data: chRows }] = await Promise.all([
+      supabase.from('pages').select('*').eq('work_id', work.id).order('sort_key'),
+      supabase.from('chapters').select('*').eq('work_id', work.id).order('sort_key'),
+    ]);
     pages = (rows ?? []).map(toPageRec);
+    chapters = (chRows ?? []) as Chapter[];
 
     // Resume at the last-read page (stored as pageId — survives reorders).
     const savedPage = loadProgress(work.id);
@@ -192,8 +214,11 @@
       total={sheets.length}
       {currentSheet}
       {hasNote}
+      {chapterMarks}
+      {currentChapter}
       {pageNumberOf}
       onSettings={patchSettings}
+      onJump={setCur}
     />
   {/if}
 </div>

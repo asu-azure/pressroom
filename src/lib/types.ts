@@ -29,12 +29,22 @@ export interface Work {
   updated_at: string;
 }
 
+export interface Chapter {
+  id: string;
+  work_id: string;
+  title: string;
+  sort_key: string;
+  cover_page_id: string | null;
+  created_at: string;
+}
+
 /** DB row shape for `pages`. */
 export interface PageRow {
   id: string;
   work_id: string;
   sort_key: string;
   spread_pair_id: string | null;
+  chapter_id: string | null;
   width: number;
   height: number;
   image_path: string;
@@ -49,6 +59,7 @@ export interface PageRec {
   id: string;
   sortKey: string;
   spreadPairId: string | null;
+  chapterId: string | null;
   width: number;
   height: number;
   fullUrl: string;
@@ -65,4 +76,12 @@ export interface ReaderSettings {
   layout: Layout;
   mode: Mode;
   fit: FitMode;
+}
+
+/** A chapter's entry point in the resolved sheet list (reader TOC). */
+export interface ChapterMark {
+  id: string;
+  title: string;
+  sheet: number;
+  coverUrl: string | null;
 }

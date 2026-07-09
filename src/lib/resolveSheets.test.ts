@@ -9,6 +9,7 @@ function page(sortKey: string, spreadPairId: string | null = null): PageRec {
     id: `p${n}`,
     sortKey,
     spreadPairId,
+    chapterId: null,
     width: 1131,
     height: 1600,
     fullUrl: '',

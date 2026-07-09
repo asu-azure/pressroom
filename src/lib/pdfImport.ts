@@ -24,6 +24,14 @@ export interface ImportHooks {
   signal?: AbortSignal;
 }
 
+export interface ImportPlacement {
+  /** Chapter the new pages belong to (null = unassigned). */
+  chapterId: string | null;
+  /** Fractional keys of the pages the import lands between (null = open end). */
+  afterKey: string | null;
+  beforeKey: string | null;
+}
+
 export interface ImportResult {
   imported: number;
   total: number;
@@ -58,13 +66,41 @@ function toBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promi
   });
 }
 
-function downscale(src: HTMLCanvasElement, targetLongEdge: number): HTMLCanvasElement {
-  const scale = Math.min(1, targetLongEdge / Math.max(src.width, src.height));
-  const out = document.createElement('canvas');
-  out.width = Math.max(1, Math.round(src.width * scale));
-  out.height = Math.max(1, Math.round(src.height * scale));
-  out.getContext('2d')!.drawImage(src, 0, 0, out.width, out.height);
-  return out;
+const nextTick = () => new Promise((r) => setTimeout(r, 0));
+
+/**
+ * A fixed set of three canvases reused for every page. Canvas backing stores
+ * are GPU-backed and freed lazily — allocating fresh ones per page piled up
+ * hundreds of MB over a long import and froze the tab (the "page doesn't
+ * respond" bug). Reuse bounds it to ~10 MB total; release() zeroes them when
+ * the import ends.
+ */
+function makeScratch() {
+  const full = document.createElement('canvas');
+  const med = document.createElement('canvas');
+  const thumb = document.createElement('canvas');
+  const size = (c: HTMLCanvasElement, w: number, h: number) => {
+    c.width = w;
+    c.height = h;
+  };
+  const draw = (dst: HTMLCanvasElement, src: HTMLCanvasElement, longEdge: number) => {
+    const scale = Math.min(1, longEdge / Math.max(src.width, src.height));
+    size(dst, Math.max(1, Math.round(src.width * scale)), Math.max(1, Math.round(src.height * scale)));
+    dst.getContext('2d')!.drawImage(src, 0, 0, dst.width, dst.height);
+  };
+  return {
+    full,
+    med,
+    thumb,
+    size,
+    draw,
+    release() {
+      for (const c of [full, med, thumb]) {
+        c.width = 0;
+        c.height = 0;
+      }
+    },
+  };
 }
 
 async function upload(path: string, blob: Blob): Promise<void> {
@@ -76,30 +112,22 @@ async function upload(path: string, blob: Blob): Promise<void> {
 
 /**
  * Rasterize a PDF into per-page image variants and commit them page by page.
- * Strictly sequential: pdf.js renders in its worker, so the main thread only
- * pays for the short canvas draw + encode per page — a 300-page import stays
- * responsive, and an abort/failure resumes cleanly (each page is committed
- * before the next starts).
+ * Strictly sequential: pdf.js renders in its worker, the main thread only
+ * pays a short draw + encode per page, and each page is committed before the
+ * next starts — an abort or failure resumes cleanly.
  */
 export async function importPdf(
   file: File,
   workId: string,
+  placement: ImportPlacement,
   hooks: ImportHooks,
 ): Promise<ImportResult> {
   const encoder = await detectEncoder();
   const loadingTask = pdfjs.getDocument({ data: await file.arrayBuffer() });
   const doc = await loadingTask.promise;
   const total = doc.numPages;
-
-  // Append after any existing pages (re-import / add-chapter case).
-  const { data: lastRow } = await supabase
-    .from('pages')
-    .select('sort_key')
-    .eq('work_id', workId)
-    .order('sort_key', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const keys = generateNKeysBetween(lastRow?.sort_key ?? null, null, total);
+  const keys = generateNKeysBetween(placement.afterKey, placement.beforeKey, total);
+  const scratch = makeScratch();
 
   let imported = 0;
   try {
@@ -114,22 +142,24 @@ export async function importPdf(
       }
       const viewport = pdfPage.getViewport({ scale });
 
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(viewport.width);
-      canvas.height = Math.round(viewport.height);
-      const ctx = canvas.getContext('2d', { alpha: false })!;
+      scratch.size(scratch.full, Math.round(viewport.width), Math.round(viewport.height));
+      const ctx = scratch.full.getContext('2d', { alpha: false })!;
       // Manga pages assume a white sheet; PDFs can have transparent regions.
       ctx.fillStyle = '#fff';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, scratch.full.width, scratch.full.height);
       // pdfjs v6 API: pass the canvas itself (canvasContext is the legacy path).
-      await pdfPage.render({ canvas, viewport }).promise;
+      await pdfPage.render({ canvas: scratch.full, viewport }).promise;
       pdfPage.cleanup();
+      await nextTick();
 
-      const [fullBlob, medBlob, thumbBlob] = await Promise.all([
-        toBlob(canvas, encoder.mime, encoder.quality),
-        toBlob(downscale(canvas, MED_EDGE), encoder.mime, encoder.quality - 0.03),
-        toBlob(downscale(canvas, THUMB_WIDTH), encoder.mime, 0.8),
-      ]);
+      // Encode sequentially — parallel toBlob on three canvases stacked large
+      // encode jobs and starved the main thread.
+      const fullBlob = await toBlob(scratch.full, encoder.mime, encoder.quality);
+      scratch.draw(scratch.med, scratch.full, MED_EDGE);
+      const medBlob = await toBlob(scratch.med, encoder.mime, encoder.quality - 0.03);
+      scratch.draw(scratch.thumb, scratch.full, THUMB_WIDTH);
+      const thumbBlob = await toBlob(scratch.thumb, encoder.mime, 0.8);
+      await nextTick();
 
       const pageId = crypto.randomUUID();
       const folder = pageFolder(workId, pageId);
@@ -147,9 +177,10 @@ export async function importPdf(
       const { error } = await supabase.from('pages').insert({
         id: pageId,
         work_id: workId,
+        chapter_id: placement.chapterId,
         sort_key: keys[i - 1],
-        width: canvas.width,
-        height: canvas.height,
+        width: scratch.full.width,
+        height: scratch.full.height,
         ...paths,
       });
       if (error) throw new Error(`page ${i} insert failed: ${error.message}`);
@@ -158,9 +189,10 @@ export async function importPdf(
       hooks.onPage(imported, total, URL.createObjectURL(thumbBlob));
 
       // Let the UI breathe between pages (paint the progress strip).
-      await new Promise((r) => setTimeout(r, 0));
+      await nextTick();
     }
   } finally {
+    scratch.release();
     await loadingTask.destroy();
   }
 
@@ -171,7 +203,7 @@ export async function importPdf(
 export async function uploadOriginal(file: File, workId: string): Promise<void> {
   const { error } = await supabase.storage
     .from('originals')
-    .upload(`works/${workId}/original.pdf`, file, {
+    .upload(`works/${workId}/${file.name.replace(/[^\w.-]+/g, '_')}`, file, {
       cacheControl: CACHE_CONTROL,
       contentType: 'application/pdf',
       upsert: true,

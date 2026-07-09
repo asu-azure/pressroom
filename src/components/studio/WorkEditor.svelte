@@ -3,12 +3,13 @@
   import { requireSession, watchSignOut } from '../../lib/authGuard';
   import Arranger from './Arranger.svelte';
   import PdfUploader from './PdfUploader.svelte';
-  import type { Work, PageRow } from '../../lib/types';
+  import type { Work, PageRow, Chapter } from '../../lib/types';
 
   let { workId }: { workId: string } = $props();
 
   let work = $state<Work | null>(null);
   let pages = $state<PageRow[]>([]);
+  let chapters = $state<Chapter[]>([]);
   let tab = $state<'pages' | 'meta'>('pages');
   let error = $state<string | null>(null);
   let savedFlash = $state(false);
@@ -32,7 +33,17 @@
   async function init() {
     if (!(await requireSession())) return;
     watchSignOut();
-    await Promise.all([loadWork(), loadPages()]);
+    await Promise.all([loadWork(), loadPages(), loadChapters()]);
+  }
+
+  async function loadChapters() {
+    const { data, error: err } = await supabase
+      .from('chapters')
+      .select('*')
+      .eq('work_id', workId)
+      .order('sort_key');
+    if (err) error = err.message;
+    else chapters = data as Chapter[];
   }
 
   async function loadWork() {
@@ -65,7 +76,7 @@
   }
 
   async function reload() {
-    await Promise.all([loadWork(), loadPages()]);
+    await Promise.all([loadWork(), loadPages(), loadChapters()]);
   }
 
   async function saveMeta(e: SubmitEvent) {
@@ -128,12 +139,13 @@
     <p class="mono">LOADING…</p>
   {:else if tab === 'pages'}
     <div class="we__pages">
-      <PdfUploader {workId} onDone={reload} />
-      {#if pages.length}
+      <PdfUploader {workId} {chapters} {pages} onDone={reload} />
+      {#if pages.length || chapters.length}
         <Arranger
           {workId}
           direction={work.direction}
           coverPageId={work.cover_page_id}
+          {chapters}
           {pages}
           onChanged={reload}
         />

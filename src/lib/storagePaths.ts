@@ -18,6 +18,7 @@ export function toPageRec(row: PageRow): PageRec {
     id: row.id,
     sortKey: row.sort_key,
     spreadPairId: row.spread_pair_id,
+    chapterId: row.chapter_id,
     width: row.width,
     height: row.height,
     fullUrl: publicUrl(row.image_path),

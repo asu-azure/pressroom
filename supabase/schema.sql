@@ -90,6 +90,36 @@ create policy series_author_ins on series for insert with check (is_author());
 create policy series_author_upd on series for update using (is_author());
 create policy series_author_del on series for delete using (is_author());
 
+-- Chapters group pages inside a work. Page order stays one global fractional
+-- keyspace per work; the arranger keeps chapter membership contiguous with it.
+create table chapters (
+  id            uuid primary key default gen_random_uuid(),
+  work_id       uuid not null references works(id) on delete cascade,
+  title         text not null,
+  sort_key      text not null,
+  cover_page_id uuid references pages(id) on delete set null,
+  created_at    timestamptz not null default now(),
+  unique (work_id, sort_key)
+);
+
+alter table pages add column chapter_id uuid references chapters(id) on delete set null;
+create index pages_chapter on pages (chapter_id);
+
+-- Bulk reorders arrive as one upsert whose intermediate states may collide;
+-- defer the uniqueness check to transaction commit.
+alter table pages drop constraint pages_work_id_sort_key_key;
+alter table pages add constraint pages_work_id_sort_key_key
+  unique (work_id, sort_key) deferrable initially deferred;
+
+alter table chapters enable row level security;
+
+create policy chapters_public_read on chapters for select
+  using (is_author() or exists (
+    select 1 from works w where w.id = chapters.work_id and w.published));
+create policy chapters_author_ins on chapters for insert with check (is_author());
+create policy chapters_author_upd on chapters for update using (is_author());
+create policy chapters_author_del on chapters for delete using (is_author());
+
 -- Keep works.updated_at honest.
 create or replace function touch_updated_at() returns trigger
 language plpgsql
