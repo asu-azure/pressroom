@@ -729,7 +729,7 @@ a {
 /* ============================================================
    MOTION III — cinema-cohesion pass
    film grain, scroll-progress hairline, section index nav,
-   marquee ticker, hanko seal, archive drag strip, FUI lightbox.
+   proof-sheet band, hanko seal, archive drag strip, FUI lightbox.
    ============================================================ */
 
 /* ---- Film grain: full-page SVG turbulence, whisper-quiet opacity ---- */
@@ -837,28 +837,64 @@ a {
 }
 @keyframes cue-drop { 0% { transform: translateY(-100%); } 55% { transform: translateY(0); } 100% { transform: translateY(100%); } }
 
-/* ---- Marquee ticker (editorial strip; duplicated track for a seamless loop) ---- */
-.ticker {
+/* ---- Proof-sheet calibration band (static printer's-proof strip) ---- */
+.proofbar {
   position: relative;
   z-index: 2;
   overflow: hidden;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: 0.85rem 0;
+  padding: clamp(1rem, 2.6vw, 1.5rem) clamp(2.6rem, 7vw, 5rem);
   background: var(--bg);
   color: var(--fg);
 }
-.ticker__track {
+.proofbar__row {
+  position: relative;
+  z-index: 2;
   display: flex;
-  width: max-content;
-  white-space: nowrap;
-  animation: ticker-run 36s linear infinite;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: clamp(0.9rem, 3vw, 2.4rem);
 }
-.ticker__track > span { display: inline-block; padding-right: 3.5rem; }
-.ticker__track .tick-accent { color: var(--accent); }
-.ticker:hover .ticker__track { animation-play-state: paused; }
-@keyframes ticker-run { to { transform: translateX(-50%); } }
-@media (prefers-reduced-motion: reduce) { .ticker__track { animation: none; } }
+.proofbar__label {
+  font-size: clamp(0.68rem, 1.4vw, 0.82rem);
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+}
+.proofbar__cmyk { display: inline-flex; align-items: center; gap: 4px; }
+.proofbar__cmyk i {
+  width: clamp(11px, 1.3vw, 15px);
+  aspect-ratio: 1;
+  display: block;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+}
+.proofbar__cmyk-lab {
+  margin-left: 0.55em;
+  font-size: 0.56rem;
+  letter-spacing: 0.32em;
+  color: var(--fg-faint);
+}
+.proofbar__meta {
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  color: var(--fg-faint);
+  white-space: nowrap;
+}
+/* Inline seal — smaller than the section-level hanko so it rides in the row */
+.proofbar__seal {
+  width: clamp(2rem, 3.4vw, 2.5rem);
+  font-size: clamp(1rem, 2vw, 1.3rem);
+}
+/* Registration marks flanking the calibration row */
+.proofbar__reg { top: 50%; translate: 0 -50%; }
+.proofbar__reg--l { left: clamp(1.4rem, 4vw, 3rem); }
+.proofbar__reg--r { right: clamp(1.4rem, 4vw, 3rem); }
+@media (max-width: 700px) {
+  .proofbar { padding-left: clamp(1.6rem, 6vw, 2.6rem); padding-right: clamp(1.6rem, 6vw, 2.6rem); }
+  .proofbar__reg,
+  .proofbar__meta { display: none; }
+}
 
 /* ---- Hanko seal (vermillion stamp) ---- */
 .hanko {

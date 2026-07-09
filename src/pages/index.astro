@@ -19,17 +19,25 @@ export const prerender = true;
       <div class="rgb-line" aria-hidden="true"></div>
     </header>
 
-    <div class="ticker" aria-hidden="true">
-      <div class="ticker__track mono">
-        {
-          Array.from({ length: 4 }).map(() => (
-            <span>
-              同人誌 <span class="tick-accent">◆</span> DOUJINSHI <span class="tick-accent">◆</span> PROOF
-              PRESS <span class="tick-accent">◆</span> ASU AZURE <span class="tick-accent">◆</span> 欄外注
-              <span class="tick-accent">◆</span> MARGIN NOTES <span class="tick-accent">◆</span>
-            </span>
-          ))
-        }
+    <div class="proofbar spread--paper" aria-hidden="true">
+      <span class="crop crop--tl"></span>
+      <span class="crop crop--tr"></span>
+      <span class="crop crop--bl"></span>
+      <span class="crop crop--br"></span>
+      <span class="regmark proofbar__reg proofbar__reg--l"></span>
+      <span class="regmark proofbar__reg proofbar__reg--r"></span>
+
+      <div class="proofbar__row">
+        <span class="proofbar__label mono">校正刷り · PROOF SHEET</span>
+        <span class="proofbar__cmyk">
+          <i style="background:#18c4d6"></i>
+          <i style="background:#ff3d8b"></i>
+          <i style="background:#e8a31a"></i>
+          <i style="background:#16140f"></i>
+          <span class="mono proofbar__cmyk-lab">CMYK</span>
+        </span>
+        <span class="proofbar__meta mono">No.05 · ASU AZURE 印</span>
+        <span class="hanko proofbar__seal">校</span>
       </div>
     </div>
 
@@ -109,12 +117,8 @@ export const prerender = true;
   .rgb-line::before, .rgb-line::after { content: ''; position: absolute; inset: 0; mix-blend-mode: screen; }
   .rgb-line::before { background: #18c4d6; animation: rgb-jit 3.2s ease-in-out infinite; }
   .rgb-line::after  { background: #ff3d8b; animation: rgb-jit 3.2s ease-in-out infinite reverse; }
-  .ticker {
+  .proofbar {
     margin-bottom: clamp(2rem, 5vh, 3.5rem);
-  }
-  .ticker__track > span {
-    font-size: 0.62rem;
-    letter-spacing: 0.2em;
   }
   .lib-foot {
     margin-top: auto;

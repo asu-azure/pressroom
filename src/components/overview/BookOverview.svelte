@@ -132,7 +132,12 @@
     };
   }
 
-  const readHref = $derived(`/w/${slug}/read`);
+  // "Start reading" must open page 1, not resume — so pin it to the first
+  // page id (the Reader falls back to saved progress when ?p is absent).
+  const firstId = $derived(ordered[0]?.id ?? null);
+  const readHref = $derived(
+    firstId ? `/w/${slug}/read?p=${encodeURIComponent(firstId)}` : `/w/${slug}/read`,
+  );
   const continueHref = $derived(
     continueAt ? `/w/${slug}/read?p=${encodeURIComponent(continueAt)}` : readHref,
   );

@@ -37,7 +37,10 @@
 </script>
 
 <!-- Thumb paints instantly (blurred) behind the real image fading in. -->
-<span class="si" style={`aspect-ratio: ${page.width} / ${page.height};`}>
+<span
+  class="si"
+  style={`aspect-ratio: ${page.width} / ${page.height}; --pw: ${page.width}; --ph: ${page.height};`}
+>
   <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" />
   <img
     class="si__img"
@@ -98,6 +101,10 @@
     background: #101012;
     max-width: 100%;
     max-height: 100%;
+    /* Size container so .si__bubbles can read the box's rendered dimensions
+       (cqw/cqh) cross-axis and reproduce object-fit:contain exactly. Safe:
+       .si always has a determinate size from the surface CSS. */
+    container-type: size;
   }
   .si__thumb,
   .si__img {
@@ -122,9 +129,18 @@
   }
 
   /* --- Translation hotspots --- */
+  /* The overlay reproduces the object-fit:contain rect and centers it, so
+     bubbles land on the artwork identically at every screen size / layout mode
+     even when the surface CSS letterboxes the image inside .si. The min()
+     formula is the contain calculation: width = min(boxW, boxH * pageAR),
+     height = min(boxH, boxW / pageAR), using container-query units for the box. */
   .si__bubbles {
     position: absolute;
-    inset: 0;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(100cqw, 100cqh * var(--pw) / var(--ph));
+    height: min(100cqh, 100cqw * var(--ph) / var(--pw));
     z-index: 3;
   }
   .si__bub {
@@ -146,6 +162,9 @@
     transform: translateX(-50%) translateY(4px);
     min-width: max(9rem, 100%);
     max-width: min(70vw, 22rem);
+    max-height: min(40svh, 18rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 0.55rem 0.7rem;
     background: rgba(12, 12, 13, 0.94);
     border: 1px solid var(--c);

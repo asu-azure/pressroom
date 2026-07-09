@@ -227,6 +227,13 @@
       overflow-y: auto;
       place-items: start center;
     }
+    /* Give the flex container a definite width so the width-based .si sizing
+       below resolves — without it the grid item shrink-wraps its (zero-
+       intrinsic, absolutely-positioned) contents and the page collapses to
+       black. Mirrors ScrollSurface's definite-width sheet. */
+    .fs__pages {
+      width: 100%;
+    }
     .fs__pages :global(.si) {
       height: auto;
       width: 100%;
