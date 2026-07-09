@@ -27,6 +27,14 @@ export interface Bubble {
   text: string; // the translation
 }
 
+/** Normalized 0..1 crop of the cover image shown in the library card. */
+export interface CoverCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface Series {
   id: string;
   title: string;
@@ -49,6 +57,8 @@ export interface Work {
   foreword: string;
   characters: Character[];
   cover_page_id: string | null;
+  cover_crop: CoverCrop | null;
+  cover_solo: boolean;
   published: boolean;
   created_at: string;
   updated_at: string;
@@ -77,6 +87,7 @@ export interface PageRow {
   thumb_path: string;
   note: string | null;
   bubbles: Bubble[];
+  is_blank: boolean;
   created_at: string;
 }
 
@@ -93,6 +104,7 @@ export interface PageRec {
   thumbUrl: string;
   note: string | null;
   bubbles: Bubble[];
+  isBlank: boolean;
 }
 
 export type Sheet =

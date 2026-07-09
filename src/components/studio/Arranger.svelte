@@ -4,6 +4,7 @@
   import { generateKeyBetween, generateNKeysBetween } from 'fractional-indexing';
   import { supabase } from '../../lib/supabase';
   import { toPageRec } from '../../lib/storagePaths';
+  import { resolveSheets } from '../../lib/resolveSheets';
   import { sortedChapters, flattenPages } from '../../lib/chapterOrder';
   import NotePanel from './NotePanel.svelte';
   import BubbleEditor from './BubbleEditor.svelte';
@@ -13,6 +14,7 @@
     workId,
     direction,
     coverPageId,
+    coverSolo,
     characters,
     chapters,
     pages,
@@ -21,11 +23,16 @@
     workId: string;
     direction: Direction;
     coverPageId: string | null;
+    coverSolo: boolean;
     characters: Character[];
     chapters: Chapter[];
     pages: PageRow[];
     onChanged: () => void;
   } = $props();
+
+  // Blank pages use a standard manga-page ratio so layout stays consistent.
+  const BLANK_W = 1131;
+  const BLANK_H = 1600;
 
   /** A drag unit: one page, or a bound spread that travels together. */
   interface Unit {
@@ -103,6 +110,14 @@
   function pageNo(page: PageRow): number {
     return flatOrder.indexOf(page.id) + 1;
   }
+  function pageNoById(id: string): number {
+    return flatOrder.indexOf(id) + 1;
+  }
+
+  /** The exact two-page spreads the reader will show, for the spread map. */
+  const spreadSheets = $derived(
+    resolveSheets(pages.map(toPageRec), { layout: 'double', coverSolo }),
+  );
 
   /** A bound pair whose members have another page's key between them. */
   function isSplit(unit: Unit): boolean {
@@ -257,8 +272,10 @@
   );
 
   const chapterCoverable = $derived(
-    selectedPages.length === 1 && selectedPages[0].chapter_id !== null,
+    selectedPages.length === 1 && !selectedPages[0].is_blank && selectedPages[0].chapter_id !== null,
   );
+  // A blank has no image, so it can't be a cover or hold translations.
+  const singleReal = $derived(selectedPages.length === 1 && !selectedPages[0].is_blank);
 
   async function bind() {
     if (!bindable) return;
@@ -314,6 +331,39 @@
     onChanged();
   }
 
+  /** Insert a blank spacer leaf after the selected page (else at the very end). */
+  async function addBlank() {
+    const anchor = selectedPages.length === 1 ? selectedPages[0] : null;
+    const chapterId = anchor?.chapter_id ?? null;
+    const sectionRows = pages
+      .filter((p) => (p.chapter_id ?? null) === chapterId)
+      .sort((a, b) => (a.sort_key < b.sort_key ? -1 : 1));
+    let prevKey: string | null;
+    let nextKey: string | null;
+    if (anchor) {
+      const i = sectionRows.findIndex((p) => p.id === anchor.id);
+      prevKey = anchor.sort_key;
+      nextKey = sectionRows[i + 1]?.sort_key ?? null;
+    } else {
+      prevKey = sectionRows.at(-1)?.sort_key ?? null;
+      nextKey = null;
+    }
+    const { error: err } = await supabase.from('pages').insert({
+      work_id: workId,
+      chapter_id: chapterId,
+      sort_key: generateKeyBetween(prevKey, nextKey),
+      is_blank: true,
+      width: BLANK_W,
+      height: BLANK_H,
+      image_path: '',
+      med_path: '',
+      thumb_path: '',
+    });
+    if (err) error = err.message;
+    selected = [];
+    onChanged();
+  }
+
   async function removeSelected() {
     if (!selectedPages.length) return;
     if (!confirm(`Delete ${selectedPages.length} page(s)? This cannot be undone.`)) return;
@@ -323,7 +373,10 @@
         error = err.message;
         continue;
       }
-      await supabase.storage.from('pages').remove([p.image_path, p.med_path, p.thumb_path]);
+      // Blanks have no stored image; only real pages own storage objects.
+      if (!p.is_blank) {
+        await supabase.storage.from('pages').remove([p.image_path, p.med_path, p.thumb_path]);
+      }
     }
     selected = [];
     onChanged();
@@ -359,6 +412,7 @@
       </span>
       <div class="arr__actions">
         <button class="mono arr__btn" onclick={newChapter}>+ CHAPTER</button>
+        <button class="mono arr__btn" onclick={addBlank} title="Insert a blank spacer page (after the selected page, else at the end)">+ BLANK</button>
         {#if direction === 'rtl'}
           <button class="mono arr__btn" onclick={() => (viewLtr = !viewLtr)}>
             VIEW: {gridRtl ? 'RTL' : 'LTR'}
@@ -368,13 +422,13 @@
           title={selectedPages.length === 2 && !bindable ? 'Pages must be adjacent, unbound, and in the same chapter' : ''}
         >⧉ BIND SPREAD</button>
         <button class="mono arr__btn" onclick={unbind} disabled={!unbindable}>UNBIND</button>
-        <button class="mono arr__btn" onclick={setBookCover} disabled={selectedPages.length !== 1}>
+        <button class="mono arr__btn" onclick={setBookCover} disabled={!singleReal}>
           BOOK COVER
         </button>
         <button class="mono arr__btn" onclick={setChapterCover} disabled={!chapterCoverable}>
           CH. COVER
         </button>
-        <button class="mono arr__btn" onclick={() => (bubblePage = selectedPages[0] ?? null)} disabled={selectedPages.length !== 1}>
+        <button class="mono arr__btn" onclick={() => (bubblePage = selectedPages[0] ?? null)} disabled={!singleReal}>
           ◫ TRANSLATE
         </button>
         <button class="mono arr__btn arr__btn--danger" onclick={removeSelected} disabled={!selectedPages.length}>
@@ -388,6 +442,44 @@
     {/if}
     {#if busy}
       <p class="mono">REBINDING…</p>
+    {/if}
+
+    <!-- Spread map: exactly how pages pair on the two-page display. -->
+    {#if spreadSheets.length}
+      <div class="arr__smap">
+        <span class="mono arr__smapTitle">
+          TWO-PAGE SPREADS {gridRtl ? '· READS RIGHT → LEFT' : ''}
+        </span>
+        <div class="arr__smapRow" class:is-rtl={gridRtl}>
+          {#each spreadSheets as sheet, i (sheet.pages[0].id)}
+            {@const ordered =
+              sheet.kind === 'spread' && direction === 'rtl'
+                ? [sheet.pages[1], sheet.pages[0]]
+                : sheet.pages}
+            <div
+              class="arr__sm"
+              class:is-spread={sheet.kind === 'spread'}
+              class:is-forced={sheet.kind === 'spread' && sheet.forced}
+            >
+              <div class="arr__smCards">
+                {#each ordered as p (p.id)}
+                  <div class="arr__smCard" class:is-blank={p.isBlank}>
+                    {#if p.isBlank}
+                      <span class="mono arr__smBlank">BLANK</span>
+                    {:else}
+                      <img src={p.thumbUrl} alt={`Page ${pageNoById(p.id)}`} loading="lazy" />
+                    {/if}
+                    <span class="mono arr__smNo">{pageNoById(p.id)}</span>
+                  </div>
+                {/each}
+              </div>
+              <span class="mono arr__smTag">
+                {i + 1}{#if sheet.kind === 'single'} · {ordered[0].isBlank ? 'BLANK' : 'SOLO'}{:else if sheet.forced} · BOUND{/if}
+              </span>
+            </div>
+          {/each}
+        </div>
+      </div>
     {/if}
 
     {#each sections as section, si (section.id)}
@@ -431,6 +523,7 @@
                 <div
                   class="arr__card"
                   class:is-selected={selected.includes(page.id)}
+                  class:is-blank={page.is_blank}
                   role="button"
                   tabindex="0"
                   onclick={() => toggleSelect(page.id)}
@@ -441,7 +534,11 @@
                     }
                   }}
                 >
-                  <img src={rec.thumbUrl} alt={`Page ${pageNo(page)}`} loading="lazy" draggable="false" />
+                  {#if page.is_blank}
+                    <span class="mono arr__blankLabel">BLANK</span>
+                  {:else}
+                    <img src={rec.thumbUrl} alt={`Page ${pageNo(page)}`} loading="lazy" draggable="false" />
+                  {/if}
                   <span class="mono arr__num">{String(pageNo(page)).padStart(2, '0')}</span>
                   {#if page.id === coverPageId}
                     <span class="mono arr__flag arr__flag--cover">COVER</span>
@@ -550,6 +647,87 @@
   .arr__error {
     color: #e8a31a;
   }
+  /* ---- Spread map (how pages actually pair in the two-page reader) ---- */
+  .arr__smap {
+    display: grid;
+    gap: 0.5rem;
+    border: 1px solid var(--line);
+    padding: 0.8rem;
+    background: var(--bg-soft);
+  }
+  .arr__smapTitle {
+    color: var(--fg-faint);
+    font-size: 0.58rem;
+  }
+  .arr__smapRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+  }
+  .arr__smapRow.is-rtl {
+    direction: rtl;
+  }
+  .arr__sm {
+    display: grid;
+    gap: 0.2rem;
+    justify-items: center;
+    direction: ltr;
+  }
+  .arr__smCards {
+    display: flex;
+    gap: 1px;
+    padding: 2px;
+    border: 1px solid var(--line-strong);
+    border-radius: 3px;
+  }
+  /* A spread reads as one bound unit; a solo page is a lone card. */
+  .arr__sm.is-spread .arr__smCards {
+    border-color: var(--fg-dim);
+  }
+  .arr__sm.is-forced .arr__smCards {
+    border-color: var(--accent);
+  }
+  .arr__smCard {
+    position: relative;
+    width: clamp(1.7rem, 3.6vw, 2.5rem);
+    aspect-ratio: 1131 / 1600;
+    background: var(--bg);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+  .arr__smCard img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .arr__smCard.is-blank {
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--bg),
+      var(--bg) 4px,
+      var(--bg-soft) 4px,
+      var(--bg-soft) 8px
+    );
+  }
+  .arr__smBlank {
+    font-size: 0.4rem;
+    color: var(--fg-faint);
+    letter-spacing: 0.05em;
+  }
+  .arr__smNo {
+    position: absolute;
+    bottom: 1px;
+    left: 2px;
+    font-size: 0.45rem;
+    color: #f4f1ea;
+    mix-blend-mode: difference;
+  }
+  .arr__smTag {
+    font-size: 0.5rem;
+    color: var(--fg-faint);
+  }
+
   .arr__section {
     display: grid;
     gap: 0.7rem;
@@ -630,6 +808,22 @@
   .arr__card.is-selected {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
+  }
+  .arr__card.is-blank {
+    display: grid;
+    place-items: center;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--bg-soft),
+      var(--bg-soft) 6px,
+      var(--bg) 6px,
+      var(--bg) 12px
+    );
+  }
+  .arr__blankLabel {
+    font-size: 0.55rem;
+    color: var(--fg-faint);
+    letter-spacing: 0.1em;
   }
   .arr__num {
     position: absolute;

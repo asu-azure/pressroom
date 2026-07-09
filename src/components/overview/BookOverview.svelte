@@ -25,9 +25,11 @@
   let continueAt = $state<string | null>(null);
 
   const ordered = $derived([...pages].sort((a, b) => (a.sortKey < b.sortKey ? -1 : 1)));
+  // Blanks are spacer leaves — never a cover, and not counted as content pages.
   const cover = $derived(
-    ordered.find((p) => p.id === work?.cover_page_id) ?? ordered[0] ?? null,
+    ordered.find((p) => p.id === work?.cover_page_id) ?? ordered.find((p) => !p.isBlank) ?? null,
   );
+  const realPageCount = $derived(ordered.filter((p) => !p.isBlank).length);
   const frontPages = $derived(ordered.filter((p) => !p.chapterId));
   const chapterList = $derived(
     sortedChapters(chapters)
@@ -36,7 +38,7 @@
         pages: ordered.filter((p) => p.chapterId === ch.id),
         cover:
           ordered.find((p) => p.id === ch.cover_page_id) ??
-          ordered.find((p) => p.chapterId === ch.id) ??
+          ordered.find((p) => p.chapterId === ch.id && !p.isBlank) ??
           null,
       }))
       .filter((c) => c.pages.length > 0),
@@ -171,7 +173,7 @@
             style={`aspect-ratio: ${cover.width} / ${cover.height}`}
           />
           <figcaption class="mono ov-hero__coverTag">
-            {work.direction.toUpperCase()} · {ordered.length}P
+            {work.direction.toUpperCase()} · {realPageCount}P
           </figcaption>
         </figure>
       {/if}
@@ -228,7 +230,7 @@
         <span class="index-num" aria-hidden="true">目</span>
         <h2 class="serif ov-toc__title">{i18n.t('ov.contents')}</h2>
         <span class="ov-toc__rule" aria-hidden="true"></span>
-        <span class="mono">{ordered.length} {i18n.t('ov.pages')}</span>
+        <span class="mono">{realPageCount} {i18n.t('ov.pages')}</span>
       </header>
 
       {#if frontPages.length && chapterList.length}
@@ -236,10 +238,10 @@
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">00</span>
             <h3 class="serif ov-chapter__title">{i18n.t('ov.front')}</h3>
-            <span class="mono ov-chapter__count">{frontPages.length}P</span>
+            <span class="mono ov-chapter__count">{frontPages.filter((p) => !p.isBlank).length}P</span>
           </header>
           <div class="ov-strip" class:is-rtl={work.direction === 'rtl'}>
-            {#each frontPages as page (page.id)}
+            {#each frontPages.filter((p) => !p.isBlank) as page (page.id)}
               <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`} data-cursor="READ">
                 <img src={page.thumbUrl} alt="" loading="lazy" />
                 <span class="mono ov-thumb__num">{String(ordered.indexOf(page) + 1).padStart(2, '0')}</span>
@@ -255,10 +257,10 @@
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">{String(ci + 1).padStart(2, '0')}</span>
             <h3 class="serif ov-chapter__title">{ch.title}</h3>
-            <span class="mono ov-chapter__count">{chPages.length}P</span>
+            <span class="mono ov-chapter__count">{chPages.filter((p) => !p.isBlank).length}P</span>
             <a
               class="mono ov-chapter__read"
-              href={`/w/${slug}/read?p=${encodeURIComponent(chPages[0].id)}`}
+              href={`/w/${slug}/read?p=${encodeURIComponent((chPages.find((p) => !p.isBlank) ?? chPages[0]).id)}`}
               data-magnetic
             >{i18n.t('ov.start')} →</a>
           </header>
@@ -273,7 +275,7 @@
                 <span class="mono ov-thumb__tag">{i18n.t('rd.toc')}</span>
               </a>
             {/if}
-            {#each chPages as page (page.id)}
+            {#each chPages.filter((p) => !p.isBlank) as page (page.id)}
               <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`} data-cursor="READ">
                 <img src={page.thumbUrl} alt="" loading="lazy" />
                 <span class="mono ov-thumb__num">{String(ordered.indexOf(page) + 1).padStart(2, '0')}</span>

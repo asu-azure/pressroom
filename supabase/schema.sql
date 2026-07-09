@@ -32,6 +32,8 @@ create table works (
   foreword       text not null default '',  -- long-form intro on the overview page
   characters     jsonb not null default '[]'::jsonb,  -- reusable cast for bubble translations
   cover_page_id  uuid,  -- FK added after pages exists (circular reference)
+  cover_crop     jsonb,  -- {x,y,w,h} 0..1 crop of the cover for the library card; null = auto
+  cover_solo     boolean not null default true,  -- cover stands alone in double layout (sets where spreads begin)
   published      boolean not null default false,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -49,6 +51,7 @@ create table pages (
   thumb_path     text not null,
   note           text,            -- author margin note, readers see it
   bubbles        jsonb not null default '[]'::jsonb,  -- translated speech bubbles (normalized rects)
+  is_blank       boolean not null default false,  -- spacer/placeholder leaf (no image); fixes gaps & spread parity
   created_at     timestamptz not null default now(),
   unique (work_id, sort_key)
 );

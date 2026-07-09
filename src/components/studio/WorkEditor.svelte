@@ -4,7 +4,9 @@
   import Arranger from './Arranger.svelte';
   import PdfUploader from './PdfUploader.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
-  import type { Work, PageRow, Chapter, Character } from '../../lib/types';
+  import CoverCropper from './CoverCropper.svelte';
+  import { toPageRec } from '../../lib/storagePaths';
+  import type { Work, PageRow, Chapter, Character, CoverCrop } from '../../lib/types';
 
   const CAST_COLORS = ['#2742f0', '#e8a31a', '#18c4d6', '#d6455f', '#6aa0ff', '#4caf7d', '#b06ad6'];
 
@@ -16,6 +18,24 @@
   let tab = $state<'pages' | 'meta'>('pages');
   let error = $state<string | null>(null);
   let savedFlash = $state(false);
+  let cropOpen = $state(false);
+
+  // The current cover page (for the crop tool), enriched with URLs.
+  const coverRec = $derived.by(() => {
+    if (!work?.cover_page_id) return null;
+    const row = pages.find((p) => p.id === work!.cover_page_id);
+    return row ? toPageRec(row) : null;
+  });
+
+  async function saveCoverCrop(crop: CoverCrop | null) {
+    const { error: err } = await supabase
+      .from('works')
+      .update({ cover_crop: crop })
+      .eq('id', workId);
+    if (err) error = err.message;
+    cropOpen = false;
+    await loadWork();
+  }
 
   // Meta form fields (bound copies; committed on save)
   let meta = $state({
@@ -27,6 +47,7 @@
     direction: 'rtl' as Work['direction'],
     default_layout: 'double' as Work['default_layout'],
     default_mode: 'flip' as Work['default_mode'],
+    cover_solo: true,
     tagsText: '',
     characters: [] as Character[],
   });
@@ -77,6 +98,7 @@
       direction: work.direction,
       default_layout: work.default_layout,
       default_mode: work.default_mode,
+      cover_solo: work.cover_solo ?? true,
       tagsText: work.tags.join(', '),
       characters: (work.characters ?? []).map((c) => ({ ...c })),
     };
@@ -109,6 +131,7 @@
         direction: meta.direction,
         default_layout: meta.default_layout,
         default_mode: meta.default_mode,
+        cover_solo: meta.cover_solo,
         tags: meta.tagsText.split(',').map((t) => t.trim()).filter(Boolean),
         characters: meta.characters
           .map((c) => ({ ...c, name: c.name.trim() }))
@@ -166,6 +189,7 @@
           {workId}
           direction={work.direction}
           coverPageId={work.cover_page_id}
+          coverSolo={work.cover_solo ?? true}
           characters={work.characters ?? []}
           {chapters}
           {pages}
@@ -227,6 +251,20 @@
           <option value="scroll">Scroll</option>
         </select>
       </label>
+      <label class="we__field we__field--check we__field--wide">
+        <input type="checkbox" bind:checked={meta.cover_solo} />
+        <span class="mono">COVER STANDS ALONE (in two-page layout the cover gets its own sheet — sets where spreads begin)</span>
+      </label>
+      <div class="we__field we__field--wide">
+        <span class="mono">COVER CROP (LIBRARY CARD)</span>
+        {#if coverRec}
+          <button type="button" class="mono we__coverBtn" onclick={() => (cropOpen = true)}>
+            ✂ ADJUST COVER FRAMING
+          </button>
+        {:else}
+          <p class="mono we__hint">Set a book cover in the PAGES tab first.</p>
+        {/if}
+      </div>
       <label class="we__field we__field--wide">
         <span class="mono">TAGS (COMMA-SEPARATED)</span>
         <input type="text" bind:value={meta.tagsText} placeholder="fantasy, one-shot, colour" />
@@ -250,6 +288,15 @@
     </form>
   {/if}
 </div>
+
+{#if cropOpen && coverRec}
+  <CoverCropper
+    page={coverRec}
+    crop={work?.cover_crop ?? null}
+    onSave={saveCoverCrop}
+    onClose={() => (cropOpen = false)}
+  />
+{/if}
 
 <style>
   .we {
@@ -314,6 +361,33 @@
   }
   .we__field--wide {
     grid-column: 1 / -1;
+  }
+  .we__field--check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .we__field--check input {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex-shrink: 0;
+    accent-color: var(--accent);
+  }
+  .we__coverBtn {
+    justify-self: start;
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--fg-dim);
+    padding: 0.6em 1em;
+    cursor: pointer;
+  }
+  .we__coverBtn:hover {
+    color: var(--fg);
+    border-color: var(--fg-dim);
+  }
+  .we__hint {
+    color: var(--fg-faint);
+    font-size: 0.6rem;
   }
   .we__field input,
   .we__field select,

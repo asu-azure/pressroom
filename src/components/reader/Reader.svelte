@@ -22,8 +22,9 @@
   let chrome = $state<ReaderChrome | null>(null);
   let highlightId = $state<string | null>(null);
 
+  const coverSolo = $derived(work?.cover_solo ?? true);
   const sheets = $derived(
-    resolveSheets(pages, { layout: settings.layout, coverSolo: true }),
+    resolveSheets(pages, { layout: settings.layout, coverSolo }),
   );
   const currentSheet = $derived(sheets[cur] ?? null);
   const hasNote = $derived(Boolean(currentSheet?.pages.some((p) => p.note)));
@@ -92,7 +93,7 @@
     const target = requested ?? loadProgress(work.id);
     if (target) {
       const idx = sheetIndexOf(
-        resolveSheets(pages, { layout: settings.layout, coverSolo: true }),
+        resolveSheets(pages, { layout: settings.layout, coverSolo: work.cover_solo }),
         target,
       );
       if (idx > 0) cur = idx;
@@ -113,7 +114,7 @@
     if (work) saveSettings(work.id, settings);
     if (anchor) {
       const idx = sheetIndexOf(
-        resolveSheets(pages, { layout: settings.layout, coverSolo: true }),
+        resolveSheets(pages, { layout: settings.layout, coverSolo }),
         anchor,
       );
       cur = idx >= 0 ? idx : 0;

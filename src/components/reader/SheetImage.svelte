@@ -39,8 +39,12 @@
 <!-- Thumb paints instantly (blurred) behind the real image fading in. -->
 <span
   class="si"
+  class:si--blank={page.isBlank}
   style={`aspect-ratio: ${page.width} / ${page.height}; --pw: ${page.width}; --ph: ${page.height};`}
 >
+  {#if page.isBlank}
+    <span class="mono si__blankMark" aria-hidden="true">◦</span>
+  {:else}
   <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" />
   <img
     class="si__img"
@@ -91,6 +95,7 @@
       {/each}
     </div>
   {/if}
+  {/if}
 </span>
 
 <style>
@@ -105,6 +110,17 @@
        (cqw/cqh) cross-axis and reproduce object-fit:contain exactly. Safe:
        .si always has a determinate size from the surface CSS. */
     container-type: size;
+  }
+  /* Blank spacer leaf — a plain paper-toned page, no image. */
+  .si--blank {
+    background: #e9e4d8;
+    display: grid;
+    place-items: center;
+  }
+  .si__blankMark {
+    color: rgba(22, 20, 15, 0.28);
+    font-size: 2rem;
+    line-height: 1;
   }
   .si__thumb,
   .si__img {

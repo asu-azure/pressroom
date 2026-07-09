@@ -75,18 +75,19 @@
     const { data: pages } = ids.length
       ? await supabase
           .from('pages')
-          .select('id, work_id, thumb_path, med_path, sort_key')
+          .select('id, work_id, thumb_path, med_path, sort_key, is_blank')
           .in('work_id', ids)
       : { data: [] };
 
     cards = list.map((work) => {
       const own = (pages ?? []).filter((p) => p.work_id === work.id);
       own.sort((a, b) => (a.sort_key < b.sort_key ? -1 : 1));
-      const cover = own.find((p) => p.id === work.cover_page_id) ?? own[0];
+      // Never fall back to a blank spacer as the cover.
+      const cover = own.find((p) => p.id === work.cover_page_id) ?? own.find((p) => !p.is_blank);
       return {
         work,
         coverUrl: cover ? publicUrl(cover.med_path) : null,
-        pageCount: own.length,
+        pageCount: own.filter((p) => !p.is_blank).length,
       };
     });
   }

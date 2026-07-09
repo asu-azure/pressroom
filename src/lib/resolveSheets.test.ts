@@ -17,6 +17,7 @@ function page(sortKey: string, spreadPairId: string | null = null): PageRec {
     thumbUrl: '',
     note: null,
     bubbles: [],
+    isBlank: false,
   };
 }
 

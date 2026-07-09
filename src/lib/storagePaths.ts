@@ -26,5 +26,6 @@ export function toPageRec(row: PageRow): PageRec {
     thumbUrl: publicUrl(row.thumb_path),
     note: row.note,
     bubbles: row.bubbles ?? [],
+    isBlank: row.is_blank ?? false,
   };
 }
