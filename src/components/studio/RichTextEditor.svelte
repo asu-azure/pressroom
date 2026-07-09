@@ -53,20 +53,25 @@
     setActiveFig(fig);
   }
 
-  async function onPickImage(e: Event) {
-    const input = e.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
+  function insertFigure(url: string) {
+    // fore-fig--active is stripped by the sanitizer — safe as a live-DOM marker.
+    const html =
+      `<figure class="fore-fig fore-fig--center fore-fig--md">` +
+      `<img src="${url}" alt=""><figcaption>Caption…</figcaption></figure><p><br></p>`;
+    document.execCommand('insertHTML', false, html);
+  }
+
+  /** Upload each image file (downscale + WebP) and drop a figure at the caret. */
+  async function uploadAndInsert(files: File[]) {
+    const images = files.filter((f) => f.type.startsWith('image/'));
+    if (!images.length) return;
     uploading = true;
     try {
-      const url = await uploadForewordImage(file, workId);
       editor.focus();
-      // fore-fig--active is stripped by the sanitizer — safe as a live-DOM marker.
-      const html =
-        `<figure class="fore-fig fore-fig--center fore-fig--md">` +
-        `<img src="${url}" alt=""><figcaption>Caption…</figcaption></figure><p><br></p>`;
-      document.execCommand('insertHTML', false, html);
+      for (const file of images) {
+        const url = await uploadForewordImage(file, workId);
+        insertFigure(url);
+      }
       emit();
     } catch (err) {
       console.error(err);
@@ -74,6 +79,45 @@
     } finally {
       uploading = false;
     }
+  }
+
+  async function onPickImage(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const files = [...(input.files ?? [])];
+    input.value = '';
+    await uploadAndInsert(files);
+  }
+
+  // Paste an image straight from the clipboard (screenshot / copied file).
+  async function onPaste(e: ClipboardEvent) {
+    const dt = e.clipboardData;
+    if (!dt) return;
+    let files = [...(dt.files ?? [])].filter((f) => f.type.startsWith('image/'));
+    if (!files.length && dt.items) {
+      // Some browsers surface a pasted image only via items, not files.
+      files = [...dt.items]
+        .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+        .map((it) => it.getAsFile())
+        .filter((f): f is File => Boolean(f));
+    }
+    if (!files.length) return; // let normal text paste proceed
+    e.preventDefault();
+    await uploadAndInsert(files);
+  }
+
+  // Drop image files onto the editor — place the caret where they land, then
+  // re-upload (a raw drop would embed an external URL the sanitizer strips).
+  async function onDrop(e: DragEvent) {
+    const files = [...(e.dataTransfer?.files ?? [])].filter((f) => f.type.startsWith('image/'));
+    if (!files.length) return;
+    e.preventDefault();
+    const range = document.caretRangeFromPoint?.(e.clientX, e.clientY);
+    if (range) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+    await uploadAndInsert(files);
   }
 
   function swapClass(prefix: string, value: string) {
@@ -102,7 +146,9 @@
 
   const BLOCKS = [
     { label: '¶ Body', value: 'p' },
-    { label: 'H Heading', value: 'h3' },
+    { label: 'H1 — Large heading', value: 'h1' },
+    { label: 'H2 — Heading', value: 'h2' },
+    { label: 'H3 — Small heading', value: 'h3' },
     { label: '❝ Quote', value: 'blockquote' },
   ];
 
@@ -145,7 +191,7 @@
     <span class="rte__sep" aria-hidden="true"></span>
     <button type="button" class="rte__btn mono" title="Clear formatting" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('removeFormat')}>⌫ FMT</button>
     <span class="rte__sep" aria-hidden="true"></span>
-    <button type="button" class="rte__btn mono" title="Insert image" disabled={uploading} onclick={() => fileInput.click()}>
+    <button type="button" class="rte__btn mono" title="Insert image — or paste / drop one directly" disabled={uploading} onclick={() => fileInput.click()}>
       {uploading ? '…' : '⌷ IMAGE'}
     </button>
     <input
@@ -174,12 +220,16 @@
 
   <div
     class="rte__area serif"
+    class:is-dropping={uploading}
     bind:this={editor}
     contenteditable="true"
     data-placeholder={placeholder}
     oninput={emit}
     onblur={emit}
     onclick={onEditorClick}
+    onpaste={onPaste}
+    ondrop={onDrop}
+    ondragover={(e) => e.preventDefault()}
   ></div>
 </div>
 
@@ -266,14 +316,23 @@
     color: var(--fg-faint);
     pointer-events: none;
   }
+  .rte__area.is-dropping {
+    outline: 2px dashed var(--accent);
+    outline-offset: -4px;
+  }
   .rte__area :global(h1),
   .rte__area :global(h2),
   .rte__area :global(h3),
   .rte__area :global(h4) {
     font-family: var(--font-serif);
-    line-height: 1.3;
+    line-height: 1.25;
     margin: 0.6em 0 0.3em;
   }
+  /* Match the rendered foreword sizes so the editor is WYSIWYG. */
+  .rte__area :global(h1) { font-size: clamp(1.9rem, 3.6vw, 2.8rem); }
+  .rte__area :global(h2) { font-size: clamp(1.55rem, 2.8vw, 2.2rem); }
+  .rte__area :global(h3) { font-size: clamp(1.3rem, 2.1vw, 1.7rem); }
+  .rte__area :global(h4) { font-size: clamp(1.12rem, 1.6vw, 1.35rem); }
   .rte__area :global(blockquote) {
     border-left: 2px solid var(--accent);
     padding-left: 1em;

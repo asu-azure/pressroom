@@ -52,6 +52,17 @@
     void load();
   });
 
+  // Fade the "scroll for more" cue once the reader starts scrolling.
+  let scrolled = $state(false);
+  $effect(() => {
+    const onScroll = () => (scrolled = window.scrollY > 40);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  });
+  function scrollDown() {
+    document.getElementById('ov-more')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+  }
+
   async function load() {
     const { data: w } = await supabase.from('works').select('*').eq('slug', slug).maybeSingle();
     if (!w) {
@@ -199,11 +210,23 @@
         </div>
       </div>
     </div>
+
+    <button
+      type="button"
+      class="ov-scrollcue mono"
+      class:is-hidden={scrolled}
+      onclick={scrollDown}
+      aria-label="Scroll for more"
+    >
+      <span class="ov-scrollcue__label">{forewordHtml ? i18n.t('ov.foreword') : i18n.t('ov.contents')}</span>
+      <span class="ov-scrollcue__line" aria-hidden="true"></span>
+      <span class="ov-scrollcue__chev" aria-hidden="true"></span>
+    </button>
   </section>
 
   <!-- ACT II: foreword — the buffer leaf between cover and content (paper) -->
   {#if forewordHtml}
-    <section class="ov-fore spread spread--paper">
+    <section class="ov-fore spread spread--paper" id="ov-more">
       <div class="paper-grid" aria-hidden="true"></div>
       <div class="crop crop--tl" aria-hidden="true"></div>
       <div class="crop crop--tr" aria-hidden="true"></div>
@@ -224,7 +247,7 @@
   {/if}
 
   <!-- ACT III: contents — chapter & page overview (ink) -->
-  <section class="ov-toc spread spread--ink">
+  <section class="ov-toc spread spread--ink" id={forewordHtml ? undefined : 'ov-more'}>
     <div class="ov-toc__inner">
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
@@ -323,6 +346,59 @@
     top: 8%;
     right: 4%;
     --wm-stroke: rgba(244, 241, 234, 0.09);
+  }
+  /* "Scroll for more" cue — proof-sheet flavour: mono label, registration
+     hairline, a cobalt chevron that bounces. Fades once the reader scrolls. */
+  .ov-scrollcue {
+    position: absolute;
+    left: 50%;
+    bottom: clamp(1rem, 3.5vh, 2.4rem);
+    transform: translateX(-50%);
+    z-index: 3;
+    display: grid;
+    justify-items: center;
+    gap: 0.5rem;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    transition: opacity 0.5s var(--ease);
+  }
+  .ov-scrollcue.is-hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .ov-scrollcue__label {
+    font-size: 0.55rem;
+    letter-spacing: 0.28em;
+    color: var(--fg-faint);
+    transition: color 0.25s var(--ease);
+  }
+  .ov-scrollcue:hover .ov-scrollcue__label {
+    color: var(--fg);
+  }
+  .ov-scrollcue__line {
+    width: 1px;
+    height: clamp(1rem, 3vh, 1.6rem);
+    background: linear-gradient(var(--accent), transparent);
+  }
+  .ov-scrollcue__chev {
+    width: 0.75rem;
+    height: 0.75rem;
+    margin-top: -0.35rem;
+    border-right: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
+    transform: rotate(45deg);
+    animation: ov-cue-bounce 1.6s var(--ease) infinite;
+  }
+  @keyframes ov-cue-bounce {
+    0%, 100% { transform: rotate(45deg) translate(-2px, -2px); opacity: 0.35; }
+    50% { transform: rotate(45deg) translate(2px, 2px); opacity: 1; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ov-scrollcue__chev {
+      animation: none;
+      opacity: 0.85;
+    }
   }
   .ov-hero__inner {
     position: relative;
@@ -462,9 +538,13 @@
   .ov-fore__body :global(h3),
   .ov-fore__body :global(h4) {
     font-family: var(--font-serif);
-    line-height: 1.35;
+    line-height: 1.25;
     margin: 1.2em 0 0.5em;
   }
+  .ov-fore__body :global(h1) { font-size: clamp(1.9rem, 3.6vw, 2.8rem); }
+  .ov-fore__body :global(h2) { font-size: clamp(1.55rem, 2.8vw, 2.2rem); }
+  .ov-fore__body :global(h3) { font-size: clamp(1.3rem, 2.1vw, 1.7rem); }
+  .ov-fore__body :global(h4) { font-size: clamp(1.12rem, 1.6vw, 1.35rem); }
   .ov-fore__body :global(blockquote) {
     border-left: 2px solid var(--accent);
     padding-left: 1.1em;
