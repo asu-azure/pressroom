@@ -14,10 +14,9 @@ insert into storage.buckets (id, name, public)
 values ('pages', 'pages', true), ('originals', 'originals', false)
 on conflict (id) do nothing;
 
--- Anyone may read page images (the bucket is public, but the select policy
--- also covers authenticated API access).
-create policy pages_storage_read on storage.objects for select
-  using (bucket_id = 'pages');
+-- NOTE: no SELECT policy on the public bucket — public URL access doesn't
+-- need one, and adding one would let clients LIST every file (including
+-- draft pages). Supabase linter 0025.
 
 create policy pages_storage_ins on storage.objects for insert
   with check (bucket_id = 'pages' and is_author());

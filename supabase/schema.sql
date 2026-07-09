@@ -63,9 +63,11 @@ alter table works  enable row level security;
 alter table pages  enable row level security;
 
 -- Author pin: defense in depth on top of disabled signups.
+-- (search_path pinned per Supabase linter 0011; auth.uid() is schema-qualified.)
 create or replace function is_author() returns boolean
-language sql stable as
-$$ select auth.uid() = 'AUTHOR_UID'::uuid $$;
+language sql stable
+set search_path = ''
+as $$ select auth.uid() = 'AUTHOR_UID'::uuid $$;
 
 -- Public read of published content; the author reads everything.
 create policy works_public_read on works for select
@@ -90,8 +92,9 @@ create policy series_author_del on series for delete using (is_author());
 
 -- Keep works.updated_at honest.
 create or replace function touch_updated_at() returns trigger
-language plpgsql as
-$$ begin new.updated_at = now(); return new; end $$;
+language plpgsql
+set search_path = ''
+as $$ begin new.updated_at = now(); return new; end $$;
 
 create trigger works_touch before update on works
   for each row execute function touch_updated_at();
