@@ -495,10 +495,16 @@
     width: min(100%, 62rem);
   }
 
-  /* Phones / portrait: pinning the page height turned each page into a tall,
-     unreadable stripe (esp. spreads at max-width:50%). Size by WIDTH instead so
-     the full spread fits the screen width; tall pages scroll vertically. */
-  @media (max-width: 700px), (orientation: portrait) {
+  /* Phones (any orientation, including short landscape viewports): pinning the
+     page height turned each page into a tall, unreadable stripe (esp. spreads at
+     max-width:50%) — and worse, in landscape the height-sized .si (width:auto,
+     container-type:size) shrink-wraps to zero on mobile WebKit and the page
+     collapses to black. Size by WIDTH instead so the full spread fits the screen
+     width; tall pages scroll vertically. Landscape phones exceed the 700px width
+     breakpoint and aren't `portrait`, so match them by their short height too. */
+  @media (max-width: 700px),
+    (orientation: portrait),
+    (orientation: landscape) and (max-height: 600px) {
     /* Give the flex container a definite width so the width-based .si sizing
        below resolves — without it the grid item shrink-wraps its (zero-
        intrinsic, absolutely-positioned) contents and the page collapses to
