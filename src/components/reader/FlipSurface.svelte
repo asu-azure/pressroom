@@ -476,12 +476,19 @@
     justify-content: center;
     max-width: 100%;
   }
-  /* Fit-height: .si carries the page aspect-ratio, so pinning the height
-     resolves the width; max-width letterboxes oversized spreads (imgs are
-     absolutely positioned with object-fit: contain). */
+  /* Fit-height: compute the width EXPLICITLY from the page's own dimensions
+     (--pw/--ph, set inline by SheetImage) instead of relying on aspect-ratio
+     to transfer the pinned height into a width. Stable iOS WebKit fails that
+     transfer during intrinsic sizing when the box also has container-type:size
+     inside this shrink-wrapping flex/grid chain — .si resolves to width 0 and,
+     because iOS doesn't re-lay-out size containers on rotation, every sheet
+     mounted in that state stays a black rectangle until remounted. An explicit
+     calc() width sidesteps intrinsic sizing on every engine; max-width still
+     letterboxes oversized spreads (imgs are absolutely positioned with
+     object-fit: contain). */
   .fs__pages :global(.si) {
     height: calc(100svh - 6.4rem);
-    width: auto;
+    width: calc((100svh - 6.4rem) * (var(--pw) / var(--ph)));
     max-width: 100%;
   }
   .fs__pages.is-spread :global(.si) {
@@ -495,16 +502,10 @@
     width: min(100%, 62rem);
   }
 
-  /* Phones (any orientation, including short landscape viewports): pinning the
-     page height turned each page into a tall, unreadable stripe (esp. spreads at
-     max-width:50%) — and worse, in landscape the height-sized .si (width:auto,
-     container-type:size) shrink-wraps to zero on mobile WebKit and the page
-     collapses to black. Size by WIDTH instead so the full spread fits the screen
-     width; tall pages scroll vertically. Landscape phones exceed the 700px width
-     breakpoint and aren't `portrait`, so match them by their short height too. */
-  @media (max-width: 700px),
-    (orientation: portrait),
-    (orientation: landscape) and (max-height: 600px) {
+  /* Phones / portrait: pinning the page height turned each page into a tall,
+     unreadable stripe (esp. spreads at max-width:50%). Size by WIDTH instead so
+     the full spread fits the screen width; tall pages scroll vertically. */
+  @media (max-width: 700px), (orientation: portrait) {
     /* Give the flex container a definite width so the width-based .si sizing
        below resolves — without it the grid item shrink-wraps its (zero-
        intrinsic, absolutely-positioned) contents and the page collapses to

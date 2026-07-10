@@ -22,6 +22,12 @@
   } = $props();
 
   let loaded = $state(false);
+  let imgEl = $state<HTMLImageElement | undefined>();
+  // Safari can skip the load event for memory-cached images (likely here — the
+  // reader preloads neighbours), leaving the fade-in stuck at opacity 0.
+  $effect(() => {
+    if (imgEl?.complete && imgEl.naturalWidth > 0) loaded = true;
+  });
   // Tap-to-open on touch (hover handles the desktop case via highlightId).
   let openId = $state<string | null>(null);
 
@@ -47,6 +53,7 @@
   {:else}
   <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" />
   <img
+    bind:this={imgEl}
     class="si__img"
     class:is-loaded={loaded}
     src={page.medUrl}
