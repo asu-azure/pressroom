@@ -198,7 +198,10 @@
 <div class="cf" role="dialog" aria-modal="true" aria-label={`${i18n.t('cast.file')} — ${ch.name}`}>
   <button class="cf__backdrop" bind:this={backdrop} aria-label={i18n.t('cast.close')} onclick={requestClose}></button>
 
-  <div class="cf__frame" bind:this={frame} tabindex="-1" style={`--c:${ch.color}`}>
+  <!-- data-lenis-prevent: a stopped Lenis preventDefaults every touch/wheel it
+       sees, which killed native scrolling inside the file on phones — this
+       attribute makes it leave gestures over the frame alone. -->
+  <div class="cf__frame" bind:this={frame} tabindex="-1" style={`--c:${ch.color}`} data-lenis-prevent>
     <span class="bracket bracket--tl" aria-hidden="true"></span>
     <span class="bracket bracket--tr" aria-hidden="true"></span>
     <span class="bracket bracket--bl" aria-hidden="true"></span>
@@ -574,11 +577,13 @@
     .cf__frame {
       width: 100%;
       height: 100%;
+      height: 100dvh; /* track the iOS URL bar so the HUD/body never sit under it */
       border: 0;
     }
     .cf__body {
       grid-template-columns: 1fr;
-      padding-bottom: 4.5rem; /* room for the floating cast arrows */
+      /* room for the floating cast arrows + iPhone home indicator */
+      padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
     }
     .cf__stageBox {
       width: 100%;
@@ -586,6 +591,9 @@
     }
     .cf__name {
       font-size: clamp(1.9rem, 9vw, 2.6rem);
+    }
+    .cf__nav {
+      bottom: calc(0.9rem + env(safe-area-inset-bottom));
     }
   }
 </style>
