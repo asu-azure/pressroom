@@ -844,6 +844,16 @@
     display: block;
     font-size: clamp(1.02rem, 1.5vw, 1.18rem);
     line-height: 2;
+    /* Author HTML can contain anything (pasted content included). A bare
+       full-size <img> outside a fore-fig once inflated this grid item's
+       min-content width past the viewport and dragged the whole column with
+       it — clamp every image and let the column shrink. */
+    min-width: 0;
+    overflow-wrap: break-word;
+  }
+  .ov-fore__body :global(img) {
+    max-width: 100%;
+    height: auto;
   }
   .ov-fore__body::after {
     content: '';

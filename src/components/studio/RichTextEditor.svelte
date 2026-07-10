@@ -373,6 +373,12 @@
   .rte__area :global(.fore-fig--sm) { width: 30%; }
   .rte__area :global(.fore-fig--md) { width: 48%; }
   .rte__area :global(.fore-fig--lg) { width: 66%; }
+  /* Any image — pasted content can carry bare <img> outside a fore-fig;
+     clamp it exactly like the rendered page does. */
+  .rte__area :global(img) {
+    max-width: 100%;
+    height: auto;
+  }
   .rte__area :global(.fore-fig img) {
     display: block;
     width: 100%;
