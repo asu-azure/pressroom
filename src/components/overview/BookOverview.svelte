@@ -318,84 +318,14 @@
       onclick={scrollDown}
       aria-label="Scroll for more"
     >
-      <span class="ov-scrollcue__label">
-        {castList.length ? i18n.t('ov.cast') : forewordHtml ? i18n.t('ov.foreword') : i18n.t('ov.contents')}
-      </span>
+      <span class="ov-scrollcue__label">{i18n.t('ov.contents')}</span>
       <span class="ov-scrollcue__line" aria-hidden="true"></span>
       <span class="ov-scrollcue__chev" aria-hidden="true"></span>
     </button>
   </section>
 
-  <!-- ACT I·5: cast — who's who, straight after the cover (paper) -->
-  {#if castList.length}
-    <section class="ov-cast spread spread--paper" id="ov-more">
-      <div class="paper-grid" aria-hidden="true"></div>
-      <div class="crop crop--tl" aria-hidden="true"></div>
-      <div class="crop crop--tr" aria-hidden="true"></div>
-      <div class="crop crop--bl" aria-hidden="true"></div>
-      <div class="crop crop--br" aria-hidden="true"></div>
-      <div class="regmark ov-cast__reg" aria-hidden="true"></div>
-      <span class="watermark ov-cast__wm" aria-hidden="true">登場人物</span>
-      <div class="ov-cast__inner">
-        <header class="ov-cast__head" use:reveal>
-          <span class="index-num" aria-hidden="true">人</span>
-          <h2 class="serif ov-cast__title">{i18n.t('ov.cast')}</h2>
-          <span class="ov-cast__rule" aria-hidden="true"></span>
-          <span class="mono">{pad2(castList.length)}</span>
-        </header>
-        <div class="ov-cast__grid" use:revealChildren>
-          {#each castList as c, i (c.id)}
-            <button
-              type="button"
-              class="ov-castTile"
-              style={`--c:${c.color}`}
-              onclick={() => openCast(i)}
-              data-cursor="VIEW"
-            >
-              <span class="ov-castTile__frame">
-                {#if c.iconUrl}
-                  <img src={c.iconUrl} alt="" loading="lazy" draggable="false" />
-                {:else}
-                  <span class="serif ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
-                {/if}
-                <span class="mono ov-castTile__num">{pad2(i + 1)}</span>
-              </span>
-              <span class="serif ov-castTile__name">{c.name}</span>
-              {#if c.role}
-                <span class="mono ov-castTile__role">{c.role}</span>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      </div>
-    </section>
-  {/if}
-
-  <!-- ACT II: foreword — the buffer leaf between cover and content (paper) -->
-  {#if forewordHtml}
-    <section class="ov-fore spread spread--paper" id={castList.length ? undefined : 'ov-more'}>
-      <div class="paper-grid" aria-hidden="true"></div>
-      <div class="crop crop--tl" aria-hidden="true"></div>
-      <div class="crop crop--tr" aria-hidden="true"></div>
-      <div class="crop crop--bl" aria-hidden="true"></div>
-      <div class="crop crop--br" aria-hidden="true"></div>
-      <div class="regmark ov-fore__reg" aria-hidden="true"></div>
-      <div class="ov-fore__inner">
-        <p class="mono ov-fore__label" use:reveal>✳ {i18n.t('ov.foreword')}</p>
-        <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
-        <div class="ov-fore__body serif" use:revealChildren>
-          {@html forewordHtml}
-        </div>
-        <div class="ov-fore__sig">
-          <span class="sig-mark serif" aria-hidden="true">A</span>
-          <span class="mono">ASU AZURE</span>
-        </div>
-      </div>
-    </section>
-  {/if}
-
-  <!-- ACT III: contents — chapter & page overview (ink) -->
-  <section class="ov-toc spread spread--ink" id={castList.length || forewordHtml ? undefined : 'ov-more'}>
+  <!-- ACT II: contents — page & chapter overview, straight after the cover (ink) -->
+  <section class="ov-toc spread spread--ink" id="ov-more">
     <div class="ov-toc__inner">
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
@@ -416,6 +346,22 @@
           <button type="button" class="mono ov-lockNote__btn" onclick={() => openLock(null)}>
             {i18n.t('lock.unlock')} →
           </button>
+        </div>
+      {/if}
+
+      <!-- Chapterless works: every page is "front matter" — show one plain
+           strip (the old chapters-only condition left this section empty). -->
+      {#if !locked && !chapterList.length && frontPages.length}
+        <div class="ov-chapter" use:reveal>
+          <div class="ov-strip" class:is-rtl={work.direction === 'rtl'}>
+            {#each frontPages.filter((p) => !p.isBlank) as page (page.id)}
+              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`} data-cursor="READ">
+                <img src={page.thumbUrl} alt="" loading="lazy" />
+                <span class="mono ov-thumb__num">{String(ordered.indexOf(page) + 1).padStart(2, '0')}</span>
+                {#if page.note}<span class="ov-thumb__note" title="note"></span>{/if}
+              </a>
+            {/each}
+          </div>
         </div>
       {/if}
 
@@ -471,13 +417,82 @@
           </div>
         </div>
       {/each}
-
-      <footer class="ov-foot">
-        <a class="mono ov-foot__back" href="/" data-magnetic>← {i18n.t('ov.back')}</a>
-        <span class="mono">© ASU AZURE</span>
-      </footer>
     </div>
   </section>
+
+  <!-- ACT III: cast — who's who (paper) -->
+  {#if castList.length}
+    <section class="ov-cast spread spread--paper">
+      <div class="paper-grid" aria-hidden="true"></div>
+      <div class="crop crop--tl" aria-hidden="true"></div>
+      <div class="crop crop--tr" aria-hidden="true"></div>
+      <div class="crop crop--bl" aria-hidden="true"></div>
+      <div class="crop crop--br" aria-hidden="true"></div>
+      <div class="regmark ov-cast__reg" aria-hidden="true"></div>
+      <span class="watermark ov-cast__wm" aria-hidden="true">登場人物</span>
+      <div class="ov-cast__inner">
+        <header class="ov-cast__head" use:reveal>
+          <span class="index-num" aria-hidden="true">人</span>
+          <h2 class="serif ov-cast__title">{i18n.t('ov.cast')}</h2>
+          <span class="ov-cast__rule" aria-hidden="true"></span>
+          <span class="mono">{pad2(castList.length)}</span>
+        </header>
+        <div class="ov-cast__grid" use:revealChildren>
+          {#each castList as c, i (c.id)}
+            <button
+              type="button"
+              class="ov-castTile"
+              style={`--c:${c.color}`}
+              onclick={() => openCast(i)}
+              data-cursor="VIEW"
+            >
+              <span class="ov-castTile__frame">
+                {#if c.iconUrl}
+                  <img src={c.iconUrl} alt="" loading="lazy" draggable="false" />
+                {:else}
+                  <span class="serif ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
+                {/if}
+                <span class="mono ov-castTile__num">{pad2(i + 1)}</span>
+              </span>
+              <span class="serif ov-castTile__name">{c.name}</span>
+              {#if c.role}
+                <span class="mono ov-castTile__role">{c.role}</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      </div>
+    </section>
+  {/if}
+
+  <!-- ACT IV: synopsis — the spoiler leaf, last before the imprint (paper) -->
+  {#if forewordHtml}
+    <section class="ov-fore spread spread--paper">
+      <div class="paper-grid" aria-hidden="true"></div>
+      <div class="crop crop--tl" aria-hidden="true"></div>
+      <div class="crop crop--tr" aria-hidden="true"></div>
+      <div class="crop crop--bl" aria-hidden="true"></div>
+      <div class="crop crop--br" aria-hidden="true"></div>
+      <div class="regmark ov-fore__reg" aria-hidden="true"></div>
+      <div class="ov-fore__inner">
+        <p class="mono ov-fore__label" use:reveal>✳ {i18n.t('ov.foreword')}</p>
+        <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
+        <div class="ov-fore__body serif" use:revealChildren>
+          {@html forewordHtml}
+        </div>
+        <div class="ov-fore__sig">
+          <span class="sig-mark serif" aria-hidden="true">A</span>
+          <span class="mono">ASU AZURE</span>
+        </div>
+      </div>
+    </section>
+  {/if}
+
+  <!-- Page foot: back link + imprint, always the last leaf (ink) -->
+  <footer class="ov-foot spread spread--ink">
+    <a class="mono ov-foot__back" href="/" data-magnetic>← {i18n.t('ov.back')}</a>
+    <span class="mono">© ASU AZURE</span>
+  </footer>
 
   {#if castOpen !== null && castList[castOpen]}
     <CastFile characters={castList} index={castOpen} onNavigate={navCast} onClose={closeCast} />
@@ -1096,11 +1111,13 @@
   }
 
   .ov-foot {
+    position: relative;
+    z-index: 1;
     display: flex;
     justify-content: space-between;
     gap: 1rem;
     border-top: 1px solid var(--line);
-    padding-top: 1.4rem;
+    padding: clamp(1.6rem, 4vh, 2.4rem) var(--pad);
   }
   .ov-foot__back:hover {
     color: var(--accent);
