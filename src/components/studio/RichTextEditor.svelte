@@ -7,11 +7,15 @@
     workId,
     onChange,
     placeholder = '',
+    allowImages = true,
   }: {
     value: string;
     workId: string;
     onChange: (html: string) => void;
     placeholder?: string;
+    /** false = text-only (no figure insert/paste/drop) — e.g. character bios
+        keep their images in the profile gallery instead. */
+    allowImages?: boolean;
   } = $props();
 
   let editor: HTMLElement;
@@ -63,6 +67,7 @@
 
   /** Upload each image file (downscale + WebP) and drop a figure at the caret. */
   async function uploadAndInsert(files: File[]) {
+    if (!allowImages) return;
     const images = files.filter((f) => f.type.startsWith('image/'));
     if (!images.length) return;
     uploading = true;
@@ -190,17 +195,19 @@
     </select>
     <span class="rte__sep" aria-hidden="true"></span>
     <button type="button" class="rte__btn mono" title="Clear formatting" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('removeFormat')}>⌫ FMT</button>
-    <span class="rte__sep" aria-hidden="true"></span>
-    <button type="button" class="rte__btn mono" title="Insert image — or paste / drop one directly" disabled={uploading} onclick={() => fileInput.click()}>
-      {uploading ? '…' : '⌷ IMAGE'}
-    </button>
-    <input
-      class="rte__file"
-      type="file"
-      accept="image/*"
-      bind:this={fileInput}
-      onchange={onPickImage}
-    />
+    {#if allowImages}
+      <span class="rte__sep" aria-hidden="true"></span>
+      <button type="button" class="rte__btn mono" title="Insert image — or paste / drop one directly" disabled={uploading} onclick={() => fileInput.click()}>
+        {uploading ? '…' : '⌷ IMAGE'}
+      </button>
+      <input
+        class="rte__file"
+        type="file"
+        accept="image/*"
+        bind:this={fileInput}
+        onchange={onPickImage}
+      />
+    {/if}
   </div>
 
   {#if activeFig}

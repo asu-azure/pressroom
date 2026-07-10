@@ -9,6 +9,8 @@
   import { toRichHtml } from '../../lib/richtext';
   import { i18n } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
+  import CastFile from './CastFile.svelte';
+  import { hasProfile } from '../../lib/types';
   import type { Work, PageRec, Chapter } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
@@ -48,6 +50,45 @@
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
 
+  // --- Cast page: profiled characters only, in the author's array order ---
+  const castList = $derived((work?.characters ?? []).filter(hasProfile));
+  let castOpen = $state<number | null>(null);
+  let castPushed = false; // whether the open overlay pushed a history entry
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+
+  function castUrl(id: string | null): string {
+    const url = new URL(location.href);
+    if (id) url.searchParams.set('c', id);
+    else url.searchParams.delete('c');
+    return url.toString();
+  }
+  function openCast(i: number) {
+    castOpen = i;
+    castPushed = true;
+    history.pushState({ castFile: true }, '', castUrl(castList[i].id));
+  }
+  function navCast(i: number) {
+    castOpen = i;
+    history.replaceState(history.state, '', castUrl(castList[i].id));
+  }
+  function closeCast() {
+    if (castPushed) {
+      castPushed = false;
+      history.back(); // popstate clears the ?c= URL and castOpen below
+    } else {
+      history.replaceState(history.state, '', castUrl(null));
+    }
+    castOpen = null;
+  }
+  $effect(() => {
+    const onPop = () => {
+      castOpen = null;
+      castPushed = false;
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  });
+
   $effect(() => {
     void load();
   });
@@ -79,6 +120,12 @@
     chapters = (chRows ?? []) as Chapter[];
     continueAt = loadProgress(work.id);
     status = 'ready';
+    // Deep link: /w/slug?c=charId opens that character's file directly.
+    const requested = new URLSearchParams(location.search).get('c');
+    if (requested) {
+      const idx = castList.findIndex((c) => c.id === requested);
+      if (idx >= 0) castOpen = idx; // not pushed — closing just clears ?c=
+    }
   }
 
   // --- Editorial FUI motion: reversible scroll entrances + decode labels ---
@@ -218,15 +265,62 @@
       onclick={scrollDown}
       aria-label="Scroll for more"
     >
-      <span class="ov-scrollcue__label">{forewordHtml ? i18n.t('ov.foreword') : i18n.t('ov.contents')}</span>
+      <span class="ov-scrollcue__label">
+        {castList.length ? i18n.t('ov.cast') : forewordHtml ? i18n.t('ov.foreword') : i18n.t('ov.contents')}
+      </span>
       <span class="ov-scrollcue__line" aria-hidden="true"></span>
       <span class="ov-scrollcue__chev" aria-hidden="true"></span>
     </button>
   </section>
 
+  <!-- ACT I·5: cast — who's who, straight after the cover (paper) -->
+  {#if castList.length}
+    <section class="ov-cast spread spread--paper" id="ov-more">
+      <div class="paper-grid" aria-hidden="true"></div>
+      <div class="crop crop--tl" aria-hidden="true"></div>
+      <div class="crop crop--tr" aria-hidden="true"></div>
+      <div class="crop crop--bl" aria-hidden="true"></div>
+      <div class="crop crop--br" aria-hidden="true"></div>
+      <div class="regmark ov-cast__reg" aria-hidden="true"></div>
+      <span class="watermark ov-cast__wm" aria-hidden="true">登場人物</span>
+      <div class="ov-cast__inner">
+        <header class="ov-cast__head" use:reveal>
+          <span class="index-num" aria-hidden="true">人</span>
+          <h2 class="serif ov-cast__title">{i18n.t('ov.cast')}</h2>
+          <span class="ov-cast__rule" aria-hidden="true"></span>
+          <span class="mono">{pad2(castList.length)}</span>
+        </header>
+        <div class="ov-cast__grid" use:revealChildren>
+          {#each castList as c, i (c.id)}
+            <button
+              type="button"
+              class="ov-castTile"
+              style={`--c:${c.color}`}
+              onclick={() => openCast(i)}
+              data-cursor="VIEW"
+            >
+              <span class="ov-castTile__frame">
+                {#if c.iconUrl}
+                  <img src={c.iconUrl} alt="" loading="lazy" draggable="false" />
+                {:else}
+                  <span class="serif ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
+                {/if}
+                <span class="mono ov-castTile__num">{pad2(i + 1)}</span>
+              </span>
+              <span class="serif ov-castTile__name">{c.name}</span>
+              {#if c.role}
+                <span class="mono ov-castTile__role">{c.role}</span>
+              {/if}
+            </button>
+          {/each}
+        </div>
+      </div>
+    </section>
+  {/if}
+
   <!-- ACT II: foreword — the buffer leaf between cover and content (paper) -->
   {#if forewordHtml}
-    <section class="ov-fore spread spread--paper" id="ov-more">
+    <section class="ov-fore spread spread--paper" id={castList.length ? undefined : 'ov-more'}>
       <div class="paper-grid" aria-hidden="true"></div>
       <div class="crop crop--tl" aria-hidden="true"></div>
       <div class="crop crop--tr" aria-hidden="true"></div>
@@ -247,7 +341,7 @@
   {/if}
 
   <!-- ACT III: contents — chapter & page overview (ink) -->
-  <section class="ov-toc spread spread--ink" id={forewordHtml ? undefined : 'ov-more'}>
+  <section class="ov-toc spread spread--ink" id={castList.length || forewordHtml ? undefined : 'ov-more'}>
     <div class="ov-toc__inner">
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
@@ -315,6 +409,10 @@
       </footer>
     </div>
   </section>
+
+  {#if castOpen !== null && castList[castOpen]}
+    <CastFile characters={castList} index={castOpen} onNavigate={navCast} onClose={closeCast} />
+  {/if}
 {/if}
 
 <style>
@@ -492,6 +590,134 @@
       max-width: min(70vw, 18rem);
     }
     .ov-hero__wm {
+      display: none;
+    }
+  }
+
+  /* ---- cast (paper leaf: who's who) ---- */
+  .ov-cast {
+    position: relative;
+    z-index: 1;
+    padding: clamp(5rem, 12vh, 8rem) var(--pad);
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .ov-cast__reg {
+    top: 2.4rem;
+    left: 10%;
+  }
+  .ov-cast__wm {
+    top: 6%;
+    right: 3%;
+    font-size: clamp(5rem, 16vw, 13rem);
+  }
+  .ov-cast__inner {
+    position: relative;
+    z-index: 2;
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    gap: clamp(1.8rem, 4.5vh, 2.8rem);
+  }
+  .ov-cast__head {
+    display: flex;
+    align-items: baseline;
+    gap: 1.2rem;
+    position: relative;
+  }
+  .ov-cast__head .index-num {
+    position: absolute;
+    top: -0.55em;
+    left: -0.12em;
+    z-index: -1;
+    font-size: clamp(5rem, 13vw, 9rem);
+  }
+  .ov-cast__title {
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+  }
+  .ov-cast__rule {
+    flex: 1;
+    height: 1px;
+    background: var(--line-strong);
+  }
+  .ov-cast__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(clamp(7.5rem, 17vw, 10.5rem), 1fr));
+    gap: clamp(0.9rem, 2.2vw, 1.6rem);
+  }
+  /* Roster tile — the art site's gallery-tile recipe, framed in the
+     character's own colour. */
+  .ov-castTile {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    text-align: left;
+    color: var(--fg);
+  }
+  .ov-castTile__frame {
+    position: relative;
+    display: block;
+    aspect-ratio: 1;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-soft);
+    overflow: hidden;
+  }
+  .ov-castTile__frame img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.65s var(--ease), filter 0.65s var(--ease);
+  }
+  .ov-castTile__frame::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 2px solid var(--c, var(--accent));
+    opacity: 0;
+    transition: opacity 0.3s var(--ease);
+    pointer-events: none;
+  }
+  .ov-castTile:hover .ov-castTile__frame img,
+  .ov-castTile:focus-visible .ov-castTile__frame img {
+    transform: scale(1.06);
+  }
+  .ov-castTile:hover .ov-castTile__frame::after,
+  .ov-castTile:focus-visible .ov-castTile__frame::after {
+    opacity: 1;
+  }
+  .ov-castTile__ph {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: clamp(2.6rem, 7vw, 4rem);
+    font-style: italic;
+    color: color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
+    user-select: none;
+  }
+  .ov-castTile__num {
+    position: absolute;
+    top: 4px;
+    left: 5px;
+    font-size: 0.52rem;
+    color: #f4f1ea;
+    mix-blend-mode: difference;
+  }
+  .ov-castTile__name {
+    font-size: clamp(1.02rem, 1.8vw, 1.25rem);
+    line-height: 1.25;
+  }
+  .ov-castTile__role {
+    font-size: 0.55rem;
+    color: var(--fg-faint);
+  }
+  @media (max-width: 640px) {
+    .ov-cast__wm {
       display: none;
     }
   }

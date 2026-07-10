@@ -5,6 +5,7 @@
   import PdfUploader from './PdfUploader.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import CoverCropper from './CoverCropper.svelte';
+  import CharacterProfileEditor from './CharacterProfileEditor.svelte';
   import { toPageRec } from '../../lib/storagePaths';
   import type { Work, PageRow, Chapter, Character, CoverCrop } from '../../lib/types';
 
@@ -60,7 +61,20 @@
   }
   function removeCharacter(id: string) {
     meta.characters = meta.characters.filter((c) => c.id !== id);
+    if (profileOpenId === id) profileOpenId = null;
   }
+  // Array order IS the cast-page order — swap adjacent entries (same pattern
+  // as BubbleEditor.moveBubble).
+  function moveCharacter(id: string, dir: -1 | 1) {
+    const i = meta.characters.findIndex((c) => c.id === id);
+    const j = i + dir;
+    if (i === -1 || j < 0 || j >= meta.characters.length) return;
+    const next = [...meta.characters];
+    [next[i], next[j]] = [next[j], next[i]];
+    meta.characters = next;
+  }
+  // Which character's profile editor is disclosed (one at a time).
+  let profileOpenId = $state<string | null>(null);
 
   $effect(() => {
     void init();
@@ -270,14 +284,26 @@
         <input type="text" bind:value={meta.tagsText} placeholder="fantasy, one-shot, colour" />
       </label>
       <div class="we__field we__field--wide">
-        <span class="mono">CAST (SPEAKERS FOR TRANSLATED BUBBLES — NAME + COLOUR)</span>
+        <span class="mono">CAST (BUBBLE SPEAKERS + CHARACTER PAGE — ORDER = ROSTER ORDER)</span>
         <div class="we__cast">
-          {#each meta.characters as ch (ch.id)}
+          {#each meta.characters as ch, i (ch.id)}
             <div class="we__castRow">
               <input class="we__castColor" type="color" bind:value={ch.color} aria-label="Colour" />
               <input class="we__castName" type="text" bind:value={ch.name} placeholder="Character name" />
+              <button type="button" class="mono we__castBtn" onclick={() => moveCharacter(ch.id, -1)} disabled={i === 0} title="Move up">↑</button>
+              <button type="button" class="mono we__castBtn" onclick={() => moveCharacter(ch.id, 1)} disabled={i === meta.characters.length - 1} title="Move down">↓</button>
+              <button
+                type="button"
+                class="mono we__castBtn we__castProfile"
+                class:is-open={profileOpenId === ch.id}
+                onclick={() => (profileOpenId = profileOpenId === ch.id ? null : ch.id)}
+                title="Character-page profile"
+              >PROFILE {profileOpenId === ch.id ? '▴' : '▾'}</button>
               <button type="button" class="mono we__castDel" onclick={() => removeCharacter(ch.id)} title="Remove">✕</button>
             </div>
+            {#if profileOpenId === ch.id}
+              <CharacterProfileEditor character={ch} {workId} />
+            {/if}
           {/each}
           <button type="button" class="mono we__castAdd" onclick={addCharacter}>+ ADD CHARACTER</button>
         </div>
@@ -425,12 +451,26 @@
   .we__castName {
     flex: 1;
   }
+  .we__castBtn,
   .we__castDel {
     background: none;
     border: 1px solid var(--line-strong);
     color: var(--fg-dim);
     padding: 0.5em 0.8em;
     cursor: pointer;
+    flex-shrink: 0;
+  }
+  .we__castBtn:hover:not(:disabled) {
+    color: var(--fg);
+    border-color: var(--fg-dim);
+  }
+  .we__castBtn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+  .we__castProfile.is-open {
+    color: var(--accent);
+    border-color: var(--accent);
   }
   .we__castDel:hover {
     color: #e8a31a;

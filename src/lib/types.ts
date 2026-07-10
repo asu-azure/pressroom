@@ -4,11 +4,32 @@ export type Layout = 'single' | 'double';
 export type Mode = 'scroll' | 'flip';
 export type FitMode = 'height' | 'width';
 
-/** A named speaker in a work's cast — reused across every bubble. */
+/** One image in a character's profile gallery. */
+export interface CastImage {
+  url: string;
+  caption?: string;
+}
+
+/**
+ * A named speaker in a work's cast — reused across every bubble, and (when the
+ * optional profile fields are filled in) shown on the overview's cast page.
+ * Array order in `Work.characters` is the author's display order. A character
+ * appears in the reader-facing roster only if it has profile content
+ * (see `hasProfile`).
+ */
 export interface Character {
   id: string;
   name: string;
-  color: string; // hex accent, colour-codes the bubble + tooltip
+  color: string; // hex accent, colour-codes the bubble + tooltip + cast tile
+  role?: string; // mono micro-label, e.g. "PROTAGONIST"
+  iconUrl?: string; // square face crop for the roster tile
+  images?: CastImage[]; // profile gallery, ordered
+  bio?: string; // rich HTML — sanitized through richtext.ts before render
+}
+
+/** Cast-page visibility: bubble-only mob characters stay hidden automatically. */
+export function hasProfile(c: Character): boolean {
+  return Boolean(c.iconUrl || c.bio || c.images?.length);
 }
 
 /**
