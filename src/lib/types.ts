@@ -81,6 +81,8 @@ export interface Work {
   cover_page_id: string | null;
   cover_crop: CoverCrop | null;
   cover_solo: boolean;
+  read_locked: boolean; // pages behind a password (RLS enforces; see read-lock.sql)
+  password_hint: string | null; // public by design — shown on the lock gate
   published: boolean;
   created_at: string;
   updated_at: string;

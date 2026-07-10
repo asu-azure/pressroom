@@ -4,7 +4,7 @@
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
   import { i18n } from '../../lib/i18n.svelte';
-  import { loadSettings, saveSettings, loadProgress, saveProgress } from '../../lib/persistence';
+  import { loadSettings, saveSettings, loadProgress, saveProgress, loadUnlock, clearUnlock } from '../../lib/persistence';
   import ScrollSurface from './ScrollSurface.svelte';
   import FlipSurface from './FlipSurface.svelte';
   import ReaderChrome from './ReaderChrome.svelte';
@@ -81,10 +81,25 @@
       translate: false,
     });
 
-    const [{ data: rows }, { data: chRows }] = await Promise.all([
+    let [{ data: rows }, { data: chRows }] = await Promise.all([
       supabase.from('pages').select('*').eq('work_id', work.id).order('sort_key'),
       supabase.from('chapters').select('*').eq('work_id', work.id).order('sort_key'),
     ]);
+    // Locked work: RLS returns at most the cover row to anon. The gate lives
+    // on the book page — redirect there unless this tab already unlocked it
+    // (author sessions get everything from the plain select above).
+    if (work.read_locked && (rows ?? []).length <= 1) {
+      const key = loadUnlock(work.id);
+      const { data: unlockedRows } = key
+        ? await supabase.rpc('unlock_pages', { p_work_id: work.id, p_password: key })
+        : { data: null };
+      if (!unlockedRows?.length) {
+        if (key) clearUnlock(work.id); // password changed since
+        location.replace(`/w/${slug}`);
+        return;
+      }
+      rows = unlockedRows;
+    }
     pages = (rows ?? []).map(toPageRec);
     chapters = (chRows ?? []) as Chapter[];
 

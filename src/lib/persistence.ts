@@ -47,3 +47,33 @@ export function saveProgress(workId: string, pageId: string): void {
     /* ignore */
   }
 }
+
+// --- Reading lock: the unlocked password, per work, per TAB SESSION ---
+// The unlock_pages RPC is stateless (RLS has no session), so the password is
+// re-sent on each fetch; sessionStorage keeps it for the tab only — closing
+// the tab re-asks. Never mirrored to localStorage.
+const unlockKeyFor = (workId: string) => `pressroom:unlock:${workId}`;
+
+export function loadUnlock(workId: string): string | null {
+  try {
+    return sessionStorage.getItem(unlockKeyFor(workId));
+  } catch {
+    return null;
+  }
+}
+
+export function saveUnlock(workId: string, password: string): void {
+  try {
+    sessionStorage.setItem(unlockKeyFor(workId), password);
+  } catch {
+    /* private mode — the gate will just re-ask */
+  }
+}
+
+export function clearUnlock(workId: string): void {
+  try {
+    sessionStorage.removeItem(unlockKeyFor(workId));
+  } catch {
+    /* ignore */
+  }
+}

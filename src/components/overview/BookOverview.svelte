@@ -4,14 +4,15 @@
   import { supabase } from '../../lib/supabase';
   import { toPageRec } from '../../lib/storagePaths';
   import { sortedChapters } from '../../lib/chapterOrder';
-  import { loadProgress } from '../../lib/persistence';
+  import { loadProgress, loadUnlock, clearUnlock } from '../../lib/persistence';
   import { decode } from '../../scripts/text';
   import { toRichHtml } from '../../lib/richtext';
   import { i18n } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
+  import LockGate from './LockGate.svelte';
   import { hasProfile } from '../../lib/types';
-  import type { Work, PageRec, Chapter } from '../../lib/types';
+  import type { Work, PageRec, Chapter, PageRow } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
 
@@ -49,6 +50,26 @@
   const statusKey = $derived(
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
+
+  // --- Reading lock: RLS hides page rows of locked works (cover excepted).
+  //     `unlocked` flips when the session key works or the author is signed in
+  //     (their select already returned everything). ---
+  let unlocked = $state(false);
+  let lockOpen = $state(false);
+  let pendingHref = $state<string | null>(null);
+  const locked = $derived(Boolean(work?.read_locked) && !unlocked);
+
+  function openLock(href: string | null, e?: Event) {
+    e?.preventDefault();
+    pendingHref = href;
+    lockOpen = true;
+  }
+  function onUnlocked(rows: PageRow[]) {
+    pages = rows.map(toPageRec);
+    unlocked = true;
+    lockOpen = false;
+    if (pendingHref) location.href = pendingHref;
+  }
 
   // --- Cast page: profiled characters only, in the author's array order ---
   const castList = $derived((work?.characters ?? []).filter(hasProfile));
@@ -118,6 +139,27 @@
     ]);
     pages = (rows ?? []).map(toPageRec);
     chapters = (chRows ?? []) as Chapter[];
+    // Locked work: >1 visible row means the author's session (RLS let it
+    // through); otherwise try this tab's remembered password.
+    if (work.read_locked) {
+      if (pages.length > 1) {
+        unlocked = true;
+      } else {
+        const key = loadUnlock(work.id);
+        if (key) {
+          const { data } = await supabase.rpc('unlock_pages', {
+            p_work_id: work.id,
+            p_password: key,
+          });
+          if (data?.length) {
+            pages = (data as PageRow[]).map(toPageRec);
+            unlocked = true;
+          } else {
+            clearUnlock(work.id); // password changed since — re-ask
+          }
+        }
+      }
+    }
     continueAt = loadProgress(work.id);
     status = 'ready';
     // Deep link: /w/slug?c=charId opens that character's file directly.
@@ -246,11 +288,22 @@
           <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{work.description}</p>
         {/if}
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
-          <a class="ov-btn mono" href={continueAt ? continueHref : readHref} data-magnetic>
+          <a
+            class="ov-btn mono"
+            href={continueAt ? continueHref : readHref}
+            data-magnetic
+            onclick={(e) => locked && openLock(continueAt ? continueHref : readHref, e)}
+          >
+            {#if locked}<span aria-hidden="true">🔒 </span>{/if}
             {continueAt ? i18n.t('ov.continue') : i18n.t('ov.start')} →
           </a>
           {#if continueAt}
-            <a class="ov-btn ov-btn--ghost mono" href={readHref} data-magnetic>
+            <a
+              class="ov-btn ov-btn--ghost mono"
+              href={readHref}
+              data-magnetic
+              onclick={(e) => locked && openLock(readHref, e)}
+            >
               {i18n.t('ov.start')}
             </a>
           {/if}
@@ -348,10 +401,25 @@
         <span class="index-num" aria-hidden="true">目</span>
         <h2 class="serif ov-toc__title">{i18n.t('ov.contents')}</h2>
         <span class="ov-toc__rule" aria-hidden="true"></span>
-        <span class="mono">{realPageCount} {i18n.t('ov.pages')}</span>
+        <span class="mono">{locked ? '——' : realPageCount} {i18n.t('ov.pages')}</span>
       </header>
 
-      {#if frontPages.length && chapterList.length}
+      {#if locked}
+        <!-- RLS returns only the cover row, so there is nothing to strip —
+             show the gate invitation instead of thumbnails. -->
+        <div class="ov-lockNote" use:reveal>
+          <span class="ov-lockNote__glyph" aria-hidden="true">🔒</span>
+          <p class="mono ov-lockNote__text">{i18n.t('ov.locked')}</p>
+          {#if work.password_hint}
+            <p class="mono ov-lockNote__hint">{i18n.t('lock.hint')} — {work.password_hint}</p>
+          {/if}
+          <button type="button" class="mono ov-lockNote__btn" onclick={() => openLock(null)}>
+            {i18n.t('lock.unlock')} →
+          </button>
+        </div>
+      {/if}
+
+      {#if !locked && frontPages.length && chapterList.length}
         <div class="ov-chapter" use:reveal>
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">00</span>
@@ -370,7 +438,7 @@
         </div>
       {/if}
 
-      {#each chapterList as { ch, pages: chPages, cover: chCover }, ci (ch.id)}
+      {#each locked ? [] : chapterList as { ch, pages: chPages, cover: chCover }, ci (ch.id)}
         <div class="ov-chapter" use:reveal>
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">{String(ci + 1).padStart(2, '0')}</span>
@@ -413,6 +481,10 @@
 
   {#if castOpen !== null && castList[castOpen]}
     <CastFile characters={castList} index={castOpen} onNavigate={navCast} onClose={closeCast} />
+  {/if}
+
+  {#if lockOpen}
+    <LockGate {work} {onUnlocked} onClose={() => (lockOpen = false)} />
   {/if}
 {/if}
 
@@ -989,6 +1061,40 @@
     border-radius: 50%;
     background: #e8a31a;
   }
+  /* Locked contents — the gate invitation where the strips would be. */
+  .ov-lockNote {
+    display: grid;
+    justify-items: center;
+    gap: 0.8rem;
+    padding: clamp(2.5rem, 8vh, 4.5rem) 1rem;
+    border: 1px dashed var(--line-strong);
+    text-align: center;
+  }
+  .ov-lockNote__glyph {
+    font-size: 1.6rem;
+    opacity: 0.75;
+  }
+  .ov-lockNote__text {
+    letter-spacing: 0.2em;
+  }
+  .ov-lockNote__hint {
+    font-size: 0.6rem;
+    color: #e8a31a;
+  }
+  .ov-lockNote__btn {
+    margin-top: 0.4rem;
+    background: var(--accent);
+    color: var(--ink-fg);
+    border: 0;
+    padding: 0.8em 1.5em;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: background-color 0.25s var(--ease);
+  }
+  .ov-lockNote__btn:hover {
+    background: #1d33c4;
+  }
+
   .ov-foot {
     display: flex;
     justify-content: space-between;

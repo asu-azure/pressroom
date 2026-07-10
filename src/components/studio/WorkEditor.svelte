@@ -76,6 +76,45 @@
   // Which character's profile editor is disclosed (one at a time).
   let profileOpenId = $state<string | null>(null);
 
+  // --- Reading lock: password lives server-side as a bf hash (read-lock.sql);
+  //     only its existence + the hint are visible here. Changeable any time. ---
+  let lockPassword = $state('');
+  let lockHint = $state('');
+  let lockBusy = $state(false);
+  let lockFlash = $state<string | null>(null);
+
+  async function setLock() {
+    if (!lockPassword.trim()) return;
+    lockBusy = true;
+    const { error: err } = await supabase.rpc('set_read_password', {
+      p_work_id: workId,
+      p_password: lockPassword,
+      p_hint: lockHint,
+    });
+    lockBusy = false;
+    if (err) {
+      error = err.message;
+      return;
+    }
+    lockPassword = '';
+    lockFlash = 'LOCK SET ✓';
+    setTimeout(() => (lockFlash = null), 1600);
+    await loadWork();
+  }
+  async function removeLock() {
+    lockBusy = true;
+    const { error: err } = await supabase.rpc('clear_read_password', { p_work_id: workId });
+    lockBusy = false;
+    if (err) {
+      error = err.message;
+      return;
+    }
+    lockPassword = '';
+    lockFlash = 'LOCK REMOVED';
+    setTimeout(() => (lockFlash = null), 1600);
+    await loadWork();
+  }
+
   $effect(() => {
     void init();
   });
@@ -116,6 +155,7 @@
       tagsText: work.tags.join(', '),
       characters: (work.characters ?? []).map((c) => ({ ...c })),
     };
+    lockHint = work.password_hint ?? '';
   }
 
   async function loadPages() {
@@ -284,6 +324,47 @@
         <input type="text" bind:value={meta.tagsText} placeholder="fantasy, one-shot, colour" />
       </label>
       <div class="we__field we__field--wide">
+        <span class="mono">READING LOCK / 閲覧パスワード (READERS NEED THE PASSWORD; RLS ENFORCES IT)</span>
+        <div class="we__lock" class:is-locked={work.read_locked}>
+          <p class="mono we__lockStatus">
+            {#if work.read_locked}
+              🔒 LOCKED{work.password_hint ? ` · HINT: ${work.password_hint}` : ''}
+            {:else}
+              OPEN — anyone can read
+            {/if}
+            {#if lockFlash}<span class="we__lockFlash"> {lockFlash}</span>{/if}
+          </p>
+          <div class="we__lockRow">
+            <input
+              type="text"
+              bind:value={lockPassword}
+              placeholder={work.read_locked ? 'New password (replaces the current one)' : 'Password'}
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <input
+              type="text"
+              bind:value={lockHint}
+              placeholder="Hint (public — shown on the gate)"
+            />
+          </div>
+          <div class="we__lockActions">
+            <button type="button" class="mono we__lockSet" onclick={setLock} disabled={lockBusy || !lockPassword.trim()}>
+              {work.read_locked ? 'CHANGE PASSWORD' : 'SET LOCK'}
+            </button>
+            {#if work.read_locked}
+              <button type="button" class="mono we__lockClear" onclick={removeLock} disabled={lockBusy}>
+                REMOVE LOCK
+              </button>
+            {/if}
+          </div>
+          <p class="mono we__hint">
+            The password is stored only as a hash — it can be replaced any time but never shown.
+            Unlocks last per browser tab. Your own signed-in reading is never gated.
+          </p>
+        </div>
+      </div>
+      <div class="we__field we__field--wide">
         <span class="mono">CAST (BUBBLE SPEAKERS + CHARACTER PAGE — ORDER = ROSTER ORDER)</span>
         <div class="we__cast">
           {#each meta.characters as ch, i (ch.id)}
@@ -430,6 +511,59 @@
     outline: none;
     border-color: var(--accent);
   }
+  .we__lock {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0.9rem;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+  }
+  .we__lock.is-locked {
+    border-left: 3px solid var(--accent);
+  }
+  .we__lockStatus {
+    color: var(--fg);
+  }
+  .we__lockFlash {
+    color: var(--accent);
+  }
+  .we__lockRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+  .we__lockActions {
+    display: flex;
+    gap: 0.6rem;
+  }
+  .we__lockSet {
+    background: var(--accent);
+    color: var(--ink-fg);
+    border: 1px solid var(--accent);
+    padding: 0.6em 1.1em;
+    cursor: pointer;
+  }
+  .we__lockSet:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .we__lockClear {
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--fg-dim);
+    padding: 0.6em 1.1em;
+    cursor: pointer;
+  }
+  .we__lockClear:hover:not(:disabled) {
+    color: #e8a31a;
+    border-color: #e8a31a;
+  }
+  @media (max-width: 620px) {
+    .we__lockRow {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .we__cast {
     display: grid;
     gap: 0.5rem;
