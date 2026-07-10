@@ -6,7 +6,7 @@ import vercel from '@astrojs/vercel';
 // Data never flows through the server — every page is a shell whose islands
 // talk to Supabase from the browser with the anon key (RLS is the boundary).
 export default defineConfig({
-  site: 'https://pressroom-asu.vercel.app',
+  site: 'https://pressroom-omega.vercel.app',
   output: 'server',
   adapter: vercel(),
   integrations: [svelte()],
