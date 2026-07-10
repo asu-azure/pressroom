@@ -150,6 +150,16 @@
 
 <div class="cpe" style={`--c:${character.color}`}>
   <label class="cpe__field">
+    <span class="mono">REAL NAME / 本名 (OPTIONAL — SHOWN SMALLER UNDER THE NICKNAME)</span>
+    <input
+      type="text"
+      value={character.realName ?? ''}
+      oninput={(e) => (character.realName = (e.currentTarget as HTMLInputElement).value)}
+      placeholder="Full name — the nickname above is what readers know them by"
+    />
+  </label>
+
+  <label class="cpe__field">
     <span class="mono">ROLE (MICRO-LABEL, e.g. PROTAGONIST / 主人公)</span>
     <input
       type="text"

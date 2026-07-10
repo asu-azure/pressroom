@@ -837,7 +837,10 @@ a {
 }
 @keyframes cue-drop { 0% { transform: translateY(-100%); } 55% { transform: translateY(0); } 100% { transform: translateY(100%); } }
 
-/* ---- Proof-sheet calibration band (static printer's-proof strip) ---- */
+/* ---- Proof-sheet calibration band (static printer's-proof strip) ----
+   Ink-toned: a quiet dark strip between the hero and the shelf — the
+   calibration flavour comes from dots, hairlines and the round ink stamp,
+   not from a bright leaf. */
 .proofbar {
   position: relative;
   z-index: 2;
@@ -845,8 +848,16 @@ a {
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   padding: clamp(1rem, 2.6vw, 1.5rem) clamp(2.6rem, 7vw, 5rem);
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--ink-bg-soft);
+  color: var(--ink-fg-dim);
+}
+/* Registration marks read light on the ink band. */
+.proofbar .regmark {
+  border-color: rgba(244, 241, 234, 0.26);
+}
+.proofbar .regmark::before,
+.proofbar .regmark::after {
+  background: rgba(244, 241, 234, 0.26);
 }
 .proofbar__row {
   position: relative;
@@ -862,12 +873,15 @@ a {
   letter-spacing: 0.24em;
   white-space: nowrap;
 }
-.proofbar__cmyk { display: inline-flex; align-items: center; gap: 4px; }
+.proofbar__cmyk { display: inline-flex; align-items: center; gap: 5px; }
+/* Printer's dots, not paint chips: small muted circles on the dark band. */
 .proofbar__cmyk i {
-  width: clamp(11px, 1.3vw, 15px);
+  width: clamp(8px, 1vw, 11px);
   aspect-ratio: 1;
   display: block;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-radius: 50%;
+  border: 1px solid rgba(244, 241, 234, 0.14);
+  opacity: 0.75;
 }
 .proofbar__cmyk-lab {
   margin-left: 0.55em;
@@ -881,10 +895,21 @@ a {
   color: var(--fg-faint);
   white-space: nowrap;
 }
-/* Inline seal — smaller than the section-level hanko so it rides in the row */
+/* Inline seal — a round cobalt ink stamp (rubber-stamp voice, not the
+   vermillion hanko square): hollow circle, serif 校, slight tilt. */
 .proofbar__seal {
-  width: clamp(2rem, 3.4vw, 2.5rem);
-  font-size: clamp(1rem, 2vw, 1.3rem);
+  display: inline-grid;
+  place-items: center;
+  width: clamp(2rem, 3.2vw, 2.4rem);
+  aspect-ratio: 1;
+  border: 1.5px solid color-mix(in srgb, var(--accent) 72%, #f4f1ea);
+  border-radius: 50%;
+  color: color-mix(in srgb, var(--accent) 72%, #f4f1ea);
+  font-size: clamp(0.95rem, 1.7vw, 1.15rem);
+  line-height: 1;
+  rotate: -5deg;
+  opacity: 0.85;
+  user-select: none;
 }
 /* Registration marks flanking the calibration row */
 .proofbar__reg { top: 50%; translate: 0 -50%; }

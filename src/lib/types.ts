@@ -19,8 +19,9 @@ export interface CastImage {
  */
 export interface Character {
   id: string;
-  name: string;
+  name: string; // the NICKNAME — what the story (bubbles) and readers call them
   color: string; // hex accent, colour-codes the bubble + tooltip + cast tile
+  realName?: string; // full/real name — shown smaller under the nickname
   role?: string; // mono micro-label, e.g. "PROTAGONIST"
   iconUrl?: string; // square face crop for the roster tile
   images?: CastImage[]; // profile gallery, ordered

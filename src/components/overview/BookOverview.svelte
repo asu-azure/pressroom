@@ -329,6 +329,7 @@
       <div class="regmark ov-fore__reg" aria-hidden="true"></div>
       <div class="ov-fore__inner">
         <p class="mono ov-fore__label" use:reveal>✳ {i18n.t('ov.foreword')}</p>
+        <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
         <div class="ov-fore__body serif" use:revealChildren>
           {@html forewordHtml}
         </div>
@@ -743,6 +744,12 @@
   }
   .ov-fore__label {
     color: var(--accent);
+  }
+  /* Spoiler notice — the amber warning voice, tucked under the label. */
+  .ov-fore__spoiler {
+    margin-top: -1.2rem;
+    font-size: 0.6rem;
+    color: #b07708;
   }
   /* Block flow (not grid) so author figures can float and wrap text.
      Blocks carry their own margins for rhythm. */

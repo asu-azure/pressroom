@@ -257,6 +257,12 @@
             <p class="mono cf__role" use:sweep><span class="cf__roleIn">{ch.role}</span></p>
           {/if}
           <h2 class="serif cf__name" use:assemble>{ch.name}</h2>
+          {#if ch.realName}
+            <p class="serif cf__realName">
+              <span class="mono cf__realNameLabel" aria-hidden="true">本名 —</span>
+              {ch.realName}
+            </p>
+          {/if}
           <span class="cf__rule" aria-hidden="true"></span>
           {#if bioHtml}
             <div class="cf__bio serif">
@@ -490,6 +496,22 @@
     line-height: 1.08;
     letter-spacing: -0.01em;
     overflow-wrap: anywhere;
+  }
+  /* Real name rides beneath the nickname — present but secondary. */
+  .cf__realName {
+    margin-top: -0.3rem;
+    font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+    font-style: italic;
+    color: rgba(244, 241, 234, 0.55);
+    overflow-wrap: anywhere;
+  }
+  .cf__realNameLabel {
+    font-size: 0.55rem;
+    font-style: normal;
+    letter-spacing: 0.2em;
+    color: color-mix(in srgb, var(--c) 75%, #f4f1ea);
+    margin-right: 0.35em;
+    vertical-align: 0.18em;
   }
   .cf__rule {
     width: 3.2rem;

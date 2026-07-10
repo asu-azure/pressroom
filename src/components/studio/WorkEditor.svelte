@@ -228,7 +228,7 @@
         <textarea bind:value={meta.description} rows="3"></textarea>
       </label>
       <div class="we__field we__field--wide">
-        <span class="mono">FOREWORD / はじめに (LONG — ITS OWN PAGE BETWEEN COVER AND CONTENT)</span>
+        <span class="mono">SYNOPSIS / あらすじ (TELLS THE WHOLE STORY, SPOILERS WELCOME — ITS OWN PAGE BETWEEN COVER AND CONTENT)</span>
         <RichTextEditor
           value={meta.foreword}
           {workId}
@@ -289,7 +289,7 @@
           {#each meta.characters as ch, i (ch.id)}
             <div class="we__castRow">
               <input class="we__castColor" type="color" bind:value={ch.color} aria-label="Colour" />
-              <input class="we__castName" type="text" bind:value={ch.name} placeholder="Character name" />
+              <input class="we__castName" type="text" bind:value={ch.name} placeholder="Nickname — the name used in the story" />
               <button type="button" class="mono we__castBtn" onclick={() => moveCharacter(ch.id, -1)} disabled={i === 0} title="Move up">↑</button>
               <button type="button" class="mono we__castBtn" onclick={() => moveCharacter(ch.id, 1)} disabled={i === meta.characters.length - 1} title="Move down">↓</button>
               <button
