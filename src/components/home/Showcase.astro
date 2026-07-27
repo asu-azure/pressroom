@@ -1,200 +1,230 @@
 ---
 /**
- * Showcase plate — a paper leaf tipped between the ink hero and the ink shelf,
- * framed with the house crop marks. One picture today; the same markup is a
- * slideshow the moment `slides` has a second entry (see src/data/showcase.ts).
+ * Contact strip — a slim rail of artwork on a paper leaf, tipped between the
+ * ink hero and the ink shelf.
  *
- * Rendered server-side rather than as a Svelte island on purpose: the homepage
- * is prerendered, so `<Image>` optimises at build time and the artwork lands in
- * the initial HTML. A client:only island would leave a hole until JS loaded and
- * could not use <Image> at all.
+ * The rail fixes HEIGHT and lets each picture's own proportions decide its
+ * width, so nothing is cropped. That is the whole design: these pieces run from
+ * 0.66 to 1.52 aspect, and any fixed-ratio banner would have shown a sliver of
+ * the tall comic pages. Varied widths become the rhythm instead of a problem.
+ *
+ * Rendered server-side rather than as an island so astro:assets optimises at
+ * build time and the tiles land in the initial HTML.
  */
 import { Image, getImage } from 'astro:assets';
 import { slides } from '../../data/showcase';
 
-const many = slides.length > 1;
-const first = slides[0];
-// Reserve the box from the real dimensions so the shelf below never jumps.
-const ratio = `${first.image.width} / ${first.image.height}`;
+// Tallest the rail ever gets (matches --strip-h below). Tiles are generated at
+// 2x this so they stay crisp on dense screens without shipping full-size art.
+const TILE_H = 240;
 
-// The lightbox needs a big variant, but `image.src` is the untouched 2 MB
-// original — serving that would undo the optimisation. Build one capped WebP
-// per slide and hand its URL to the overlay instead.
+// The lightbox variant. Static art gets a capped WebP; animated slides are
+// passed through untouched, since resizing them through sharp here would keep
+// only the first frame and freeze the animation.
 const fulls = await Promise.all(
   slides.map((slide) =>
-    getImage({ src: slide.image, width: 2000, format: 'webp', quality: 85 }),
+    slide.animated
+      ? Promise.resolve({ src: slide.image.src })
+      : getImage({ src: slide.image, width: 1600, format: 'webp', quality: 85 }),
   ),
 );
+
+const tileWidth = (slide: (typeof slides)[number]) =>
+  Math.round(TILE_H * (slide.image.width / slide.image.height));
 ---
 
-<section class="plate spread spread--paper">
+<section class="strip spread spread--paper">
   <div class="paper-grid" aria-hidden="true"></div>
   <div class="crop crop--tl" aria-hidden="true"></div>
   <div class="crop crop--tr" aria-hidden="true"></div>
   <div class="crop crop--bl" aria-hidden="true"></div>
   <div class="crop crop--br" aria-hidden="true"></div>
-  <div class="regmark plate__reg" aria-hidden="true"></div>
 
-  <div class="plate__inner">
-    <button
-      type="button"
-      class="plate__frame"
-      style={`aspect-ratio: ${ratio}`}
-      data-lb-open
-      data-cursor="VIEW"
-      aria-label="View artwork full size"
-    >
+  <div class="strip__rail" data-rail tabindex="0" role="region" aria-label="Artwork by Asu Azure">
+    <ul class="strip__track" data-track>
       {
         slides.map((slide, i) => (
-          <Image
-            class="plate__img"
-            src={slide.image}
-            alt={slide.alt}
-            width={1600}
-            widths={[640, 960, 1280, 1600]}
-            sizes="(max-width: 900px) 92vw, min(72rem, 80vw)"
-            format="webp"
-            quality={82}
-            loading={i === 0 ? 'eager' : 'lazy'}
-            data-slide={i}
-            data-full={fulls[i].src}
-            data-alt={slide.alt}
-            hidden={i !== 0}
-          />
-        ))
-      }
-    </button>
-
-    {
-      many && (
-        <div class="plate__dots" role="tablist" aria-label="Choose artwork">
-          {slides.map((_, i) => (
+          <li class="strip__cell">
             <button
               type="button"
-              class="plate__dot"
-              data-dot={i}
-              role="tab"
-              aria-selected={i === 0}
-              aria-label={`Artwork ${i + 1}`}
-            />
-          ))}
-        </div>
-      )
-    }
+              class="strip__tile"
+              style={`aspect-ratio: ${slide.image.width} / ${slide.image.height}`}
+              data-open={i}
+              data-cursor="VIEW"
+              aria-label={slide.alt}
+            >
+              {
+                slide.animated ? (
+                  // Untransformed: <Image> would drop every frame but the first.
+                  <img
+                    class="strip__img"
+                    src={slide.image.src}
+                    alt={slide.alt}
+                    width={slide.image.width}
+                    height={slide.image.height}
+                    loading={i < 4 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    draggable="false"
+                  />
+                ) : (
+                  <Image
+                    class="strip__img"
+                    src={slide.image}
+                    alt={slide.alt}
+                    height={TILE_H}
+                    widths={[tileWidth(slide), tileWidth(slide) * 2]}
+                    sizes={`${tileWidth(slide)}px`}
+                    format="webp"
+                    quality={82}
+                    loading={i < 4 ? 'eager' : 'lazy'}
+                    decoding="async"
+                    draggable="false"
+                  />
+                )
+              }
+              <span class="mono strip__num" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+            </button>
+          </li>
+        ))
+      }
+    </ul>
   </div>
 </section>
 
-<!-- Authored here (hidden) rather than built in JS, so the global .lb__* rules
-     apply and there is never a flash of unstyled overlay. -->
+<!-- Authored here (hidden) so the global .lb__* rules apply — no flash of
+     unstyled overlay, and nothing has to be built in JS. -->
 <div class="lb" hidden data-lb role="dialog" aria-modal="true" aria-label="Artwork">
   <div class="lb__backdrop" data-lb-dismiss></div>
   <span class="bracket bracket--tl" aria-hidden="true"></span>
   <span class="bracket bracket--br" aria-hidden="true"></span>
 
   <figure class="lb__stage">
-    <img class="lb__img" data-lb-img src={fulls[0].src} alt={first.alt} />
+    <img class="lb__img" data-lb-img src={fulls[0].src} alt={slides[0].alt} />
   </figure>
 
-  {many && <div class="lb__hud lb__hud--bl mono" data-lb-count aria-hidden="true" />}
+  <div class="lb__hud lb__hud--bl mono" data-lb-count aria-hidden="true"></div>
 
   <button type="button" class="lb__btn lb__close" data-lb-dismiss aria-label="Close">✕</button>
-  {
-    many && (
-      <>
-        <button type="button" class="lb__btn lb__prev" data-lb-prev aria-label="Previous artwork">
-          ‹
-        </button>
-        <button type="button" class="lb__btn lb__next" data-lb-next aria-label="Next artwork">
-          ›
-        </button>
-      </>
-    )
-  }
+  <button type="button" class="lb__btn lb__prev" data-lb-prev aria-label="Previous artwork">‹</button>
+  <button type="button" class="lb__btn lb__next" data-lb-next aria-label="Next artwork">›</button>
 </div>
 
+<script
+  type="application/json"
+  data-lb-sources
+  set:html={JSON.stringify(slides.map((s, i) => ({ src: fulls[i].src, alt: s.alt })))}
+/>
+
 <style>
-  .plate {
+  .strip {
+    --strip-h: clamp(9rem, 19vh, 15rem);
     position: relative;
     z-index: 1;
-    padding: clamp(3rem, 8vh, 5.5rem) var(--pad);
+    padding: clamp(2.2rem, 6vh, 3.4rem) 0;
     isolation: isolate;
     overflow: hidden;
   }
-  .plate__reg {
-    top: 2.2rem;
-    right: 12%;
-  }
-  .plate__inner {
+
+  /* Full-bleed rail: the artwork runs to both edges and fades out, so the strip
+     reads as a continuing reel rather than a boxed-in widget. */
+  .strip__rail {
     position: relative;
     z-index: 2;
-    display: grid;
-    justify-items: center;
-    gap: 1.1rem;
-    max-width: 72rem;
-    margin: 0 auto;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* Feathered ends. Masking beats a gradient overlay here — the paper grid
+       and crop marks stay visible through it. */
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
   }
-  /* The frame is a button: reset it, then let it behave like a figure. */
-  .plate__frame {
-    position: relative;
-    display: block;
-    width: 100%;
-    padding: 0;
-    background: var(--bg-soft);
-    border: 1px solid rgba(22, 20, 15, 0.22);
-    cursor: zoom-in;
-    overflow: hidden;
-    /* Paper stock: a printed plate sits slightly off the page. */
-    box-shadow: 0 18px 50px -28px rgba(22, 20, 15, 0.55);
-    transition: box-shadow 0.45s var(--ease), border-color 0.35s var(--ease);
-  }
-  .plate__frame:hover,
-  .plate__frame:focus-visible {
-    border-color: var(--accent);
-    box-shadow: 0 26px 70px -26px rgba(22, 20, 15, 0.7);
-  }
-  .plate__img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.7s var(--ease);
-  }
-  .plate__img[hidden] {
+  .strip__rail::-webkit-scrollbar {
     display: none;
   }
-  .plate__frame:hover .plate__img,
-  .plate__frame:focus-visible .plate__img {
-    transform: scale(1.02);
+  .strip__rail:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: 4px;
   }
 
-  /* --- Slideshow affordances: only ever rendered when there's a 2nd slide --- */
-  .plate__dots {
+  .strip__track {
     display: flex;
-    gap: 0.5rem;
+    align-items: flex-end;
+    gap: clamp(0.6rem, 1.4vw, 1.1rem);
+    padding: 0 var(--pad);
+    list-style: none;
+    margin: 0;
+    width: max-content;
   }
-  .plate__dot {
-    width: 30px;
-    height: 3px;
+  .strip__cell {
+    flex: 0 0 auto;
+  }
+
+  /* Each tile is a button reset to behave like a mounted print. Height is
+     fixed; aspect-ratio (inline, from the real dimensions) resolves the width,
+     which is what keeps every piece uncropped. */
+  .strip__tile {
+    position: relative;
+    display: block;
+    height: var(--strip-h);
+    width: auto;
     padding: 0;
-    background: rgba(22, 20, 15, 0.22);
-    border: 0;
-    cursor: pointer;
-    transition: background-color 0.3s var(--ease);
+    margin: 0;
+    background: var(--bg-soft);
+    border: 1px solid rgba(22, 20, 15, 0.2);
+    cursor: zoom-in;
+    overflow: hidden;
+    box-shadow: 0 10px 26px -20px rgba(22, 20, 15, 0.7);
+    transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease),
+      border-color 0.3s var(--ease);
   }
-  .plate__dot:hover {
-    background: rgba(22, 20, 15, 0.45);
+  .strip__tile:hover,
+  .strip__tile:focus-visible {
+    transform: translateY(-4px);
+    border-color: var(--accent);
+    box-shadow: 0 20px 40px -22px rgba(22, 20, 15, 0.85);
   }
-  .plate__dot[aria-selected='true'] {
-    background: var(--accent);
+  .strip__img {
+    display: block;
+    height: 100%;
+    width: 100%;
+    object-fit: contain;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  /* Proof-sheet frame number, bottom-left of each print. */
+  .strip__num {
+    position: absolute;
+    left: 5px;
+    bottom: 4px;
+    font-size: 0.5rem;
+    color: #f4f1ea;
+    mix-blend-mode: difference;
+    pointer-events: none;
+  }
+
+  /* While dragging, suppress the hover lift so tiles don't jitter under the
+     cursor, and show the grabbing affordance. */
+  .strip__rail.is-dragging {
+    cursor: grabbing;
+  }
+  .strip__rail.is-dragging .strip__tile {
+    transition: none;
+    pointer-events: none;
+  }
+  .strip__rail.is-dragging .strip__tile:hover {
+    transform: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .plate__frame,
-    .plate__img {
+    .strip__tile {
       transition: none;
     }
-    .plate__frame:hover .plate__img,
-    .plate__frame:focus-visible .plate__img {
+    .strip__tile:hover,
+    .strip__tile:focus-visible {
       transform: none;
     }
   }

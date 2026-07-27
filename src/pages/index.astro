@@ -62,13 +62,13 @@ export const prerender = true;
       );
     }
 
-    // Showcase plate rises as it scrolls in. Reversible, per the house rule —
+    // Contact strip rises as it scrolls in. Reversible, per the house rule —
     // never `once: true`.
-    const plate = document.querySelector('.plate__inner');
+    const plate = document.querySelector('.strip__rail');
     if (plate) {
       gsap.fromTo(
         plate,
-        { opacity: 0, y: 34 },
+        { opacity: 0, y: 24 },
         {
           opacity: 1,
           y: 0,
@@ -82,10 +82,10 @@ export const prerender = true;
         },
       );
 
-      // The plate is the first trigger that can already be on screen at rest,
+      // The strip is the first trigger that can already be on screen at rest,
       // and ScrollTrigger is pumped by Lenis's scroll event — so with no scroll
       // it never evaluates and the artwork sits at opacity 0. Refresh once the
-      // eager image has settled the layout, which also fixes the start position.
+      // eager images have settled the layout, which also fixes the start position.
       // refresh() recalculates start/end; update() is what re-evaluates state
       // and fires the toggleAction. Without the second call the plate stays at
       // opacity 0 until the visitor happens to scroll.
