@@ -33,10 +33,14 @@
   {:else if coverUrl}
     <img src={coverUrl} alt={`Cover of ${work.title}`} loading={index < 6 ? 'eager' : 'lazy'} />
   {:else}
-    <div class="card__blank"><span class="mono">NO PROOF</span></div>
+    <div class="card__blank"><span class="mono">NO COVER</span></div>
   {/if}
   <span class="tile__num mono">{String(index + 1).padStart(2, '0')}</span>
-  <span class="tile__tag mono">{statusLabel} · {pageCount}P · {work.direction.toUpperCase()}</span>
+  <span class="tile__tag mono">
+    {statusLabel} · {pageCount}P · {work.direction.toUpperCase()}{#if work.read_locked}<span
+        class="card__lock"
+        title={i18n.t('ov.locked')}>🔒</span>{/if}
+  </span>
   <span class="card__meta">
     <span class="card__title serif">{work.title}</span>
     {#if work.tags.length}
@@ -69,6 +73,9 @@
   :global(.tile:hover) .card__cover,
   :global(.tile:focus-visible) .card__cover {
     transform: scale(1.06);
+  }
+  .card__lock {
+    margin-left: 0.5em;
   }
   .card__meta {
     position: absolute;

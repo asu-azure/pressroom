@@ -729,7 +729,7 @@ a {
 /* ============================================================
    MOTION III — cinema-cohesion pass
    film grain, scroll-progress hairline, section index nav,
-   proof-sheet band, hanko seal, archive drag strip, FUI lightbox.
+   hanko seal, archive drag strip, FUI lightbox.
    ============================================================ */
 
 /* ---- Film grain: full-page SVG turbulence, whisper-quiet opacity ---- */
@@ -836,90 +836,6 @@ a {
   animation: cue-drop 2.1s var(--ease) infinite;
 }
 @keyframes cue-drop { 0% { transform: translateY(-100%); } 55% { transform: translateY(0); } 100% { transform: translateY(100%); } }
-
-/* ---- Proof-sheet calibration band (static printer's-proof strip) ----
-   Ink-toned: a quiet dark strip between the hero and the shelf — the
-   calibration flavour comes from dots, hairlines and the round ink stamp,
-   not from a bright leaf. */
-.proofbar {
-  position: relative;
-  z-index: 2;
-  overflow: hidden;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: clamp(1rem, 2.6vw, 1.5rem) clamp(2.6rem, 7vw, 5rem);
-  background: var(--ink-bg-soft);
-  color: var(--ink-fg-dim);
-}
-/* Registration marks read light on the ink band. */
-.proofbar .regmark {
-  border-color: rgba(244, 241, 234, 0.26);
-}
-.proofbar .regmark::before,
-.proofbar .regmark::after {
-  background: rgba(244, 241, 234, 0.26);
-}
-.proofbar__row {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: clamp(0.9rem, 3vw, 2.4rem);
-}
-.proofbar__label {
-  font-size: clamp(0.68rem, 1.4vw, 0.82rem);
-  letter-spacing: 0.24em;
-  white-space: nowrap;
-}
-.proofbar__cmyk { display: inline-flex; align-items: center; gap: 5px; }
-/* Printer's dots, not paint chips: small muted circles on the dark band. */
-.proofbar__cmyk i {
-  width: clamp(8px, 1vw, 11px);
-  aspect-ratio: 1;
-  display: block;
-  border-radius: 50%;
-  border: 1px solid rgba(244, 241, 234, 0.14);
-  opacity: 0.75;
-}
-.proofbar__cmyk-lab {
-  margin-left: 0.55em;
-  font-size: 0.56rem;
-  letter-spacing: 0.32em;
-  color: var(--fg-faint);
-}
-.proofbar__meta {
-  font-size: 0.58rem;
-  letter-spacing: 0.16em;
-  color: var(--fg-faint);
-  white-space: nowrap;
-}
-/* Inline seal — a round cobalt ink stamp (rubber-stamp voice, not the
-   vermillion hanko square): hollow circle, serif 校, slight tilt. */
-.proofbar__seal {
-  display: inline-grid;
-  place-items: center;
-  width: clamp(2rem, 3.2vw, 2.4rem);
-  aspect-ratio: 1;
-  border: 1.5px solid color-mix(in srgb, var(--accent) 72%, #f4f1ea);
-  border-radius: 50%;
-  color: color-mix(in srgb, var(--accent) 72%, #f4f1ea);
-  font-size: clamp(0.95rem, 1.7vw, 1.15rem);
-  line-height: 1;
-  rotate: -5deg;
-  opacity: 0.85;
-  user-select: none;
-}
-/* Registration marks flanking the calibration row */
-.proofbar__reg { top: 50%; translate: 0 -50%; }
-.proofbar__reg--l { left: clamp(1.4rem, 4vw, 3rem); }
-.proofbar__reg--r { right: clamp(1.4rem, 4vw, 3rem); }
-@media (max-width: 700px) {
-  .proofbar { padding-left: clamp(1.6rem, 6vw, 2.6rem); padding-right: clamp(1.6rem, 6vw, 2.6rem); }
-  .proofbar__reg,
-  .proofbar__meta { display: none; }
-}
 
 /* ---- Hanko seal (vermillion stamp) ---- */
 .hanko {

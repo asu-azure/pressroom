@@ -8,11 +8,10 @@ const STORAGE_KEY = 'pressroom:lang';
 
 const dict = {
   ja: {
-    'lib.sub': '同人誌・校正刷り・欄外の注 — 綴じたままのかたちで。',
-    'lib.devnote': '※ 本サイトは開発中です — 校正・確認用の公開です。',
-    'lib.loading': '校正刷りを取得中…',
-    'lib.empty': 'まだ何も刷られていません',
-    'lib.offline': '印刷所オフライン',
+    'lib.sub': '同人誌を、綴じたままのかたちで。',
+    'lib.loading': '本を並べています…',
+    'lib.empty': 'まだ本がありません',
+    'lib.offline': '接続できません',
     'status.ongoing': '連載中',
     'status.complete': '完結',
     'status.oneshot': '読切',
@@ -53,17 +52,18 @@ const dict = {
     'rd.off': 'オフ',
     'rd.panel': 'コマ',
     'rd.lang': '言語',
-    'rd.missing': '登録エラー — この校正刷りは綴じられていません。',
-    'rd.noPages': 'この校正刷りにはまだページがありません。',
-    'rd.loading': '校正刷りを取得中…',
-    'nf.title': 'この校正刷りは綴じられていません。',
+    'rd.missing': 'この本は見つかりません。',
+    'rd.noPages': 'この本にはまだページがありません。',
+    'rd.loading': '本を開いています…',
+    'nf.kicker': 'ページが見つかりません',
+    'nf.title': 'お探しのページは見つかりません。',
+    'nf.back': '書庫へ戻る',
   },
   en: {
-    'lib.sub': 'Doujinshi, proofs & margin notes — read them the way they were bound.',
-    'lib.devnote': '※ THIS SITE IS UNDER DEVELOPMENT — PUBLISHED FOR PROOFREADING & CHECKING.',
-    'lib.loading': 'PULLING PROOFS…',
-    'lib.empty': 'NOTHING ON THE PRESS YET',
-    'lib.offline': 'PRESS OFFLINE',
+    'lib.sub': 'Doujinshi, read the way they were bound.',
+    'lib.loading': 'OPENING THE SHELF…',
+    'lib.empty': 'NO BOOKS ON THE SHELF YET',
+    'lib.offline': "CAN'T REACH THE SHELF",
     'status.ongoing': 'ONGOING',
     'status.complete': 'COMPLETE',
     'status.oneshot': 'ONE-SHOT',
@@ -104,10 +104,12 @@ const dict = {
     'rd.off': 'OFF',
     'rd.panel': 'PANEL',
     'rd.lang': 'LANGUAGE',
-    'rd.missing': 'REGISTRATION ERROR — THIS PROOF WAS NEVER BOUND.',
-    'rd.noPages': 'NO PAGES IN THIS PROOF YET.',
-    'rd.loading': 'PULLING THE PROOF…',
-    'nf.title': 'This proof was never bound.',
+    'rd.missing': "THIS BOOK ISN'T HERE.",
+    'rd.noPages': 'NO PAGES IN THIS BOOK YET.',
+    'rd.loading': 'OPENING THE BOOK…',
+    'nf.kicker': 'PAGE NOT FOUND',
+    'nf.title': "This page isn't on the shelf.",
+    'nf.back': 'BACK TO THE LIBRARY',
   },
 } as const;
 
@@ -121,6 +123,9 @@ class I18n {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved === 'en' || saved === 'ja') this.lang = saved;
     }
+    // The shell ships <html lang="ja">; a restored preference has to move it too,
+    // or screen readers and browser translation read the whole page as Japanese.
+    if (typeof document !== 'undefined') document.documentElement.lang = this.lang;
   }
 
   set(lang: Lang) {
