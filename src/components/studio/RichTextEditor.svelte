@@ -19,6 +19,7 @@
   } = $props();
 
   let editor: HTMLElement;
+  let shell: HTMLElement;
   let fileInput: HTMLInputElement;
   let mounted = $state(false);
   let uploading = $state(false);
@@ -29,6 +30,12 @@
   $effect(() => {
     if (editor && !mounted) {
       editor.innerHTML = toRichHtml(value);
+      // sanitizeRich drops empty captions so they never publish as a gap — but
+      // in here the author needs somewhere to click, so give every figure one
+      // back. It only survives the next save if they actually type in it.
+      for (const fig of editor.querySelectorAll('figure.fore-fig')) {
+        if (!fig.querySelector('figcaption')) fig.append(document.createElement('figcaption'));
+      }
       mounted = true;
     }
   });
@@ -50,6 +57,7 @@
     if (activeFig && activeFig !== fig) activeFig.classList.remove('fore-fig--active');
     fig?.classList.add('fore-fig--active');
     activeFig = fig;
+    syncFigState();
   }
 
   function onEditorClick(e: MouseEvent) {
@@ -59,9 +67,11 @@
 
   function insertFigure(url: string) {
     // fore-fig--active is stripped by the sanitizer — safe as a live-DOM marker.
+    // The caption starts EMPTY: the editor shows a CSS placeholder, and
+    // sanitizeRich drops it if untouched, so nothing publishes by accident.
     const html =
       `<figure class="fore-fig fore-fig--center fore-fig--md">` +
-      `<img src="${url}" alt=""><figcaption>Caption…</figcaption></figure><p><br></p>`;
+      `<img src="${url}" alt=""><figcaption></figcaption></figure><p><br></p>`;
     document.execCommand('insertHTML', false, html);
   }
 
@@ -125,13 +135,74 @@
     await uploadAndInsert(files);
   }
 
-  function swapClass(prefix: string, value: string) {
-    if (!activeFig) return;
-    for (const c of [...activeFig.classList]) {
-      if (c.startsWith(prefix)) activeFig.classList.remove(c);
+  // Placement and size are INDEPENDENT axes. They used to share one
+  // `fore-fig--` prefix swap, so setting either wiped the other — a figure
+  // could never be both "wrapped left" and "small" at the same time.
+  const ALIGNS = ['left', 'center', 'right'] as const;
+  const SIZES = ['sm', 'md', 'lg'] as const;
+  type Align = (typeof ALIGNS)[number];
+  type Size = (typeof SIZES)[number];
+
+  // The figure lives in the contenteditable DOM, which Svelte doesn't track —
+  // mirror the bits the toolbar needs into state and re-read after every change.
+  let figState = $state<{ align: Align | null; size: Size | null; width: string | null }>({
+    align: null,
+    size: null,
+    width: null,
+  });
+
+  // Screen position of the drag handle. The handle lives OUTSIDE the
+  // contenteditable (as an overlay on the shell) so it never ends up in
+  // innerHTML — the DOM in there is the saved document.
+  let handlePos = $state<{ x: number; y: number } | null>(null);
+
+  function updateHandle() {
+    if (!activeFig || !shell || !editor) {
+      handlePos = null;
+      return;
     }
-    activeFig.classList.add(`${prefix}${value}`);
+    const fig = activeFig.getBoundingClientRect();
+    const box = shell.getBoundingClientRect();
+    const area = editor.getBoundingClientRect();
+    // Hide it once the figure's corner scrolls out of the editor's viewport.
+    if (fig.bottom < area.top || fig.bottom > area.bottom) {
+      handlePos = null;
+      return;
+    }
+    handlePos = { x: fig.right - box.left, y: fig.bottom - box.top };
+  }
+
+  function syncFigState() {
+    const fig = activeFig;
+    if (!fig) {
+      figState = { align: null, size: null, width: null };
+      handlePos = null;
+      return;
+    }
+    updateHandle();
+    figState = {
+      align: ALIGNS.find((a) => fig.classList.contains(`fore-fig--${a}`)) ?? null,
+      // A drag-resized width overrides the preset, so no preset reads as active.
+      size: fig.style.width
+        ? null
+        : (SIZES.find((s) => fig.classList.contains(`fore-fig--${s}`)) ?? null),
+      width: fig.style.width || null,
+    };
+  }
+
+  function swapIn(group: readonly string[], value: string) {
+    if (!activeFig) return;
+    for (const g of group) activeFig.classList.remove(`fore-fig--${g}`);
+    activeFig.classList.add(`fore-fig--${value}`);
+    syncFigState();
     emit();
+  }
+
+  const setAlign = (a: Align) => swapIn(ALIGNS, a);
+  function setSize(s: Size) {
+    // A preset overrides any drag-resized width, or the inline style would win.
+    activeFig?.style.removeProperty('width');
+    swapIn(SIZES, s);
   }
 
   function removeFig() {
@@ -139,6 +210,42 @@
     activeFig.remove();
     activeFig = null;
     emit();
+  }
+
+  // --- Drag-to-resize: the Word gesture. Writes an inline % width, which the
+  //     sanitizer allows on FIGURE only (richtext.ts) and which beats the
+  //     preset class widths in both this editor and the published page. ---
+  const MIN_W = 10;
+  const MAX_W = 100;
+
+  function startResize(e: PointerEvent) {
+    if (!activeFig) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const fig = activeFig;
+    const parent = fig.parentElement ?? editor;
+    const parentW = parent.clientWidth || 1;
+    const startX = e.clientX;
+    const startW = fig.getBoundingClientRect().width;
+    // Dragging a right-floated / centred figure's handle still grows rightward.
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+
+    const move = (ev: PointerEvent) => {
+      const next = ((startW + (ev.clientX - startX)) / parentW) * 100;
+      fig.style.width = `${Math.round(Math.min(MAX_W, Math.max(MIN_W, next)))}%`;
+      syncFigState();
+    };
+    const up = (ev: PointerEvent) => {
+      handle.releasePointerCapture?.(ev.pointerId);
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      emit();
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
   }
 
   const FONTS = [
@@ -157,29 +264,126 @@
     { label: '❝ Quote', value: 'blockquote' },
   ];
 
+  // Text sizes, relative so they still scale with the reader's viewport.
+  const SIZE_STEPS = [
+    { label: 'XS', value: '0.8em' },
+    { label: 'S', value: '0.9em' },
+    { label: 'M', value: '1em' },
+    { label: 'L', value: '1.25em' },
+    { label: 'XL', value: '1.6em' },
+  ];
+
+  /**
+   * Apply a font size to the selection.
+   *
+   * execCommand('fontSize') emits `<font size="N">`, and the sanitizer keeps
+   * only the `face` attribute on FONT — the size would be silently dropped the
+   * moment the synopsis saved. So: use size 7 purely as a marker to get the
+   * browser's correct range splitting across partial selections, then rewrite
+   * every marker into a span carrying `font-size`, which IS allowed through.
+   */
+  function applyFontSize(size: string) {
+    editor.focus();
+    document.execCommand('styleWithCSS', false, 'false');
+    document.execCommand('fontSize', false, '7');
+    for (const font of [...editor.querySelectorAll('font[size="7"]')]) {
+      const span = document.createElement('span');
+      span.style.fontSize = size;
+      span.append(...font.childNodes);
+      font.replaceWith(span);
+    }
+    emit();
+  }
+
   function pickFont(e: Event) {
-    const v = (e.currentTarget as HTMLSelectElement).value;
-    if (v) cmd('fontName', v);
-    (e.currentTarget as HTMLSelectElement).value = '';
+    const el = e.currentTarget as HTMLSelectElement;
+    if (el.value) cmd('fontName', el.value);
+    el.value = '';
   }
 
   function pickBlock(e: Event) {
-    const v = (e.currentTarget as HTMLSelectElement).value;
-    if (v) cmd('formatBlock', v);
-    (e.currentTarget as HTMLSelectElement).value = '';
+    const el = e.currentTarget as HTMLSelectElement;
+    if (el.value) cmd('formatBlock', el.value);
+    el.value = '';
   }
+
+  function pickSize(e: Event) {
+    const el = e.currentTarget as HTMLSelectElement;
+    if (el.value) applyFontSize(el.value);
+    el.value = '';
+  }
+
+  // --- C6: reflect what's actually active, so the bar describes the selection ---
+  const MARKS = ['bold', 'italic', 'underline', 'strikeThrough'] as const;
+  let marks = $state<Record<string, boolean>>({});
+  let block = $state('');
+
+  function syncToolbar() {
+    if (!editor) return;
+    // Only care while the caret is genuinely inside this editor.
+    const sel = window.getSelection();
+    if (!sel?.anchorNode || !editor.contains(sel.anchorNode)) return;
+    const next: Record<string, boolean> = {};
+    for (const m of MARKS) {
+      try {
+        next[m] = document.queryCommandState(m);
+      } catch {
+        next[m] = false;
+      }
+    }
+    // justify* are mutually exclusive; fold them into the same map.
+    for (const j of ['justifyLeft', 'justifyCenter', 'justifyRight']) {
+      try {
+        next[j] = document.queryCommandState(j);
+      } catch {
+        next[j] = false;
+      }
+    }
+    marks = next;
+    try {
+      block = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+    } catch {
+      block = '';
+    }
+  }
+
+  $effect(() => {
+    document.addEventListener('selectionchange', syncToolbar);
+    return () => document.removeEventListener('selectionchange', syncToolbar);
+  });
+
+  // The handle tracks a figure inside a scrolling box — follow it.
+  $effect(() => {
+    if (!editor) return;
+    const track = () => updateHandle();
+    editor.addEventListener('scroll', track, { passive: true });
+    window.addEventListener('resize', track);
+    window.addEventListener('scroll', track, { passive: true });
+    return () => {
+      editor.removeEventListener('scroll', track);
+      window.removeEventListener('resize', track);
+      window.removeEventListener('scroll', track);
+    };
+  });
+
+  const currentBlockLabel = $derived(
+    BLOCKS.find((b) => b.value === block)?.label ?? 'STYLE…',
+  );
 </script>
 
-<div class="rte">
+<div class="rte" bind:this={shell}>
   <div class="rte__bar" role="toolbar" aria-label="Text formatting">
-    <button type="button" class="rte__btn" title="Bold" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('bold')}><b>B</b></button>
-    <button type="button" class="rte__btn" title="Italic" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('italic')}><i>I</i></button>
-    <button type="button" class="rte__btn" title="Underline" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('underline')}><u>U</u></button>
-    <button type="button" class="rte__btn" title="Strikethrough" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('strikeThrough')}><s>S</s></button>
+    <button type="button" class="rte__btn" class:is-on={marks.bold} title="Bold (Ctrl+B)" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('bold')}><b>B</b></button>
+    <button type="button" class="rte__btn" class:is-on={marks.italic} title="Italic (Ctrl+I)" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('italic')}><i>I</i></button>
+    <button type="button" class="rte__btn" class:is-on={marks.underline} title="Underline (Ctrl+U)" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('underline')}><u>U</u></button>
+    <button type="button" class="rte__btn" class:is-on={marks.strikeThrough} title="Strikethrough" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('strikeThrough')}><s>S</s></button>
     <span class="rte__sep" aria-hidden="true"></span>
-    <button type="button" class="rte__btn mono" title="Align left" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('justifyLeft')}>⇤</button>
-    <button type="button" class="rte__btn mono" title="Align center" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('justifyCenter')}>↔</button>
-    <button type="button" class="rte__btn mono" title="Align right" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('justifyRight')}>⇥</button>
+    <!-- TEXT alignment. The image bar below uses word labels, never these
+         arrows — the two used to be identical glyphs stacked on top of each
+         other, so there was no way to tell which one moved the picture. -->
+    <button type="button" class="rte__btn mono" class:is-on={marks.justifyLeft} title="Align text left" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('justifyLeft')}>⇤</button>
+    <button type="button" class="rte__btn mono" class:is-on={marks.justifyCenter} title="Align text center" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('justifyCenter')}>↔</button>
+    <button type="button" class="rte__btn mono" class:is-on={marks.justifyRight} title="Align text right" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('justifyRight')}>⇥</button>
     <span class="rte__sep" aria-hidden="true"></span>
     <select class="rte__select mono" title="Font" onmousedown={(e) => e.stopPropagation()} onchange={pickFont}>
       <option value="">FONT…</option>
@@ -187,8 +391,16 @@
         <option value={f.value}>{f.label}</option>
       {/each}
     </select>
+    <select class="rte__select mono" title="Text size" onchange={pickSize}>
+      <option value="">SIZE…</option>
+      {#each SIZE_STEPS as s (s.value)}
+        <option value={s.value}>{s.label}</option>
+      {/each}
+    </select>
+    <!-- Resets to the placeholder after each pick, so the placeholder itself
+         reports the block the caret is currently in. -->
     <select class="rte__select mono" title="Block style" onchange={pickBlock}>
-      <option value="">STYLE…</option>
+      <option value="">{currentBlockLabel}</option>
       {#each BLOCKS as b (b.value)}
         <option value={b.value}>{b.label}</option>
       {/each}
@@ -211,18 +423,37 @@
   </div>
 
   {#if activeFig}
+    <!-- Placement and size are independent: setting one no longer clears the
+         other. Word labels (not the text bar's arrows) so it's obvious at a
+         glance that these buttons move the picture. -->
     <div class="rte__figbar" role="toolbar" aria-label="Image layout">
-      <span class="mono rte__figlabel">IMAGE —</span>
-      <button type="button" class="rte__btn mono" title="Float left" onmousedown={(e) => e.preventDefault()} onclick={() => swapClass('fore-fig--', 'left')}>⇤</button>
-      <button type="button" class="rte__btn mono" title="Center" onmousedown={(e) => e.preventDefault()} onclick={() => swapClass('fore-fig--', 'center')}>↔</button>
-      <button type="button" class="rte__btn mono" title="Float right" onmousedown={(e) => e.preventDefault()} onclick={() => swapClass('fore-fig--', 'right')}>⇥</button>
+      <span class="mono rte__figlabel">▣ PICTURE</span>
+      <button type="button" class="rte__btn mono" class:is-on={figState.align === 'left'} title="Text wraps down the right side" onmousedown={(e) => e.preventDefault()} onclick={() => setAlign('left')}>◧ WRAP LEFT</button>
+      <button type="button" class="rte__btn mono" class:is-on={figState.align === 'center'} title="Centred, text above and below" onmousedown={(e) => e.preventDefault()} onclick={() => setAlign('center')}>▣ CENTER</button>
+      <button type="button" class="rte__btn mono" class:is-on={figState.align === 'right'} title="Text wraps down the left side" onmousedown={(e) => e.preventDefault()} onclick={() => setAlign('right')}>◨ WRAP RIGHT</button>
       <span class="rte__sep" aria-hidden="true"></span>
-      <button type="button" class="rte__btn mono" title="Small" onmousedown={(e) => e.preventDefault()} onclick={() => swapClass('fore-fig--', 'sm')}>S</button>
-      <button type="button" class="rte__btn mono" title="Medium" onmousedown={(e) => e.preventDefault()} onclick={() => swapClass('fore-fig--', 'md')}>M</button>
-      <button type="button" class="rte__btn mono" title="Large" onmousedown={(e) => e.preventDefault()} onclick={() => swapClass('fore-fig--', 'lg')}>L</button>
+      <button type="button" class="rte__btn mono" class:is-on={figState.size === 'sm'} title="Small (30%)" onmousedown={(e) => e.preventDefault()} onclick={() => setSize('sm')}>S</button>
+      <button type="button" class="rte__btn mono" class:is-on={figState.size === 'md'} title="Medium (48%)" onmousedown={(e) => e.preventDefault()} onclick={() => setSize('md')}>M</button>
+      <button type="button" class="rte__btn mono" class:is-on={figState.size === 'lg'} title="Large (66%)" onmousedown={(e) => e.preventDefault()} onclick={() => setSize('lg')}>L</button>
+      {#if figState.width}
+        <span class="mono rte__figwidth" title="Dragged width — click S/M/L to go back to a preset">{figState.width}</span>
+      {/if}
       <span class="rte__sep" aria-hidden="true"></span>
       <button type="button" class="rte__btn rte__btn--danger mono" title="Remove image" onmousedown={(e) => e.preventDefault()} onclick={removeFig}>✕ REMOVE</button>
     </div>
+  {/if}
+
+  {#if handlePos}
+    <!-- Grab the corner, like Word. Writes an inline % width the sanitizer
+         allows on FIGURE only; S/M/L clear it again. -->
+    <button
+      type="button"
+      class="rte__handle"
+      aria-label="Drag to resize image"
+      title="Drag to resize"
+      style={`left:${handlePos.x}px; top:${handlePos.y}px`}
+      onpointerdown={startResize}
+    ></button>
   {/if}
 
   <div
@@ -242,6 +473,7 @@
 
 <style>
   .rte {
+    position: relative;
     display: grid;
     border: 1px solid var(--line-strong);
     background: var(--bg-soft);
@@ -272,6 +504,12 @@
     color: var(--fg);
     border-color: var(--line-strong);
   }
+  /* Reflects the actual selection, so the bar describes what you've got. */
+  .rte__btn.is-on {
+    color: var(--ink-fg);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
   .rte__btn--danger:hover {
     color: #e8a31a;
     border-color: #e8a31a;
@@ -298,6 +536,26 @@
     font-size: 0.55rem;
     color: var(--accent);
     margin-right: 0.2rem;
+  }
+  .rte__figwidth {
+    font-size: 0.55rem;
+    color: var(--fg-faint);
+    margin-left: 0.2rem;
+  }
+  /* Corner grip, positioned over the active figure from JS. Lives outside the
+     contenteditable so it never lands in the saved HTML. */
+  .rte__handle {
+    position: absolute;
+    z-index: 3;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    padding: 0;
+    background: var(--accent);
+    border: 2px solid var(--bg-soft);
+    border-radius: 50%;
+    cursor: nwse-resize;
+    touch-action: none;
   }
   .rte__select {
     background: var(--bg);
@@ -358,12 +616,19 @@
     margin: 0.6em 0;
     padding: 0;
   }
+  /* These must mirror .ov-fore__body's figure rules in BookOverview.svelte —
+     the editor was missing the widths on --left/--right, so a wrapped figure
+     rendered full-width here and 48% on the published page. Order matters:
+     the size classes come last so they win over a placement class's width,
+     exactly as they do on the page. */
   .rte__area :global(.fore-fig--left) {
     float: left;
+    width: 48%;
     margin: 0.2rem 1.2rem 0.8rem 0;
   }
   .rte__area :global(.fore-fig--right) {
     float: right;
+    width: 48%;
     margin: 0.2rem 0 0.8rem 1.2rem;
   }
   .rte__area :global(.fore-fig--center) {
@@ -373,6 +638,12 @@
   .rte__area :global(.fore-fig--sm) { width: 30%; }
   .rte__area :global(.fore-fig--md) { width: 48%; }
   .rte__area :global(.fore-fig--lg) { width: 66%; }
+  /* Untouched caption reads as a hint, not as content (sanitizeRich drops it). */
+  .rte__area :global(.fore-fig figcaption:empty)::before {
+    content: 'Caption (optional)';
+    color: var(--fg-faint);
+    opacity: 0.7;
+  }
   /* Any image — pasted content can carry bare <img> outside a fore-fig;
      clamp it exactly like the rendered page does. */
   .rte__area :global(img) {
