@@ -1,0 +1,206 @@
+---
+/**
+ * Showcase plate — a paper leaf tipped between the ink hero and the ink shelf,
+ * framed with the house crop marks. One picture today; the same markup is a
+ * slideshow the moment `slides` has a second entry (see src/data/showcase.ts).
+ *
+ * Rendered server-side rather than as a Svelte island on purpose: the homepage
+ * is prerendered, so `<Image>` optimises at build time and the artwork lands in
+ * the initial HTML. A client:only island would leave a hole until JS loaded and
+ * could not use <Image> at all.
+ */
+import { Image, getImage } from 'astro:assets';
+import { slides } from '../../data/showcase';
+
+const many = slides.length > 1;
+const first = slides[0];
+// Reserve the box from the real dimensions so the shelf below never jumps.
+const ratio = `${first.image.width} / ${first.image.height}`;
+
+// The lightbox needs a big variant, but `image.src` is the untouched 2 MB
+// original — serving that would undo the optimisation. Build one capped WebP
+// per slide and hand its URL to the overlay instead.
+const fulls = await Promise.all(
+  slides.map((slide) =>
+    getImage({ src: slide.image, width: 2000, format: 'webp', quality: 85 }),
+  ),
+);
+---
+
+<section class="plate spread spread--paper">
+  <div class="paper-grid" aria-hidden="true"></div>
+  <div class="crop crop--tl" aria-hidden="true"></div>
+  <div class="crop crop--tr" aria-hidden="true"></div>
+  <div class="crop crop--bl" aria-hidden="true"></div>
+  <div class="crop crop--br" aria-hidden="true"></div>
+  <div class="regmark plate__reg" aria-hidden="true"></div>
+
+  <div class="plate__inner">
+    <button
+      type="button"
+      class="plate__frame"
+      style={`aspect-ratio: ${ratio}`}
+      data-lb-open
+      data-cursor="VIEW"
+      aria-label="View artwork full size"
+    >
+      {
+        slides.map((slide, i) => (
+          <Image
+            class="plate__img"
+            src={slide.image}
+            alt={slide.alt}
+            width={1600}
+            widths={[640, 960, 1280, 1600]}
+            sizes="(max-width: 900px) 92vw, min(72rem, 80vw)"
+            format="webp"
+            quality={82}
+            loading={i === 0 ? 'eager' : 'lazy'}
+            data-slide={i}
+            data-full={fulls[i].src}
+            data-alt={slide.alt}
+            hidden={i !== 0}
+          />
+        ))
+      }
+    </button>
+
+    {
+      many && (
+        <div class="plate__dots" role="tablist" aria-label="Choose artwork">
+          {slides.map((_, i) => (
+            <button
+              type="button"
+              class="plate__dot"
+              data-dot={i}
+              role="tab"
+              aria-selected={i === 0}
+              aria-label={`Artwork ${i + 1}`}
+            />
+          ))}
+        </div>
+      )
+    }
+  </div>
+</section>
+
+<!-- Authored here (hidden) rather than built in JS, so the global .lb__* rules
+     apply and there is never a flash of unstyled overlay. -->
+<div class="lb" hidden data-lb role="dialog" aria-modal="true" aria-label="Artwork">
+  <div class="lb__backdrop" data-lb-dismiss></div>
+  <span class="bracket bracket--tl" aria-hidden="true"></span>
+  <span class="bracket bracket--br" aria-hidden="true"></span>
+
+  <figure class="lb__stage">
+    <img class="lb__img" data-lb-img src={fulls[0].src} alt={first.alt} />
+  </figure>
+
+  {many && <div class="lb__hud lb__hud--bl mono" data-lb-count aria-hidden="true" />}
+
+  <button type="button" class="lb__btn lb__close" data-lb-dismiss aria-label="Close">✕</button>
+  {
+    many && (
+      <>
+        <button type="button" class="lb__btn lb__prev" data-lb-prev aria-label="Previous artwork">
+          ‹
+        </button>
+        <button type="button" class="lb__btn lb__next" data-lb-next aria-label="Next artwork">
+          ›
+        </button>
+      </>
+    )
+  }
+</div>
+
+<style>
+  .plate {
+    position: relative;
+    z-index: 1;
+    padding: clamp(3rem, 8vh, 5.5rem) var(--pad);
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .plate__reg {
+    top: 2.2rem;
+    right: 12%;
+  }
+  .plate__inner {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    justify-items: center;
+    gap: 1.1rem;
+    max-width: 72rem;
+    margin: 0 auto;
+  }
+  /* The frame is a button: reset it, then let it behave like a figure. */
+  .plate__frame {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: var(--bg-soft);
+    border: 1px solid rgba(22, 20, 15, 0.22);
+    cursor: zoom-in;
+    overflow: hidden;
+    /* Paper stock: a printed plate sits slightly off the page. */
+    box-shadow: 0 18px 50px -28px rgba(22, 20, 15, 0.55);
+    transition: box-shadow 0.45s var(--ease), border-color 0.35s var(--ease);
+  }
+  .plate__frame:hover,
+  .plate__frame:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 26px 70px -26px rgba(22, 20, 15, 0.7);
+  }
+  .plate__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.7s var(--ease);
+  }
+  .plate__img[hidden] {
+    display: none;
+  }
+  .plate__frame:hover .plate__img,
+  .plate__frame:focus-visible .plate__img {
+    transform: scale(1.02);
+  }
+
+  /* --- Slideshow affordances: only ever rendered when there's a 2nd slide --- */
+  .plate__dots {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .plate__dot {
+    width: 30px;
+    height: 3px;
+    padding: 0;
+    background: rgba(22, 20, 15, 0.22);
+    border: 0;
+    cursor: pointer;
+    transition: background-color 0.3s var(--ease);
+  }
+  .plate__dot:hover {
+    background: rgba(22, 20, 15, 0.45);
+  }
+  .plate__dot[aria-selected='true'] {
+    background: var(--accent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .plate__frame,
+    .plate__img {
+      transition: none;
+    }
+    .plate__frame:hover .plate__img,
+    .plate__frame:focus-visible .plate__img {
+      transform: none;
+    }
+  }
+</style>
+
+<script>
+  import { initShowcase } from '../../scripts/showcase';
+  initShowcase();
+</script>
