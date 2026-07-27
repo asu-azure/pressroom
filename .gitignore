@@ -17,3 +17,6 @@ Thumbs.db
 
 # logs
 npm-debug.log*
+
+# local working notes — never pushed
+poi/
