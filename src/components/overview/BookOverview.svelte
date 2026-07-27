@@ -36,14 +36,20 @@
   const frontPages = $derived(ordered.filter((p) => !p.chapterId));
   const chapterList = $derived(
     sortedChapters(chapters)
-      .map((ch) => ({
-        ch,
-        pages: ordered.filter((p) => p.chapterId === ch.id),
-        cover:
-          ordered.find((p) => p.id === ch.cover_page_id) ??
-          ordered.find((p) => p.chapterId === ch.id && !p.isBlank) ??
-          null,
-      }))
+      .map((ch) => {
+        const pages = ordered.filter((p) => p.chapterId === ch.id);
+        return {
+          ch,
+          pages,
+          cover:
+            ordered.find((p) => p.id === ch.cover_page_id) ??
+            pages.find((p) => !p.isBlank) ??
+            null,
+          // Where "read this chapter" lands: a chapter can open on a blank
+          // spacer leaf, and dropping the reader there shows an empty page.
+          firstReadable: pages.find((p) => !p.isBlank) ?? pages[0] ?? null,
+        };
+      })
       .filter((c) => c.pages.length > 0),
   );
   const forewordHtml = $derived(work ? toRichHtml(work.foreword) : '');
@@ -272,8 +278,10 @@
             alt={`${work.title} — cover`}
             style={`aspect-ratio: ${cover.width} / ${cover.height}`}
           />
+          <!-- RLS returns only the cover row for a locked work, so realPageCount
+               would read "1P" — same guard as the CONTENTS header below. -->
           <figcaption class="mono ov-hero__coverTag">
-            {work.direction.toUpperCase()} · {realPageCount}P
+            {work.direction.toUpperCase()}{locked ? '' : ` · ${realPageCount}P`}
           </figcaption>
         </figure>
       {/if}
@@ -384,7 +392,7 @@
         </div>
       {/if}
 
-      {#each locked ? [] : chapterList as { ch, pages: chPages, cover: chCover }, ci (ch.id)}
+      {#each locked ? [] : chapterList as { ch, pages: chPages, cover: chCover, firstReadable }, ci (ch.id)}
         <div class="ov-chapter" use:reveal>
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">{String(ci + 1).padStart(2, '0')}</span>
@@ -392,7 +400,7 @@
             <span class="mono ov-chapter__count">{chPages.filter((p) => !p.isBlank).length}P</span>
             <a
               class="mono ov-chapter__read"
-              href={`/w/${slug}/read?p=${encodeURIComponent((chPages.find((p) => !p.isBlank) ?? chPages[0]).id)}`}
+              href={`/w/${slug}/read?p=${encodeURIComponent(firstReadable!.id)}`}
               data-magnetic
             >{i18n.t('ov.start')} →</a>
           </header>
@@ -400,7 +408,7 @@
             {#if chCover}
               <a
                 class="ov-thumb ov-thumb--cover"
-                href={`/w/${slug}/read?p=${encodeURIComponent(chPages[0].id)}`}
+                href={`/w/${slug}/read?p=${encodeURIComponent(firstReadable!.id)}`}
                 data-cursor="READ"
               >
                 <img src={chCover.thumbUrl} alt={`${ch.title} — cover`} loading="lazy" />

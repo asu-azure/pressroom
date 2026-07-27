@@ -62,7 +62,7 @@
     {#each notes as note (note.no)}
       <div class="nm__note">
         <span class="nm__leader" aria-hidden="true"></span>
-        <span class="mono nm__label">NOTE — P.{String(note.no).padStart(2, '0')}</span>
+        <span class="mono nm__label">{i18n.t('rd.note')} — P.{String(note.no).padStart(2, '0')}</span>
         <p class="serif nm__text">{note.text}</p>
       </div>
     {/each}

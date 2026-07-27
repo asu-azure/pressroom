@@ -1,13 +1,49 @@
 ---
 import Base from '../../layouts/Base.astro';
 import BookOverview from '../../components/overview/BookOverview.svelte';
+import { supabaseServer } from '../../lib/supabaseServer';
+import { publicUrl } from '../../lib/storagePaths';
 
-// Server-output shell: the slug is only passed into the island; all data is
-// fetched client-side with the anon key (public read via RLS).
+// Server-output shell: the slug is only passed into the island; all page data
+// is still fetched client-side with the anon key (public read via RLS).
+//
+// The one exception is <head> metadata: crawlers building a link preview never
+// run the island, so a shared work link would otherwise show the generic site
+// card. Public work fields only, and a failure here must never block the page —
+// it just falls back to the layout's defaults.
 const { slug } = Astro.params;
+
+let title: string | undefined;
+let description: string | undefined;
+let image: string | undefined;
+
+try {
+  const { data: work } = await supabaseServer
+    .from('works')
+    .select('title, description, cover_page_id')
+    .eq('slug', slug!)
+    .eq('published', true)
+    .maybeSingle();
+
+  if (work) {
+    title = `${work.title} — Pressroom`;
+    if (work.description?.trim()) description = work.description.trim();
+
+    if (work.cover_page_id) {
+      const { data: cover } = await supabaseServer
+        .from('pages')
+        .select('med_path')
+        .eq('id', work.cover_page_id)
+        .maybeSingle();
+      if (cover?.med_path) image = publicUrl(cover.med_path);
+    }
+  }
+} catch {
+  /* preview metadata is a nicety — never let it take the page down */
+}
 ---
 
-<Base title="Pressroom — Asu Azure">
+<Base title={title} description={description} image={image}>
   <main class="ov-shell">
     <BookOverview client:only="svelte" slug={slug!} />
   </main>

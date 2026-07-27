@@ -6,13 +6,16 @@ import '../styles/motion.css';
 interface Props {
   title?: string;
   description?: string;
+  /** Absolute URL of a share-card image (a work's cover). Upgrades the card. */
+  image?: string;
   /** Reader route drives its own scrolling — skip Lenis + progress hairline. */
   chromeless?: boolean;
 }
 
 const {
   title = 'Pressroom — Asu Azure',
-  description = 'Doujinshi library & reader by Asu Azure.',
+  description = 'Read Asu Azure\'s doujinshi online — the way they were bound.',
+  image,
   chromeless = false,
 } = Astro.props;
 
@@ -51,10 +54,12 @@ const jsonLd = JSON.stringify({
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical} />
     <meta property="og:site_name" content="Pressroom — Asu Azure" />
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
     <meta name="twitter:creator" content="@asukonpeki" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
+    {image && <meta property="og:image" content={image} />}
+    {image && <meta name="twitter:image" content={image} />}
 
     <script type="application/ld+json" set:html={jsonLd} />
 

@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 import type { PageRow, PageRec } from './types';
 
 export const PAGES_BUCKET = 'pages';
@@ -9,8 +8,16 @@ export function pageFolder(workId: string, pageId: string): string {
   return `works/${workId}/${pageId}`;
 }
 
+/**
+ * Public storage URL. Built by hand rather than via `supabase.storage
+ * .getPublicUrl()` so this module stays free of the browser client — the
+ * server-rendered <head> metadata on /w/[slug] imports it too, and pulling the
+ * auth-bearing singleton into SSR just to concatenate a string is a bad trade.
+ * Same shape richtext.ts already validates image sources against.
+ */
 export function publicUrl(path: string): string {
-  return supabase.storage.from(PAGES_BUCKET).getPublicUrl(path).data.publicUrl;
+  const base = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
+  return `${base}/storage/v1/object/public/${PAGES_BUCKET}/${path}`;
 }
 
 export function toPageRec(row: PageRow): PageRec {

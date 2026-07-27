@@ -19,6 +19,14 @@
     pageCount: number;
   }
 
+  /** One row per published work, from the library_cards() RPC. */
+  interface CardRow {
+    card_work_id: string;
+    card_cover_page_id: string | null;
+    card_med_path: string | null;
+    card_page_count: number;
+  }
+
   let cards = $state<CardData[] | null>(null);
   let error = $state<string | null>(null);
 
@@ -31,8 +39,6 @@
   $effect(() => {
     const sub = document.getElementById('lib-sub');
     if (sub) sub.textContent = i18n.t('lib.sub');
-    const dev = document.getElementById('lib-devnote');
-    if (dev) dev.textContent = i18n.t('lib.devnote');
   });
 
   /** Reversible scroll entrance for each card (Editorial FUI house rule). */
@@ -59,35 +65,31 @@
   }
 
   async function load() {
-    const { data: works, error: err } = await supabase
-      .from('works')
-      .select('*')
-      .eq('published', true)
-      .order('updated_at', { ascending: false });
-    if (err) {
-      error = err.message;
+    // Covers + page counts come from library_cards() (see supabase/library-cards.sql):
+    // one row per work instead of one per page, so the grid can't hit PostgREST's
+    // 1000-row cap, and locked works report their true length rather than "1P".
+    const [{ data: works, error: err }, { data: rows, error: cardErr }] = await Promise.all([
+      supabase
+        .from('works')
+        .select('*')
+        .eq('published', true)
+        .order('updated_at', { ascending: false }),
+      supabase.rpc('library_cards'),
+    ]);
+    if (err || cardErr) {
+      error = (err ?? cardErr)!.message;
       return;
     }
-    const list = (works ?? []) as Work[];
 
-    // One query for all covers + counts (library stays a single round trip pair).
-    const ids = list.map((w) => w.id);
-    const { data: pages } = ids.length
-      ? await supabase
-          .from('pages')
-          .select('id, work_id, thumb_path, med_path, sort_key, is_blank')
-          .in('work_id', ids)
-      : { data: [] };
-
-    cards = list.map((work) => {
-      const own = (pages ?? []).filter((p) => p.work_id === work.id);
-      own.sort((a, b) => (a.sort_key < b.sort_key ? -1 : 1));
-      // Never fall back to a blank spacer as the cover.
-      const cover = own.find((p) => p.id === work.cover_page_id) ?? own.find((p) => !p.is_blank);
+    const byWork = new Map<string, CardRow>(
+      ((rows ?? []) as CardRow[]).map((r) => [r.card_work_id, r]),
+    );
+    cards = ((works ?? []) as Work[]).map((work) => {
+      const row = byWork.get(work.id);
       return {
         work,
-        coverUrl: cover ? publicUrl(cover.med_path) : null,
-        pageCount: own.filter((p) => !p.is_blank).length,
+        coverUrl: row?.card_med_path ? publicUrl(row.card_med_path) : null,
+        pageCount: row?.card_page_count ?? 0,
       };
     });
   }

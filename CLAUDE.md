@@ -34,10 +34,15 @@ Same rule as the sibling `art` repo: this project is **alias-only**.
 ## Stack
 
 Astro (`output: 'server'`, Vercel adapter) + **Svelte 5 islands** for everything interactive
-(reader, uploader, arranger, dashboard) + supabase-js **in the browser only** (no custom
-backend, no server-side data fetching) + GSAP + Lenis for motion. `pdfjs-dist` rasterizes
-uploaded PDFs client-side (worker via `?url` import, client-only — never import pdfjs in
-Astro frontmatter).
+(reader, uploader, arranger, dashboard) + supabase-js **in the browser** (no custom
+backend) + GSAP + Lenis for motion. `pdfjs-dist` rasterizes uploaded PDFs client-side
+(worker via `?url` import, client-only — never import pdfjs in Astro frontmatter).
+
+**Server-side reads are permitted for `<head>` metadata only** — public work fields, so a
+shared link previews with its real title and cover (crawlers never run the island). Use
+`src/lib/supabaseServer.ts` (anon key, no session persistence), never read anything
+user-specific, and always wrap in try/catch: metadata must never gate a render. All other
+data fetching stays in the browser.
 
 ## Commands
 
@@ -49,8 +54,11 @@ Astro frontmatter).
 
 1. Run `supabase/schema.sql` then `supabase/storage.sql` in the SQL editor — replace
    `AUTHOR_UID` with the author user's `auth.users.id` first.
-2. Create the author user (email+password) in Auth, then **disable public signups**.
-3. Put the project URL + anon key in `.env`.
+2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
+   `translations.sql`, `read-lock.sql`, `library-cards.sql`. **The homepage will not load
+   without `library-cards.sql`** — it defines the `library_cards()` RPC the grid reads.
+3. Create the author user (email+password) in Auth, then **disable public signups**.
+4. Put the project URL + anon key in `.env`.
 
 ## Design system (inherited "Editorial FUI")
 
