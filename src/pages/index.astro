@@ -36,10 +36,12 @@ export const prerender = true;
 
       {/* Hanko: the artist's own doodle, keyed transparent and tinted
           vermillion. An animated WebP cannot be paused with CSS, so reduced
-          motion gets a still frame through <picture> instead. */}
+          motion gets a still frame through <picture> instead.
+          Not lazy: it sits above the fold at 30kB, so deferring it gains
+          nothing and the browser was declining to fetch it at all. */}
       <picture class="lib-hero__stamp">
         <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
-        <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} loading="lazy" decoding="async" />
+        <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
       </picture>
 
       <div class="rgb-line" aria-hidden="true"></div>
