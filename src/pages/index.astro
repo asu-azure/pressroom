@@ -32,7 +32,7 @@ export const prerender = true;
       <h1 class="mega lib-hero__title" data-vel>
         <span class="reveal-mask"><span id="lib-title-line">Press<span class="flow-text">room</span></span></span>
       </h1>
-      <p class="serif lib-hero__sub" id="lib-sub">同人誌を、綴じたままのかたちで。</p>
+      <p class="serif lib-hero__sub" id="lib-sub">Asu Azure のオリジナル作品をまとめた場所。</p>
 
       {/* Hanko: the artist's own doodle, keyed transparent and tinted
           vermillion. An animated WebP cannot be paused with CSS, so reduced
@@ -81,14 +81,9 @@ export const prerender = true;
         { yPercent: 0, duration: 1.0, ease: 'power3.out', delay: 0.12 },
       );
     }
-    const sub = document.getElementById('lib-sub');
-    if (sub) {
-      gsap.fromTo(
-        sub,
-        { opacity: 0, y: 18 },
-        { opacity: 1, y: 0, duration: 0.8, ease: 'power3.out', delay: 0.4 },
-      );
-    }
+    // The tagline's entrance lives in Library.svelte, which owns that text: it
+    // rewrites #lib-sub on mount and on every language change, so animating it
+    // here would just get overwritten when the island hydrates.
 
     // Contact strip rises as it scrolls in. Reversible, per the house rule —
     // never `once: true`.

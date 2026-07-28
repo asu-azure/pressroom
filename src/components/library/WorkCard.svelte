@@ -35,7 +35,8 @@
   {:else}
     <div class="card__blank"><span class="mono">NO COVER</span></div>
   {/if}
-  <span class="tile__num mono">{String(index + 1).padStart(2, '0')}</span>
+  <!-- No index badge: numbering the covers implied a reading order between
+       works that isn't intended. `index` still drives eager/lazy loading. -->
   <span class="tile__tag mono">
     {statusLabel} · {pageCount}P · {work.direction.toUpperCase()}{#if work.read_locked}<span
         class="card__lock"
@@ -46,6 +47,9 @@
     {#if work.tags.length}
       <span class="card__tags mono">{work.tags.join(' / ')}</span>
     {/if}
+    <!-- Says where the tap goes, so the overview isn't a surprise stop on the
+         way to reading. -->
+    <span class="card__go mono">{i18n.t('lib.open')} →</span>
   </span>
 </a>
 
@@ -70,7 +74,13 @@
     height: 100%;
     transition: transform 0.65s var(--ease);
   }
-  :global(.tile:hover) .card__cover,
+  /* Gated on a real pointer — see the note on .tile in global.css. On touch an
+     unguarded :hover eats the first tap. */
+  @media (hover: hover) {
+    :global(.tile:hover) .card__cover {
+      transform: scale(1.06);
+    }
+  }
   :global(.tile:focus-visible) .card__cover {
     transform: scale(1.06);
   }
@@ -97,5 +107,22 @@
   .card__tags {
     color: rgba(244, 241, 234, 0.6);
     font-size: 0.55rem;
+  }
+  .card__go {
+    margin-top: 0.15rem;
+    font-size: 0.55rem;
+    color: var(--accent);
+    letter-spacing: 0.14em;
+  }
+  /* On a pointer the label brightens with the rest of the card; on touch it is
+     simply always visible, which is the whole point of signposting it. */
+  @media (hover: hover) {
+    .card__go {
+      color: rgba(244, 241, 234, 0.5);
+      transition: color 0.25s var(--ease);
+    }
+    :global(.tile:hover) .card__go {
+      color: var(--accent);
+    }
   }
 </style>

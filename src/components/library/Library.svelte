@@ -4,6 +4,7 @@
   import { supabase } from '../../lib/supabase';
   import { publicUrl } from '../../lib/storagePaths';
   import { i18n } from '../../lib/i18n.svelte';
+  import { assemble } from '../../scripts/text';
   import WorkCard from './WorkCard.svelte';
   import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
@@ -35,10 +36,16 @@
   });
 
   // Hero text lives in the static Astro shell — swap it on language change
-  // (same data-i18n spirit as the art site).
+  // (same data-i18n spirit as the art site). The entrance belongs here rather
+  // than in the page script: this effect rewrites the node on mount and on
+  // every language change, which would wipe an animation started elsewhere.
   $effect(() => {
     const sub = document.getElementById('lib-sub');
-    if (sub) sub.textContent = i18n.t('lib.sub');
+    if (!sub) return;
+    sub.textContent = i18n.t('lib.sub');
+    // Gathers per grapheme. decode() can't be used — the line is Japanese by
+    // default and that effect's scramble alphabet is Latin only.
+    assemble(sub, { delay: 0.15 });
   });
 
   /** Reversible scroll entrance for each card (Editorial FUI house rule). */

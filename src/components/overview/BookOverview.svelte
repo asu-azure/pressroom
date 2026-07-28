@@ -5,8 +5,9 @@
   import { toPageRec } from '../../lib/storagePaths';
   import { sortedChapters } from '../../lib/chapterOrder';
   import { loadProgress, loadUnlock, clearUnlock } from '../../lib/persistence';
-  import { decode } from '../../scripts/text';
-  import { toRichHtml } from '../../lib/richtext';
+  import { decode, assemble } from '../../scripts/text';
+  import { stamp, stampStatic } from '../../data/showcase';
+  import { toRichHtml, blurbFor } from '../../lib/richtext';
   import { i18n } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
@@ -53,6 +54,9 @@
       .filter((c) => c.pages.length > 0),
   );
   const forewordHtml = $derived(work ? toRichHtml(work.foreword) : '');
+  // Neither book fills in `description`, so the hero would open with no framing
+  // at all. Same fallback the shared-link metadata uses.
+  const blurb = $derived(work ? blurbFor(work.description, work.foreword) : '');
   const statusKey = $derived(
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
@@ -210,6 +214,30 @@
     decode(node, text, 900);
   }
 
+  /** Book title gathers on load. decode() can't be used — the titles are
+      Japanese and its scramble alphabet is Latin only. */
+  const titleIn = (node: HTMLElement) => assemble(node, { delay: 0.25 });
+
+  /** Section headings gather as they scroll in. Reversible per the house rule:
+      the tween is re-run on each re-entry rather than played once. */
+  function headingIn(node: HTMLElement) {
+    if (reduced) return;
+    const original = node.textContent ?? '';
+    const trigger = ScrollTrigger.create({
+      trigger: node,
+      start: 'top 88%',
+      onEnter: () => assemble(node),
+      onEnterBack: () => {
+        node.textContent = original;
+        assemble(node);
+      },
+      onLeaveBack: () => {
+        node.textContent = original;
+      },
+    });
+    return { destroy: () => trigger.kill() };
+  }
+
   /** Reveal each rendered rich-text block as it scrolls in (reversible). */
   function revealChildren(node: HTMLElement) {
     if (reduced) return;
@@ -287,13 +315,13 @@
       {/if}
       <div class="ov-hero__text">
         <p class="mono ov-hero__kicker" use:decodeIn>ASU AZURE · PRESSROOM</p>
-        <h1 class="ov-hero__title serif" use:reveal>{work.title}</h1>
+        <h1 class="ov-hero__title serif" use:titleIn>{work.title}</h1>
         <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
           {i18n.t(statusKey)}
           {#if work.tags.length}· {work.tags.join(' / ')}{/if}
         </p>
-        {#if work.description}
-          <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{work.description}</p>
+        {#if blurb}
+          <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{blurb}</p>
         {/if}
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
           <a
@@ -337,7 +365,7 @@
     <div class="ov-toc__inner">
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
-        <h2 class="serif ov-toc__title">{i18n.t('ov.contents')}</h2>
+        <h2 class="serif ov-toc__title" use:headingIn>{i18n.t('ov.contents')}</h2>
         <span class="ov-toc__rule" aria-hidden="true"></span>
         <span class="mono">{locked ? '——' : realPageCount} {i18n.t('ov.pages')}</span>
       </header>
@@ -348,8 +376,14 @@
         <div class="ov-lockNote" use:reveal>
           <span class="ov-lockNote__glyph" aria-hidden="true">🔒</span>
           <p class="mono ov-lockNote__text">{i18n.t('ov.locked')}</p>
+          <!-- Never render nothing here: with no hint set, a visitor from a
+               shared link had no idea how to get in. -->
           {#if work.password_hint}
             <p class="mono ov-lockNote__hint">{i18n.t('lock.hint')} — {work.password_hint}</p>
+          {:else}
+            <p class="mono ov-lockNote__hint">
+              {i18n.t('lock.hint')} — {i18n.t('lock.noHint')}
+            </p>
           {/if}
           <button type="button" class="mono ov-lockNote__btn" onclick={() => openLock(null)}>
             {i18n.t('lock.unlock')} →
@@ -441,7 +475,7 @@
       <div class="ov-cast__inner">
         <header class="ov-cast__head" use:reveal>
           <span class="index-num" aria-hidden="true">人</span>
-          <h2 class="serif ov-cast__title">{i18n.t('ov.cast')}</h2>
+          <h2 class="serif ov-cast__title" use:headingIn>{i18n.t('ov.cast')}</h2>
           <span class="ov-cast__rule" aria-hidden="true"></span>
           <span class="mono">{pad2(castList.length)}</span>
         </header>
@@ -483,13 +517,19 @@
       <div class="crop crop--br" aria-hidden="true"></div>
       <div class="regmark ov-fore__reg" aria-hidden="true"></div>
       <div class="ov-fore__inner">
-        <p class="mono ov-fore__label" use:reveal>✳ {i18n.t('ov.foreword')}</p>
+        <p class="mono ov-fore__label" use:headingIn>✳ {i18n.t('ov.foreword')}</p>
         <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
         <div class="ov-fore__body serif" use:revealChildren>
           {@html forewordHtml}
         </div>
         <div class="ov-fore__sig">
-          <span class="sig-mark serif" aria-hidden="true">A</span>
+          <!-- The author's own doodle as a signature seal, replacing the plain
+               cobalt "A". Animated WebP can't be paused with CSS, so reduced
+               motion gets a still frame — same pattern as the hero hanko. -->
+          <picture class="ov-fore__stamp" aria-hidden="true">
+            <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
+            <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
+          </picture>
           <span class="mono">ASU AZURE</span>
         </div>
       </div>
@@ -778,11 +818,19 @@
     transition: opacity 0.3s var(--ease);
     pointer-events: none;
   }
-  .ov-castTile:hover .ov-castTile__frame img,
+  /* Pointer-gated: cast tiles are buttons, and an unguarded :hover makes the
+     first tap on a phone do nothing but paint this state. */
+  @media (hover: hover) {
+    .ov-castTile:hover .ov-castTile__frame img {
+      transform: scale(1.06);
+    }
+    .ov-castTile:hover .ov-castTile__frame::after {
+      opacity: 1;
+    }
+  }
   .ov-castTile:focus-visible .ov-castTile__frame img {
     transform: scale(1.06);
   }
-  .ov-castTile:hover .ov-castTile__frame::after,
   .ov-castTile:focus-visible .ov-castTile__frame::after {
     opacity: 1;
   }
@@ -944,19 +992,19 @@
     gap: 1rem;
     margin-top: 0.6rem;
   }
-  .sig-mark {
-    display: inline-grid;
-    place-items: center;
-    width: 2.6rem;
-    aspect-ratio: 1;
-    background: var(--accent);
-    color: var(--ink-fg);
-    font-style: italic;
-    font-size: 1.5rem;
-    border-radius: 8px;
-    rotate: -4deg;
-    box-shadow: 0 4px 18px -8px rgba(39, 66, 240, 0.6);
+  /* Signature seal. Sits on the paper leaf, so the vermillion doodle reads
+     directly — no plate or backing needed. */
+  .ov-fore__stamp {
+    display: block;
+    width: clamp(3.2rem, 6vw, 4.6rem);
+    rotate: -6deg;
+    flex-shrink: 0;
     user-select: none;
+  }
+  .ov-fore__stamp img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
   .ov-backchip {
     position: fixed;
@@ -1053,7 +1101,14 @@
     overflow: hidden;
     transition: border-color 0.25s var(--ease), transform 0.25s var(--ease);
   }
-  .ov-thumb:hover {
+  /* Pointer-gated: these thumbnails are links into the reader. */
+  @media (hover: hover) {
+    .ov-thumb:hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+    }
+  }
+  .ov-thumb:focus-visible {
     border-color: var(--accent);
     transform: translateY(-3px);
   }

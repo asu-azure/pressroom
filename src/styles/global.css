@@ -944,7 +944,14 @@ a {
   object-fit: cover;
   transition: transform 0.65s var(--ease), filter 0.65s var(--ease);
 }
-.tile:hover img, .tile:focus-visible img { transform: scale(1.06); }
+/* Hover effects are gated on a real hovering pointer. Unguarded, a touch
+   device applies :hover on the FIRST tap and only activates the link on the
+   second — the tap appears to do nothing. :focus-visible stays outside the
+   query so keyboard users keep the same affordance. */
+@media (hover: hover) {
+  .tile:hover img { transform: scale(1.06); }
+}
+.tile:focus-visible img { transform: scale(1.06); }
 .tile::after {
   /* cobalt frame sweeps on hover */
   content: '';
@@ -955,7 +962,10 @@ a {
   transition: opacity 0.3s var(--ease);
   pointer-events: none;
 }
-.tile:hover::after, .tile:focus-visible::after { opacity: 1; }
+@media (hover: hover) {
+  .tile:hover::after { opacity: 1; }
+}
+.tile:focus-visible::after { opacity: 1; }
 .tile__tag {
   position: absolute;
   left: 0.55rem;

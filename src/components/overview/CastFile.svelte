@@ -2,6 +2,7 @@
   import { gsap } from 'gsap';
   import { i18n } from '../../lib/i18n.svelte';
   import { toRichHtml } from '../../lib/richtext';
+  import { assemble } from '../../scripts/text';
   import type { Character } from '../../lib/types';
 
   let {
@@ -143,43 +144,9 @@
     );
   }
 
-  /** Name scatters in per grapheme — the art site's assemble() essence. */
-  function assemble(node: HTMLElement) {
-    if (reduced) return;
-    const text = node.textContent ?? '';
-    const graphemes = [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(text)]
-      .map((s) => s.segment);
-    node.textContent = '';
-    const spans = graphemes.map((g) => {
-      const s = document.createElement('span');
-      s.textContent = g;
-      s.style.display = 'inline-block';
-      if (/\s/.test(g)) s.style.whiteSpace = 'pre';
-      node.appendChild(s);
-      return s;
-    });
-    gsap.fromTo(
-      spans,
-      {
-        opacity: 0,
-        x: () => gsap.utils.random(-90, 90),
-        y: () => gsap.utils.random(-40, 40),
-        rotate: () => gsap.utils.random(-30, 30),
-        filter: 'blur(6px)',
-      },
-      {
-        opacity: 1,
-        x: 0,
-        y: 0,
-        rotate: 0,
-        filter: 'blur(0px)',
-        duration: 0.8,
-        ease: 'power3.out',
-        stagger: { each: 0.03, from: 'random' },
-        delay: 0.12,
-      },
-    );
-  }
+  /** Name scatters in per grapheme. Shared with the overview and homepage —
+      see scripts/text.ts, which also explains why decode() can't be used here. */
+  const nameIn = (node: HTMLElement) => assemble(node);
 
   /** Role label: selection-invert sweep (--sw drives a scaleX pseudo-element). */
   function sweep(node: HTMLElement) {
@@ -259,7 +226,7 @@
           {#if ch.role}
             <p class="mono cf__role" use:sweep><span class="cf__roleIn">{ch.role}</span></p>
           {/if}
-          <h2 class="serif cf__name" use:assemble>{ch.name}</h2>
+          <h2 class="serif cf__name" use:nameIn>{ch.name}</h2>
           {#if ch.realName}
             <p class="serif cf__realName">
               <span class="mono cf__realNameLabel" aria-hidden="true">本名 —</span>

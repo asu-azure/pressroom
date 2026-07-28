@@ -154,11 +154,17 @@ const panels = Array.from({ length: PANELS }, (_, i) => i);
     box-shadow: 1px 0 0 rgba(39, 66, 240, 0.55);
     transition: flex-grow 0.55s var(--ease);
   }
-  /* Hovering widens a panel and lets its neighbours give up the room. */
-  .strip__row:hover .strip__panel {
-    flex-grow: 0.92;
+  /* Hovering widens a panel and lets its neighbours give up the room.
+     Pointer-gated: panels open the lightbox, and on touch an unguarded :hover
+     is spent on the first tap instead of opening anything. */
+  @media (hover: hover) {
+    .strip__row:hover .strip__panel {
+      flex-grow: 0.92;
+    }
+    .strip__row .strip__panel:hover {
+      flex-grow: 1.5;
+    }
   }
-  .strip__row .strip__panel:hover,
   .strip__row .strip__panel:focus-visible {
     flex-grow: 1.5;
   }
@@ -207,16 +213,19 @@ const panels = Array.from({ length: PANELS }, (_, i) => i);
     );
   }
 
+  /* Two panels on a phone wasted the space. Four on tablets, three on phones —
+     the slant needs a little width to read, so three is the floor. */
   @media (max-width: 900px) {
-    .strip__panel:nth-child(n + 4) {
+    .strip__panel:nth-child(n + 5) {
       display: none;
     }
   }
   @media (max-width: 560px) {
     .strip {
-      --panel-h: clamp(5.5rem, 16vh, 7.5rem);
+      --skew: -7deg; /* a softer slant survives the narrower panel */
+      --panel-h: clamp(5rem, 15vh, 7rem);
     }
-    .strip__panel:nth-child(n + 3) {
+    .strip__panel:nth-child(n + 4) {
       display: none;
     }
   }
@@ -226,8 +235,7 @@ const panels = Array.from({ length: PANELS }, (_, i) => i);
     .strip__img {
       transition: none;
     }
-    .strip__row:hover .strip__panel,
-    .strip__row .strip__panel:hover {
+    .strip__row .strip__panel:focus-visible {
       flex-grow: 1;
     }
   }

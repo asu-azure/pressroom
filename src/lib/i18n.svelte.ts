@@ -8,10 +8,11 @@ const STORAGE_KEY = 'pressroom:lang';
 
 const dict = {
   ja: {
-    'lib.sub': '同人誌を、綴じたままのかたちで。',
+    'lib.sub': 'Asu Azure のオリジナル作品をまとめた場所。',
     'lib.loading': '本を並べています…',
     'lib.empty': 'まだ本がありません',
     'lib.offline': '接続できません',
+    'lib.open': '作品を見る',
     'status.ongoing': '連載中',
     'status.complete': '完結',
     'status.oneshot': '読切',
@@ -30,6 +31,7 @@ const dict = {
     'ov.locked': '施錠中 — 合言葉で開きます',
     'lock.title': '施錠中',
     'lock.hint': 'ヒント',
+    'lock.noHint': '合言葉は作者にお問い合わせください',
     'lock.enter': '合言葉',
     'lock.unlock': '開く',
     'lock.wrong': '合言葉が違います',
@@ -60,10 +62,11 @@ const dict = {
     'nf.back': '書庫へ戻る',
   },
   en: {
-    'lib.sub': 'Doujinshi, read the way they were bound.',
+    'lib.sub': "Where Asu Azure's original work is collected.",
     'lib.loading': 'OPENING THE SHELF…',
     'lib.empty': 'NO BOOKS ON THE SHELF YET',
     'lib.offline': "CAN'T REACH THE SHELF",
+    'lib.open': 'OPEN THIS WORK',
     'status.ongoing': 'ONGOING',
     'status.complete': 'COMPLETE',
     'status.oneshot': 'ONE-SHOT',
@@ -82,6 +85,7 @@ const dict = {
     'ov.locked': 'LOCKED — ENTER THE PASSWORD',
     'lock.title': 'LOCKED',
     'lock.hint': 'HINT',
+    'lock.noHint': 'ASK THE AUTHOR FOR THE PASSWORD',
     'lock.enter': 'PASSWORD',
     'lock.unlock': 'UNLOCK',
     'lock.wrong': 'WRONG PASSWORD',
