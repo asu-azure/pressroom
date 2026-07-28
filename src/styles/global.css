@@ -48,17 +48,28 @@
   --line: var(--ink-line);
   --line-strong: var(--ink-line-strong);
 
-  /* Type — serif narrates, grotesk punches, mono labels */
-  --font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  /* Type — serif narrates, grotesk punches, mono labels.
+     Every stack names a Noto JP face right after its Latin face. The Latin
+     faces carry no kana or kanji, so Japanese used to fall through to the
+     generic `serif` / `sans-serif`, and browsers resolve those for CJK from
+     the <html lang> attribute — which the language toggle rewrites. That is
+     why 日本語 rendered in one font on the JA page and another on the EN page,
+     and why titles (--font-serif) disagreed with the elements that pin
+     --font-serif-jp. Naming the face makes it deterministic.
+     Font matching is per glyph, so Latin still comes from Fraunces / Space
+     Grotesk / JetBrains Mono; only kana and kanji reach the Noto faces, whose
+     @font-face carries a CJK unicode-range so Latin-only pages never fetch
+     them (see fonts.css). */
+  --font-serif: 'Fraunces', 'Noto Serif JP', Georgia, 'Times New Roman', serif;
   --font-serif-jp: 'Noto Serif JP', serif;
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Space Grotesk', 'Noto Sans JP', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;
   /* Stack Sans Headline (Latin) → headings + big display.
      The art site's Thai faces weren't carried over; their tokens fall back
      to the grotesk so shared decor classes (.wm-line) still resolve. */
-  --font-stack: 'Stack Sans Headline', system-ui, sans-serif;
-  --font-ekkamai: 'Space Grotesk', system-ui, sans-serif;
+  --font-stack: 'Stack Sans Headline', 'Noto Sans JP', system-ui, sans-serif;
+  --font-ekkamai: 'Space Grotesk', 'Noto Sans JP', system-ui, sans-serif;
 
   /* Mega display scale — recurring giant emphasis words (SAKAZUKI / GUEST motif) */
   --font-mega: clamp(3rem, 13vw, 11rem);
