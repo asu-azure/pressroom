@@ -373,14 +373,9 @@
         <div class="ov-lockNote" use:reveal>
           <span class="ov-lockNote__glyph" aria-hidden="true">🔒</span>
           <p class="mono ov-lockNote__text">{i18n.t('ov.locked')}</p>
-          <!-- Never render nothing here: with no hint set, a visitor from a
-               shared link had no idea how to get in. -->
+          <!-- Shown only when the author has set one, in the studio. -->
           {#if work.password_hint}
             <p class="mono ov-lockNote__hint">{i18n.t('lock.hint')} — {work.password_hint}</p>
-          {:else}
-            <p class="mono ov-lockNote__hint">
-              {i18n.t('lock.hint')} — {i18n.t('lock.noHint')}
-            </p>
           {/if}
           <button type="button" class="mono ov-lockNote__btn" onclick={() => openLock(null)}>
             {i18n.t('lock.unlock')} →

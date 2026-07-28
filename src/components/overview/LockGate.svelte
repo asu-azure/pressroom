@@ -92,22 +92,11 @@
     <p class="mono lg__title"><span class="lg__keyGlyph" aria-hidden="true">🗝</span> {i18n.t('lock.title')} · LOCKED</p>
     <p class="serif lg__work">{work.title}</p>
 
-    <!-- With no hint set this used to render nothing, leaving a bare password
-         box and no way forward — a wall with no door for anyone arriving from
-         a shared link. Fall back to the author's public handle. The real hint
-         is authored in Studio → the work → meta. -->
+    <!-- Shown only when the author has set one, in Studio → the work → meta. -->
     {#if work.password_hint}
       <p class="mono lg__hint">
         <span class="lg__hintLabel">{i18n.t('lock.hint')} —</span>
         {work.password_hint}
-      </p>
-    {:else}
-      <p class="mono lg__hint">
-        <span class="lg__hintLabel">{i18n.t('lock.hint')} —</span>
-        {i18n.t('lock.noHint')}
-        <a class="lg__hintLink" href="https://x.com/asukonpeki" target="_blank" rel="noopener">
-          X — @ASUKONPEKI
-        </a>
       </p>
     {/if}
 
@@ -182,16 +171,6 @@
   .lg__hintLabel {
     color: #e8a31a;
     letter-spacing: 0.2em;
-  }
-  .lg__hintLink {
-    display: inline-block;
-    margin-left: 0.4em;
-    color: var(--accent);
-    text-decoration: underline;
-    text-underline-offset: 0.3em;
-  }
-  .lg__hintLink:hover {
-    color: #f4f1ea;
   }
   .lg__field {
     display: grid;
