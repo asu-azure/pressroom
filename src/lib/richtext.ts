@@ -97,51 +97,6 @@ export function sanitizeRich(html: string): string {
   return doc.body.innerHTML;
 }
 
-/**
- * A one-paragraph blurb for a work, used on the overview hero and — more
- * importantly — as og:description on every shared link.
- *
- * `works.description` is optional and is currently empty on both books, which
- * left links previewing with the generic site line and the book page opening
- * with no framing. Falling back to the opening of the foreword gives both a
- * real summary without the author having to write a second one.
- *
- * Runs on the server too (the /w/[slug] head), so it cannot use DOMParser.
- */
-export function blurbFor(
-  description: string | null | undefined,
-  foreword: string | null | undefined,
-  max = 160,
-): string {
-  const direct = (description ?? '').trim();
-  if (direct) return direct;
-
-  const text = (foreword ?? '')
-    // Block-level tags become spaces so words don't run together.
-    .replace(/<(br|\/p|\/h[1-6]|\/div|\/li|\/blockquote)[^>]*>/gi, ' ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (text.length <= max) return text;
-
-  // Prefer a sentence boundary — Japanese uses 。！？, so match those too.
-  const window = text.slice(0, max + 40);
-  const lastStop = Math.max(
-    window.lastIndexOf('。'),
-    window.lastIndexOf('！'),
-    window.lastIndexOf('？'),
-    window.lastIndexOf('. '),
-  );
-  if (lastStop >= max * 0.5) return window.slice(0, lastStop + 1).trim();
-  return `${text.slice(0, max).trim()}…`;
-}
-
 /** Legacy plain-text forewords (pre-editor) become paragraphs. */
 export function toRichHtml(foreword: string): string {
   if (!foreword.trim()) return '';

@@ -7,7 +7,7 @@
   import { loadProgress, loadUnlock, clearUnlock } from '../../lib/persistence';
   import { decode, assemble } from '../../scripts/text';
   import { stamp, stampStatic } from '../../data/showcase';
-  import { toRichHtml, blurbFor } from '../../lib/richtext';
+  import { toRichHtml } from '../../lib/richtext';
   import { i18n } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
@@ -54,9 +54,6 @@
       .filter((c) => c.pages.length > 0),
   );
   const forewordHtml = $derived(work ? toRichHtml(work.foreword) : '');
-  // Neither book fills in `description`, so the hero would open with no framing
-  // at all. Same fallback the shared-link metadata uses.
-  const blurb = $derived(work ? blurbFor(work.description, work.foreword) : '');
   const statusKey = $derived(
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
@@ -320,8 +317,8 @@
           {i18n.t(statusKey)}
           {#if work.tags.length}· {work.tags.join(' / ')}{/if}
         </p>
-        {#if blurb}
-          <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{blurb}</p>
+        {#if work.description}
+          <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{work.description}</p>
         {/if}
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
           <a

@@ -3,7 +3,6 @@ import Base from '../../layouts/Base.astro';
 import BookOverview from '../../components/overview/BookOverview.svelte';
 import { supabaseServer } from '../../lib/supabaseServer';
 import { publicUrl } from '../../lib/storagePaths';
-import { blurbFor } from '../../lib/richtext';
 
 // Server-output shell: the slug is only passed into the island; all page data
 // is still fetched client-side with the anon key (public read via RLS).
@@ -21,16 +20,17 @@ let image: string | undefined;
 try {
   const { data: work } = await supabaseServer
     .from('works')
-    .select('title, description, foreword, cover_page_id')
+    .select('title, description, cover_page_id')
     .eq('slug', slug!)
     .eq('published', true)
     .maybeSingle();
 
   if (work) {
     title = `${work.title} — Pressroom`;
-    // description is empty on both books, so fall back to the synopsis rather
-    // than letting every shared link preview with the generic site line.
-    description = blurbFor(work.description, work.foreword) || undefined;
+    // Author-written only. Deriving this from the foreword was a bad idea: that
+    // section carries a spoiler warning and, for 夜光虫編, opens onto abuse and
+    // self-harm — not something to auto-paste into a social card.
+    if (work.description?.trim()) description = work.description.trim();
 
     if (work.cover_page_id) {
       const { data: cover } = await supabaseServer
