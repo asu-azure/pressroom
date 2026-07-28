@@ -1,94 +1,75 @@
 /**
- * Homepage contact strip — a slim rail of artwork between the hero and the shelf.
+ * Homepage artwork.
  *
- * TO ADD A PICTURE: drop it in `src/assets/showcase/`, import it, add one entry.
- * Order here is the order on the rail.
+ * `slides` feeds the skewed panel strip. Panels CROP rather than fit, which is
+ * what lets the strip stay thin — these pieces run from 0.66 to 1.52 aspect, so
+ * nothing sized to show them whole could be short.
  *
- * The strip fixes HEIGHT and lets width fall out of each picture's own
- * proportions, so nothing is ever cropped — these range from 0.66 (tall comic
- * page) to 1.52 (wide still), and a fixed-ratio banner would have shown a
- * sliver of the tall ones.
+ * Because panels are wide bands, the vertical focal point is the difference
+ * between a face and a torso. `focus` is a CSS object-position, tuned per piece
+ * against a real crop preview — see the comment on each.
  *
- * Sources are pre-downscaled to 2200px WebP (see the repo history): the site
- * never needs more than 1600px, and the untouched originals were 97MB.
- *
- * `animated: true` matters — those slides skip `astro:assets`, which resizes
- * with sharp and would keep only the first frame, freezing the animation.
+ * Deliberately not here: the three pieces on plain white backgrounds
+ * (tomato-chibi, uniform-stand, green-outfit) read as near-blank slots between
+ * full-bleed neighbours, and the two animated sketches are too small to crop.
+ * Their files are still in src/assets/showcase if they should come back.
  */
 import type { ImageMetadata } from 'astro';
 
-import friendsForever from '../assets/showcase/friends-forever.jpg';
 import studyDesk from '../assets/showcase/study-desk.webp';
 import newyear2569 from '../assets/showcase/newyear-2569.webp';
-import comicMono from '../assets/showcase/comic-mono.webp';
-import tomatoChibi from '../assets/showcase/tomato-chibi.webp';
-import uniformStand from '../assets/showcase/uniform-stand.webp';
-import greenOutfit from '../assets/showcase/green-outfit.webp';
 import blossomLean from '../assets/showcase/blossom-lean.webp';
-import postSolo from '../assets/showcase/post-solo.webp';
 import postPair from '../assets/showcase/post-pair.webp';
-import hugDoodle from '../assets/showcase/hug-doodle.webp';
-import sketchLoop from '../assets/showcase/sketch-loop.webp';
+import postSolo from '../assets/showcase/post-solo.webp';
+import comicMono from '../assets/showcase/comic-mono.webp';
+
+/** Faint art behind the PRESSROOM hero. */
+export { default as heroArt } from '../assets/showcase/hero-art.webp';
+/** Hanko stamp — the doodle, keyed transparent and tinted vermillion. */
+export { default as stamp } from '../assets/showcase/stamp.webp';
+/** Single frame of the same, for prefers-reduced-motion. */
+export { default as stampStatic } from '../assets/showcase/stamp-static.png';
 
 export interface Slide {
   image: ImageMetadata;
-  /** Described for screen readers. The strip itself carries no visible caption. */
+  /** Described for screen readers. Panels carry no visible caption. */
   alt: string;
-  /** Animated (multi-frame) — served untransformed so the animation survives. */
-  animated?: boolean;
+  /** CSS object-position for the crop. Vertical value is the one that matters. */
+  focus: string;
 }
 
-// Sequenced so neighbours contrast: wide next to tall, colour next to linework,
-// rather than grouping the comic pages into one indistinguishable block.
+// Values tuned against the live strip, not guessed: panels render about 3.9
+// aspect, a far thinner band than it looks on paper, so a few points of drift
+// turns a face into a shirt collar.
 export const slides: Slide[] = [
-  {
-    image: friendsForever,
-    alt: 'Three schoolboys in blue uniforms leap arm-in-arm past a school gate under falling cherry blossom.',
-  },
-  {
-    image: uniformStand,
-    alt: 'A fair-haired student in a school uniform standing with hands on hips.',
-  },
-  {
-    image: newyear2569,
-    alt: 'A colourful new-year illustration: a student in a floral shirt sitting above stylised waves.',
-  },
-  {
-    image: sketchLoop,
-    alt: 'A looping pencil-line animation of a character sketch.',
-    animated: true,
-  },
   {
     image: blossomLean,
     alt: 'A student leaning forward outdoors, cherry blossom drifting past.',
+    focus: '35% 16%', // face is high AND left; centring it pushed the face off-panel
+  },
+  {
+    image: postPair,
+    alt: 'Two characters close together against a blue sky, one holding a book.',
+    focus: 'center 22%', // profile against the sky
+  },
+  {
+    image: studyDesk,
+    alt: 'A dim cinematic still of a student asleep at a desk covered in sticky notes.',
+    focus: 'center 58%', // the figure only enters low in the frame
+  },
+  {
+    image: newyear2569,
+    alt: 'A colourful new-year illustration of a student in a floral shirt above stylised waves.',
+    focus: 'center 30%', // torso and colour, clear of the lettering along the top
   },
   {
     image: comicMono,
     alt: 'A monochrome comic page: two students framed across several panels.',
-  },
-  {
-    image: tomatoChibi,
-    alt: 'Two chibi characters wearing tomato hats, huddled together.',
-  },
-  {
-    image: studyDesk,
-    alt: 'A dim cinematic still of a student working at a desk covered in sticky notes.',
-  },
-  {
-    image: postPair,
-    alt: 'Artwork of two characters close together, framed as a social-media post.',
-  },
-  {
-    image: hugDoodle,
-    alt: 'A rough looping doodle animation of a character asking for a hug.',
-    animated: true,
-  },
-  {
-    image: greenOutfit,
-    alt: 'A character in a green outfit, annotated with the artist’s handwritten notes.',
+    focus: '60% 16%', // the readable figure sits right of centre
   },
   {
     image: postSolo,
-    alt: 'Artwork of a single character in soft light, framed as a social-media post.',
+    alt: 'A single character in soft dappled light.',
+    focus: 'center 18%', // face
   },
 ];

@@ -1,111 +1,103 @@
 ---
 /**
- * Contact strip — a slim rail of artwork on a paper leaf, tipped between the
- * ink hero and the ink shelf.
+ * Skewed panel strip — a thin band of slanted parallelogram panels holding
+ * tight crops, running edge to edge under the hero.
  *
- * The rail fixes HEIGHT and lets each picture's own proportions decide its
- * width, so nothing is cropped. That is the whole design: these pieces run from
- * 0.66 to 1.52 aspect, and any fixed-ratio banner would have shown a sliver of
- * the tall comic pages. Varied widths become the rhythm instead of a problem.
+ * Panels CROP rather than fit. That is what lets the band be thin: showing each
+ * piece whole would hold the height hostage to the tallest one (these run 0.66
+ * to 1.52 aspect). Cropping also quietly removes the mock UI chrome around the
+ * two post-framed pieces.
  *
- * Rendered server-side rather than as an island so astro:assets optimises at
- * build time and the tiles land in the initial HTML.
+ * Panels outnumber nothing — the pool is larger than the visible count, so the
+ * cycler in scripts/showcase.ts can rotate unseen work in.
  */
 import { Image, getImage } from 'astro:assets';
 import { slides } from '../../data/showcase';
 
-// Tallest the rail ever gets (matches --strip-h below). Tiles are generated at
-// 2x this so they stay crisp on dense screens without shipping full-size art.
-const TILE_H = 240;
+// Visible panels at the widest breakpoint. Extras are hidden by media query
+// rather than removed, so the markup stays static and the cycler always has
+// the same nodes to work with.
+const PANELS = 5;
 
-// The lightbox variant. Static art gets a capped WebP; animated slides are
-// passed through untouched, since resizing them through sharp here would keep
-// only the first frame and freeze the animation.
+// Panel crops are small; generate a couple of widths for density.
+const TILE_W = 520;
+
+const tiles = await Promise.all(
+  slides.map((s) =>
+    getImage({ src: s.image, width: TILE_W, format: 'webp', quality: 80 }),
+  ),
+);
+const tiles2x = await Promise.all(
+  slides.map((s) =>
+    getImage({ src: s.image, width: TILE_W * 2, format: 'webp', quality: 72 }),
+  ),
+);
+// Full art for the lightbox. Capped to the source's own width — asking for 1600
+// from a 1558px original upscales it, producing a file LARGER than the source.
 const fulls = await Promise.all(
-  slides.map((slide) =>
-    slide.animated
-      ? Promise.resolve({ src: slide.image.src })
-      : getImage({ src: slide.image, width: 1600, format: 'webp', quality: 85 }),
+  slides.map((s) =>
+    getImage({
+      src: s.image,
+      width: Math.min(1600, s.image.width),
+      format: 'webp',
+      quality: 85,
+    }),
   ),
 );
 
-const tileWidth = (slide: (typeof slides)[number]) =>
-  Math.round(TILE_H * (slide.image.width / slide.image.height));
+const panels = Array.from({ length: PANELS }, (_, i) => i);
 ---
 
-<section class="strip spread spread--paper">
-  <div class="paper-grid" aria-hidden="true"></div>
-  <div class="crop crop--tl" aria-hidden="true"></div>
-  <div class="crop crop--tr" aria-hidden="true"></div>
-  <div class="crop crop--bl" aria-hidden="true"></div>
-  <div class="crop crop--br" aria-hidden="true"></div>
-
-  <div class="strip__rail" data-rail tabindex="0" role="region" aria-label="Artwork by Asu Azure">
-    <ul class="strip__track" data-track>
-      {
-        slides.map((slide, i) => (
-          <li class="strip__cell">
-            <button
-              type="button"
-              class="strip__tile"
-              style={`aspect-ratio: ${slide.image.width} / ${slide.image.height}`}
-              data-open={i}
-              data-cursor="VIEW"
-              aria-label={slide.alt}
-            >
-              {
-                slide.animated ? (
-                  // Untransformed: <Image> would drop every frame but the first.
-                  <img
-                    class="strip__img"
-                    src={slide.image.src}
-                    alt={slide.alt}
-                    width={slide.image.width}
-                    height={slide.image.height}
-                    loading={i < 4 ? 'eager' : 'lazy'}
-                    decoding="async"
-                    draggable="false"
-                  />
-                ) : (
-                  <Image
-                    class="strip__img"
-                    src={slide.image}
-                    alt={slide.alt}
-                    height={TILE_H}
-                    widths={[tileWidth(slide), tileWidth(slide) * 2]}
-                    sizes={`${tileWidth(slide)}px`}
-                    format="webp"
-                    quality={82}
-                    loading={i < 4 ? 'eager' : 'lazy'}
-                    decoding="async"
-                    draggable="false"
-                  />
-                )
-              }
-              <span class="mono strip__num" aria-hidden="true">
-                {String(i + 1).padStart(2, '0')}
-              </span>
-            </button>
-          </li>
-        ))
-      }
-    </ul>
+<section class="strip spread spread--ink" aria-label="Artwork by Asu Azure">
+  <div class="strip__row" data-strip>
+    {
+      panels.map((i) => (
+        <button
+          type="button"
+          class="strip__panel"
+          data-panel={i}
+          data-index={i % slides.length}
+          data-cursor="VIEW"
+          aria-label={slides[i % slides.length].alt}
+        >
+          {/* Two stacked layers per panel so a change crossfades instead of popping. */}
+          <span class="strip__inner">
+            <img
+              class="strip__img is-on"
+              data-layer="a"
+              src={tiles[i % slides.length].src}
+              srcset={`${tiles[i % slides.length].src} 1x, ${tiles2x[i % slides.length].src} 2x`}
+              alt=""
+              style={`object-position:${slides[i % slides.length].focus}`}
+              loading={i < 3 ? 'eager' : 'lazy'}
+              decoding="async"
+              draggable="false"
+            />
+            {/* No loading="lazy" here. This layer starts with no src and only
+                gets one when the cycler swaps; while it sits at opacity 0 the
+                browser treats a lazy image as not worth fetching, so the load
+                never begins and the crossfade waits on it forever. */}
+            <img class="strip__img" data-layer="b" alt="" decoding="async" draggable="false" />
+          </span>
+        </button>
+      ))
+    }
   </div>
 </section>
 
-<!-- Authored here (hidden) so the global .lb__* rules apply — no flash of
-     unstyled overlay, and nothing has to be built in JS. -->
+<!-- Authored here (hidden) so the global .lb__* rules apply. -->
 <div class="lb" hidden data-lb role="dialog" aria-modal="true" aria-label="Artwork">
   <div class="lb__backdrop" data-lb-dismiss></div>
   <span class="bracket bracket--tl" aria-hidden="true"></span>
   <span class="bracket bracket--br" aria-hidden="true"></span>
-
   <figure class="lb__stage">
-    <img class="lb__img" data-lb-img src={fulls[0].src} alt={slides[0].alt} />
+    {/* No src until the overlay is opened. A hidden subtree still fetches its
+        images in most browsers, so baking one in here would have pulled a
+        full-size piece down on every page load for something most visitors
+        never open. The script sets it in paint(). */}
+    <img class="lb__img" data-lb-img alt="" />
   </figure>
-
   <div class="lb__hud lb__hud--bl mono" data-lb-count aria-hidden="true"></div>
-
   <button type="button" class="lb__btn lb__close" data-lb-dismiss aria-label="Close">✕</button>
   <button type="button" class="lb__btn lb__prev" data-lb-prev aria-label="Previous artwork">‹</button>
   <button type="button" class="lb__btn lb__next" data-lb-next aria-label="Next artwork">›</button>
@@ -113,119 +105,130 @@ const tileWidth = (slide: (typeof slides)[number]) =>
 
 <script
   type="application/json"
-  data-lb-sources
-  set:html={JSON.stringify(slides.map((s, i) => ({ src: fulls[i].src, alt: s.alt })))}
+  data-showcase
+  set:html={JSON.stringify({
+    panels: PANELS,
+    slides: slides.map((s, i) => ({
+      tile: tiles[i].src,
+      tile2x: tiles2x[i].src,
+      full: fulls[i].src,
+      alt: s.alt,
+      focus: s.focus,
+    })),
+  })}
 />
 
 <style>
   .strip {
-    --strip-h: clamp(9rem, 19vh, 15rem);
+    --skew: -9deg;
+    --panel-h: clamp(6.5rem, 12vh, 9.5rem);
     position: relative;
     z-index: 1;
-    padding: clamp(2.2rem, 6vh, 3.4rem) 0;
-    isolation: isolate;
-    overflow: hidden;
+    height: var(--panel-h);
+    overflow: hidden; /* clips the end slants off-screen */
+    background: var(--ink-bg-soft);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
   }
 
-  /* Full-bleed rail: the artwork runs to both edges and fades out, so the strip
-     reads as a continuing reel rather than a boxed-in widget. */
-  .strip__rail {
-    position: relative;
-    z-index: 2;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    /* Feathered ends. Masking beats a gradient overlay here — the paper grid
-       and crop marks stay visible through it. */
-    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
-  }
-  .strip__rail::-webkit-scrollbar {
-    display: none;
-  }
-  .strip__rail:focus-visible {
-    outline: 1px solid var(--accent);
-    outline-offset: 4px;
-  }
-
-  .strip__track {
+  /* The row overhangs the viewport on both sides so the outermost slanted
+     edges are cut off by the section instead of leaving triangular gaps. */
+  .strip__row {
     display: flex;
-    align-items: flex-end;
-    gap: clamp(0.6rem, 1.4vw, 1.1rem);
-    padding: 0 var(--pad);
-    list-style: none;
-    margin: 0;
-    width: max-content;
-  }
-  .strip__cell {
-    flex: 0 0 auto;
+    height: 100%;
+    margin: 0 calc(var(--panel-h) * -0.4);
   }
 
-  /* Each tile is a button reset to behave like a mounted print. Height is
-     fixed; aspect-ratio (inline, from the real dimensions) resolves the width,
-     which is what keeps every piece uncropped. */
-  .strip__tile {
+  .strip__panel {
     position: relative;
-    display: block;
-    height: var(--strip-h);
-    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
     padding: 0;
-    margin: 0;
-    background: var(--bg-soft);
-    border: 1px solid rgba(22, 20, 15, 0.2);
+    border: 0;
+    background: var(--ink-bg);
     cursor: zoom-in;
     overflow: hidden;
-    box-shadow: 0 10px 26px -20px rgba(22, 20, 15, 0.7);
-    transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease),
-      border-color 0.3s var(--ease);
+    transform: skewX(var(--skew));
+    /* Hairline seam between panels, in the house cobalt. */
+    box-shadow: 1px 0 0 rgba(39, 66, 240, 0.55);
+    transition: flex-grow 0.55s var(--ease);
   }
-  .strip__tile:hover,
-  .strip__tile:focus-visible {
-    transform: translateY(-4px);
-    border-color: var(--accent);
-    box-shadow: 0 20px 40px -22px rgba(22, 20, 15, 0.85);
+  /* Hovering widens a panel and lets its neighbours give up the room. */
+  .strip__row:hover .strip__panel {
+    flex-grow: 0.92;
+  }
+  .strip__row .strip__panel:hover,
+  .strip__row .strip__panel:focus-visible {
+    flex-grow: 1.5;
+  }
+  .strip__panel:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -2px;
+  }
+
+  /* Counter-skew keeps the artwork upright; the scale hides the corners the
+     slant would otherwise expose. A 9deg slant across a short panel only needs
+     a few percent — 1.22 was over-zooming and eating the chosen crop. */
+  .strip__inner {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transform: skewX(calc(var(--skew) * -1)) scale(1.12);
   }
   .strip__img {
-    display: block;
-    height: 100%;
+    position: absolute;
+    inset: 0;
     width: 100%;
-    object-fit: contain;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    transition: opacity 0.7s var(--ease);
     user-select: none;
     -webkit-user-drag: none;
   }
+  .strip__img.is-on {
+    opacity: 1;
+  }
 
-  /* Proof-sheet frame number, bottom-left of each print. */
-  .strip__num {
+  /* Fade the band into the ink above and below so it sits in the page rather
+     than on it. */
+  .strip::after {
+    content: '';
     position: absolute;
-    left: 5px;
-    bottom: 4px;
-    font-size: 0.5rem;
-    color: #f4f1ea;
-    mix-blend-mode: difference;
+    inset: 0;
     pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(12, 12, 13, 0.55),
+      rgba(12, 12, 13, 0) 30%,
+      rgba(12, 12, 13, 0) 70%,
+      rgba(12, 12, 13, 0.55)
+    );
   }
 
-  /* While dragging, suppress the hover lift so tiles don't jitter under the
-     cursor, and show the grabbing affordance. */
-  .strip__rail.is-dragging {
-    cursor: grabbing;
+  @media (max-width: 900px) {
+    .strip__panel:nth-child(n + 4) {
+      display: none;
+    }
   }
-  .strip__rail.is-dragging .strip__tile {
-    transition: none;
-    pointer-events: none;
-  }
-  .strip__rail.is-dragging .strip__tile:hover {
-    transform: none;
+  @media (max-width: 560px) {
+    .strip {
+      --panel-h: clamp(5.5rem, 16vh, 7.5rem);
+    }
+    .strip__panel:nth-child(n + 3) {
+      display: none;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .strip__tile {
+    .strip__panel,
+    .strip__img {
       transition: none;
     }
-    .strip__tile:hover,
-    .strip__tile:focus-visible {
-      transform: none;
+    .strip__row:hover .strip__panel,
+    .strip__row .strip__panel:hover {
+      flex-grow: 1;
     }
   }
 </style>

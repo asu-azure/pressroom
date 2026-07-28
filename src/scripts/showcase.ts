@@ -1,13 +1,12 @@
 /**
- * Contact strip — drift, drag and lightbox.
+ * Skewed panel strip — cycler and lightbox.
  *
- * Progressive enhancement: with JS off the rail is still a scrollable row of
- * optimised artwork. This adds the slow drift, drag-to-scroll and the overlay.
+ * Progressive enhancement: with JS off the panels still render their first
+ * assigned crop, so the strip is never empty. This adds the rotation.
  *
- * The drift moves `scrollLeft` on a rAF loop rather than animating a transform.
- * A CSS marquee would fight native scrolling — you could not grab and browse a
- * transformed track — whereas nudging the real scroll position composes with
- * the user's own wheel, swipe and drag for free.
+ * Panels advance ROUND-ROBIN on a stagger — one panel changes at a time, to the
+ * next piece not currently on screen. Changing them together would read as a
+ * page flip rather than a slow reveal, and would risk showing duplicates.
  */
 
 interface Lenis {
@@ -15,165 +14,124 @@ interface Lenis {
   start(): void;
 }
 
-interface Source {
-  src: string;
+interface ShowcaseSlide {
+  tile: string;
+  tile2x: string;
+  full: string;
   alt: string;
+  focus: string;
+}
+
+interface ShowcaseData {
+  panels: number;
+  slides: ShowcaseSlide[];
 }
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
+/** How long a panel holds before the next one turns over. */
+const STEP_MS = 3600;
 
 export function initShowcase(): void {
-  const rail = document.querySelector<HTMLElement>('[data-rail]');
-  const track = document.querySelector<HTMLElement>('[data-track]');
+  const strip = document.querySelector<HTMLElement>('[data-strip]');
   const lb = document.querySelector<HTMLElement>('[data-lb]');
   const lbImg = lb?.querySelector<HTMLImageElement>('[data-lb-img]');
-  if (!rail || !track || !lb || !lbImg) return;
+  const raw = document.querySelector<HTMLElement>('[data-showcase]')?.textContent;
+  if (!strip || !lb || !lbImg || !raw) return;
 
-  const raw = document.querySelector<HTMLElement>('[data-lb-sources]')?.textContent;
-  let sources: Source[] = [];
+  let data: ShowcaseData;
   try {
-    sources = raw ? (JSON.parse(raw) as Source[]) : [];
+    data = JSON.parse(raw) as ShowcaseData;
   } catch {
     return;
   }
-  const total = sources.length;
+  const { slides } = data;
+  const total = slides.length;
   if (!total) return;
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const panelEls = [...strip.querySelectorAll<HTMLElement>('[data-panel]')];
   const counter = lb.querySelector<HTMLElement>('[data-lb-count]');
-  let index = 0;
-  let lastFocus: HTMLElement | null = null;
 
-  // --- Seamless drift -------------------------------------------------------
-  // The cells are duplicated into the SAME track so the copy continues the row
-  // rather than starting a second one — cloning the <ul> itself stacked it
-  // underneath, because the rail is a block container. The copies are inert for
-  // assistive tech and skipped in tab order.
-  let half = 0;
-  if (!reduced) {
-    const originals = [...track.children] as HTMLElement[];
-    for (const cell of originals) {
-      const copy = cell.cloneNode(true) as HTMLElement;
-      copy.setAttribute('aria-hidden', 'true');
-      for (const el of copy.querySelectorAll<HTMLElement>('[data-open]')) {
-        el.tabIndex = -1;
-      }
-      track.append(copy);
+  // Which piece each panel is showing, and which layer is currently visible.
+  const shown = panelEls.map((el) => Number(el.dataset.index ?? 0));
+  const frontIsA = panelEls.map(() => true);
+
+  /** The next piece not on screen anywhere, so a turn never duplicates. */
+  function nextUnseen(from: number): number {
+    for (let step = 1; step <= total; step++) {
+      const cand = (from + step) % total;
+      if (!shown.includes(cand)) return cand;
     }
-    // The repeat period is the distance from the first original to its copy —
-    // exact, and unlike scrollWidth/2 it accounts for the inter-cell gap.
-    const firstCopy = track.children[originals.length] as HTMLElement | undefined;
-    const measure = () => {
-      if (firstCopy) half = firstCopy.offsetLeft - originals[0].offsetLeft;
+    return (from + 1) % total;
+  }
+
+  function swap(panelIdx: number) {
+    const el = panelEls[panelIdx];
+    // Skip panels the breakpoint has hidden — swapping them is wasted work and
+    // would silently consume pieces that never get seen.
+    if (!el || el.offsetParent === null) return;
+
+    const next = nextUnseen(shown[panelIdx]);
+    const s = slides[next];
+    const a = el.querySelector<HTMLImageElement>('[data-layer="a"]');
+    const b = el.querySelector<HTMLImageElement>('[data-layer="b"]');
+    if (!a || !b) return;
+
+    const incoming = frontIsA[panelIdx] ? b : a;
+    const outgoing = frontIsA[panelIdx] ? a : b;
+
+    // Decode before crossfading, or the fade reveals a blank layer first.
+    incoming.src = s.tile;
+    incoming.srcset = `${s.tile} 1x, ${s.tile2x} 2x`;
+    incoming.style.objectPosition = s.focus;
+    const reveal = () => {
+      incoming.classList.add('is-on');
+      outgoing.classList.remove('is-on');
+      frontIsA[panelIdx] = !frontIsA[panelIdx];
+      shown[panelIdx] = next;
+      el.dataset.index = String(next);
+      el.setAttribute('aria-label', s.alt);
     };
-    measure();
-    // Lazy tiles and webfonts resize the row after first paint.
-    window.addEventListener('load', measure, { once: true });
-    window.addEventListener('resize', measure);
+    // Race the decode against a timeout. A stalled or failed image must never
+    // strand a panel mid-swap — worst case it pops in instead of fading.
+    if (incoming.decode) {
+      let done = false;
+      const once = () => {
+        if (!done) {
+          done = true;
+          reveal();
+        }
+      };
+      incoming.decode().then(once).catch(once);
+      setTimeout(once, 1200);
+    } else {
+      reveal();
+    }
   }
 
+  // --- Rotation -------------------------------------------------------------
   let paused = false;
-  // Declared before the loop that reads it — rAF fires after this function
-  // returns, but relying on that for a `let` binding is needlessly fragile.
-  let dragging = false;
-  // Px per SECOND, not per frame: a per-frame step drifts 2.4x faster on a
-  // 144Hz screen than on 60Hz, so the strip would move at a different speed for
-  // every visitor.
-  const SPEED = 17;
-
-  // The position has to be accumulated HERE, as a float. `scrollLeft` rounds to
-  // whole pixels, so adding a sub-pixel step to it reads straight back as the
-  // same value and the drift never moves at all.
-  let pos = 0;
-  let last = 0;
-
-  function tick(now: number) {
-    if (last) {
-      // Clamped so returning from a background tab doesn't jump the rail.
-      const dt = Math.min(now - last, 50) / 1000;
-      if (!reduced && !paused && !dragging && half > 0) {
-        pos += SPEED * dt;
-        if (pos >= half) pos -= half;
-        rail!.scrollLeft = pos;
-      }
-    }
-    last = now;
-    requestAnimationFrame(tick);
+  let cursor = 0;
+  if (!reduced && total > panelEls.length) {
+    setInterval(() => {
+      if (paused || lb!.hidden === false) return;
+      swap(cursor % panelEls.length);
+      cursor++;
+    }, STEP_MS);
+    strip.addEventListener('pointerenter', () => (paused = true));
+    strip.addEventListener('pointerleave', () => (paused = false));
+    strip.addEventListener('focusin', () => (paused = true));
+    strip.addEventListener('focusout', () => (paused = false));
   }
-  if (!reduced) requestAnimationFrame(tick);
-
-  const pause = () => (paused = true);
-  const resume = () => (paused = false);
-  rail.addEventListener('pointerenter', pause);
-  rail.addEventListener('pointerleave', resume);
-  rail.addEventListener('focusin', pause);
-  rail.addEventListener('focusout', resume);
-
-  // --- Drag to scroll -------------------------------------------------------
-  // A drag must not also fire the tile's click, so movement past a small
-  // threshold marks the gesture and the click is swallowed in the capture phase.
-  let moved = false;
-  let startX = 0;
-  let startScroll = 0;
-
-  rail.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    dragging = true;
-    moved = false;
-    startX = e.clientX;
-    startScroll = rail.scrollLeft;
-  });
-  rail.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    if (Math.abs(dx) > 4) {
-      if (!moved) rail.classList.add('is-dragging');
-      moved = true;
-      rail.scrollLeft = startScroll - dx;
-    }
-  });
-  const endDrag = () => {
-    dragging = false;
-    rail.classList.remove('is-dragging');
-  };
-  rail.addEventListener('pointerup', endDrag);
-  rail.addEventListener('pointercancel', endDrag);
-  rail.addEventListener(
-    'click',
-    (e) => {
-      if (moved) {
-        e.preventDefault();
-        e.stopPropagation();
-        moved = false;
-      }
-    },
-    true,
-  );
-
-  // Adopt the visitor's own scrolling so the drift carries on from where they
-  // left it instead of snapping back. The >1.5px guard ignores the scroll
-  // events the drift itself fires (its assignment rounds by less than a pixel).
-  rail.addEventListener(
-    'scroll',
-    () => {
-      if (half <= 0) return;
-      let sl = rail.scrollLeft;
-      // Reaching the end of the duplicated track wraps to the identical spot.
-      if (sl >= half * 2 - 1) {
-        sl -= half;
-        rail.scrollLeft = sl;
-      }
-      if (Math.abs(sl - pos) > 1.5) pos = sl;
-    },
-    { passive: true },
-  );
 
   // --- Lightbox -------------------------------------------------------------
   const lenis = () => (window as unknown as { __lenis?: Lenis }).__lenis;
+  let index = 0;
+  let lastFocus: HTMLElement | null = null;
 
   function paint() {
-    const s = sources[index];
-    lbImg!.src = s.src;
+    const s = slides[index];
+    lbImg!.src = s.full;
     lbImg!.alt = s.alt;
     if (counter) counter.textContent = `${pad2(index + 1)} / ${pad2(total)}`;
   }
@@ -196,14 +154,14 @@ export function initShowcase(): void {
   }
 
   const step = (d: number) => {
-    index = ((index + d) % total + total) % total;
+    index = (((index + d) % total) + total) % total;
     paint();
   };
 
-  // Delegated so the cloned track's tiles open the right piece too.
-  rail.addEventListener('click', (e) => {
-    const btn = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-open]');
-    if (btn) open(Number(btn.dataset.open));
+  // Delegated, because a panel's index changes as it cycles.
+  strip.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-panel]');
+    if (btn) open(Number(btn.dataset.index));
   });
 
   for (const el of lb.querySelectorAll<HTMLElement>('[data-lb-dismiss]')) {

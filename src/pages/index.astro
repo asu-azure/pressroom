@@ -1,7 +1,9 @@
 ---
+import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
+import { heroArt, stamp, stampStatic } from '../data/showcase';
 
 export const prerender = true;
 ---
@@ -9,6 +11,21 @@ export const prerender = true;
 <Base>
   <main class="spread spread--ink lib-shell">
     <header class="lib-hero">
+      {/* Faint art behind the masthead. Decorative, so it is hidden from
+          assistive tech; the scrim below keeps the type readable over it. */}
+      <div class="lib-hero__art" aria-hidden="true">
+        <Image
+          src={heroArt}
+          alt=""
+          widths={[900, 1440, 1920]}
+          sizes="100vw"
+          format="webp"
+          quality={72}
+          loading="eager"
+          fetchpriority="high"
+        />
+      </div>
+
       <div class="bracket bracket--tl" aria-hidden="true"></div>
       <div class="bracket bracket--tr" aria-hidden="true"></div>
       <p class="mono lib-hero__kicker" id="lib-kicker">ASU AZURE · PRESSROOM</p>
@@ -16,6 +33,15 @@ export const prerender = true;
         <span class="reveal-mask"><span id="lib-title-line">Press<span class="flow-text">room</span></span></span>
       </h1>
       <p class="serif lib-hero__sub" id="lib-sub">同人誌を、綴じたままのかたちで。</p>
+
+      {/* Hanko: the artist's own doodle, keyed transparent and tinted
+          vermillion. An animated WebP cannot be paused with CSS, so reduced
+          motion gets a still frame through <picture> instead. */}
+      <picture class="lib-hero__stamp">
+        <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
+        <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} loading="lazy" decoding="async" />
+      </picture>
+
       <div class="rgb-line" aria-hidden="true"></div>
     </header>
 
@@ -64,7 +90,7 @@ export const prerender = true;
 
     // Contact strip rises as it scrolls in. Reversible, per the house rule —
     // never `once: true`.
-    const plate = document.querySelector('.strip__rail');
+    const plate = document.querySelector('.strip__row');
     if (plate) {
       gsap.fromTo(
         plate,
@@ -113,6 +139,87 @@ export const prerender = true;
   }
   .lib-hero .bracket--tl { top: clamp(2.4rem, 6vh, 4rem); }
   .lib-hero .bracket--tr { top: clamp(2.4rem, 6vh, 4rem); }
+
+  /* --- Faint art behind the masthead --------------------------------------
+     Everything after this sits above it: .lib-hero's children are z-index 1,
+     the art is 0. The scrim does the real work — the kicker and tagline are
+     --fg-dim and would be the first things to become unreadable. */
+  .lib-hero__art {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .lib-hero__art img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+    opacity: 0.6;
+  }
+  /* The masthead sits in the left half, so the scrim is near-opaque there and
+     releases toward the right where the art can actually be read. Values are
+     tuned against the real image: the two gradients stack, so the left edge
+     lands around 0.05 of the art's brightness and the right around 0.35.
+     The vertical pass only softens the top and blends the base into the strip. */
+  .lib-hero__art::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(
+        90deg,
+        rgba(12, 12, 13, 0.9) 0%,
+        rgba(12, 12, 13, 0.78) 38%,
+        rgba(12, 12, 13, 0.45) 70%,
+        rgba(12, 12, 13, 0.3) 100%
+      ),
+      linear-gradient(
+        180deg,
+        rgba(12, 12, 13, 0.45) 0%,
+        rgba(12, 12, 13, 0) 40%,
+        rgba(12, 12, 13, 0.75) 100%
+      );
+  }
+
+  .lib-hero__kicker,
+  .lib-hero__title,
+  .lib-hero__sub,
+  .rgb-line {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* --- Hanko ---------------------------------------------------------------
+     Sits low-right over the art, tilted like a pressed seal. */
+  .lib-hero__stamp {
+    position: absolute;
+    right: clamp(1.5rem, 6vw, 5rem);
+    bottom: clamp(3.5rem, 9vh, 6rem);
+    z-index: 1;
+    display: block;
+    width: clamp(4.5rem, 9vw, 7.5rem);
+    rotate: -7deg;
+    opacity: 0.9;
+    pointer-events: none;
+    filter: drop-shadow(0 3px 14px rgba(211, 56, 28, 0.35));
+  }
+  .lib-hero__stamp img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  /* On phones the hero is tight and the stamp would land on the tagline. */
+  @media (max-width: 640px) {
+    .lib-hero__stamp {
+      width: 3.6rem;
+      right: 1rem;
+      bottom: 1.4rem;
+      opacity: 0.75;
+    }
+  }
+
   .lib-hero__kicker { margin-bottom: 1.2rem; }
   .lib-hero__title { color: var(--fg); }
   .lib-hero__sub {
