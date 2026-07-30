@@ -1,6 +1,7 @@
 import { generateNKeysBetween } from 'fractional-indexing';
 import { supabase } from './supabase';
 import { PAGES_BUCKET, pageFolder } from './storagePaths';
+import { toBlob, detectEncoder, CACHE_CONTROL } from './imageEncode';
 
 // Client-only module — pdf.js must never be imported in Astro frontmatter.
 // The ?url import ships the worker that matches the installed pdfjs-dist,
@@ -15,8 +16,6 @@ const MED_EDGE = 900;
 const THUMB_WIDTH = 320;
 /** iOS Safari caps canvas area around 16.7 MP; stay far below it. */
 const MAX_AREA = 8_000_000;
-/** Immutable paths — cache aggressively to protect Supabase egress. */
-const CACHE_CONTROL = '31536000';
 
 export interface ImportHooks {
   /** Called after each page is fully committed (uploaded + row inserted). */
@@ -38,33 +37,8 @@ export interface ImportResult {
   aborted: boolean;
 }
 
-interface Encoder {
-  mime: 'image/webp' | 'image/jpeg';
-  ext: 'webp' | 'jpg';
-  quality: number;
-}
-
-let cachedEncoder: Encoder | null = null;
-
-/** Safari's canvas.toBlob silently ignores 'image/webp' — probe once. */
-async function detectEncoder(): Promise<Encoder> {
-  if (cachedEncoder) return cachedEncoder;
-  const probe = document.createElement('canvas');
-  probe.width = 1;
-  probe.height = 1;
-  const blob = await toBlob(probe, 'image/webp', 0.8).catch(() => null);
-  cachedEncoder =
-    blob && blob.type === 'image/webp'
-      ? { mime: 'image/webp', ext: 'webp', quality: 0.85 }
-      : { mime: 'image/jpeg', ext: 'jpg', quality: 0.87 };
-  return cachedEncoder;
-}
-
-function toBlob(canvas: HTMLCanvasElement, mime: string, quality: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas.toBlob failed'))), mime, quality);
-  });
-}
+// Encoder probe + toBlob live in imageEncode.ts (shared with foreImage,
+// castImage and the artwork uploader).
 
 const nextTick = () => new Promise((r) => setTimeout(r, 0));
 

@@ -97,6 +97,57 @@ export function sanitizeRich(html: string): string {
   return doc.body.innerHTML;
 }
 
+/**
+ * Server-safe read path.
+ *
+ * `sanitizeRich` needs DOMParser, which does not exist in the Node SSR runtime —
+ * calling it in Astro frontmatter throws. The write path is the real boundary
+ * (RichTextEditor runs sanitizeRich before every save, and RLS means the author
+ * is the only writer), so what SSR renders is already sanitizer output.
+ *
+ * This is defense-in-depth on top of that: a dependency-free VALIDATOR rather
+ * than a rewriter. Validating conservatively is easy to get right; rewriting
+ * HTML with regexes is not. Anything it cannot vouch for degrades to escaped
+ * text, so a tampered row loses its formatting instead of executing.
+ */
+const TAG = /<\s*\/?\s*([a-zA-Z][a-zA-Z0-9]*)\b/g;
+/** Case-insensitive: `ONMOUSEOVER=` is every bit as live as `onmouseover=`. */
+const EVENT_ATTR = /\son[a-zA-Z]+\s*=/i;
+const BAD_URL = /(?:href|src|srcdoc|xlink:href)\s*=\s*["']?\s*(?:javascript|data|vbscript):/i;
+const IMG_SRC = /<img\b[^>]*?\bsrc\s*=\s*["']([^"']*)["']/gi;
+
+function escapeHtml(s: string): string {
+  return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+}
+
+export function isRichSafe(html: string): boolean {
+  if (EVENT_ATTR.test(html) || BAD_URL.test(html)) return false;
+  for (const m of html.matchAll(TAG)) {
+    if (!ALLOWED_TAGS.has(m[1].toUpperCase())) return false;
+  }
+  for (const m of html.matchAll(IMG_SRC)) {
+    if (!isAllowedImageSrc(m[1])) return false;
+  }
+  return true;
+}
+
+/**
+ * Render-ready HTML for server-side output. Returns the stored markup when it
+ * validates, otherwise its text content escaped into one paragraph so the words
+ * survive even when the markup is rejected.
+ *
+ * The degrade is deliberately blunt: `<…>` runs are dropped wholesale, which
+ * also eats prose like "1 < 2 > 0". That is the right trade for a path that
+ * only runs on markup we already refused to trust — losing a few characters
+ * beats guessing which angle brackets were content.
+ */
+export function richForServer(html: string): string {
+  if (!html.trim()) return '';
+  if (isRichSafe(html)) return html;
+  const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  return text ? `<p>${escapeHtml(text)}</p>` : '';
+}
+
 /** Legacy plain-text forewords (pre-editor) become paragraphs. */
 export function toRichHtml(foreword: string): string {
   if (!foreword.trim()) return '';
