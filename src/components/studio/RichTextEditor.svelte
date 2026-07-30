@@ -4,23 +4,18 @@
 
   let {
     value,
-    workId = '',
+    workId,
     onChange,
     placeholder = '',
     allowImages = true,
-    uploadImage,
   }: {
     value: string;
-    /** Required unless `uploadImage` is provided. */
-    workId?: string;
+    workId: string;
     onChange: (html: string) => void;
     placeholder?: string;
     /** false = text-only (no figure insert/paste/drop) — e.g. character bios
         keep their images in the profile gallery instead. */
     allowImages?: boolean;
-    /** Override where inserted images upload to (returns a public URL).
-        Default: the work's foreword folder in the pages bucket. */
-    uploadImage?: (file: File) => Promise<string>;
   } = $props();
 
   let editor: HTMLElement;
@@ -89,7 +84,7 @@
     try {
       editor.focus();
       for (const file of images) {
-        const url = await (uploadImage ? uploadImage(file) : uploadForewordImage(file, workId));
+        const url = await uploadForewordImage(file, workId);
         insertFigure(url);
       }
       emit();

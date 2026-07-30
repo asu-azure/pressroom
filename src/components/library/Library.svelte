@@ -118,19 +118,6 @@
           <WorkCard work={card.work} coverUrl={card.coverUrl} pageCount={card.pageCount} index={i} />
         </div>
       {/each}
-
-      <!-- The odd one out: cream paper among the dark covers, a seal instead of
-           art. A book about the person who made the books. data-flock hands the
-           navigation to the bird-flock sweep (delegated in flock.ts, so it works
-           even though this markup arrives with the island). -->
-      <div use:rise={cards.length}>
-        <a class="authorcard" href="/asu" data-flock data-cursor="MEET" data-hover>
-          <span class="mono authorcard__k">{i18n.t('artist.cardK')}</span>
-          <span class="authorcard__seal" aria-hidden="true">亜</span>
-          <span class="serif authorcard__title">{i18n.t('artist.cardTitle')}</span>
-          <span class="mono authorcard__cta">{i18n.t('artist.cardCta')} →</span>
-        </a>
-      </div>
     </div>
   {/if}
 </section>
@@ -146,58 +133,5 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(15rem, 42vw), 1fr));
     gap: clamp(1rem, 2.5vw, 2rem);
-  }
-
-  /* --- Author card ---------------------------------------------------------
-     Matches WorkCard's 4/5.4 footprint so the grid stays even, but inverts the
-     tone: paper stock, dashed edge, no cover image. It should read as a card
-     that wandered in from a different section. */
-  .authorcard {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    aspect-ratio: 4 / 5.4;
-    padding: clamp(1rem, 2vw, 1.4rem);
-    text-decoration: none;
-    border: 1px dashed var(--paper-line-strong);
-    border-radius: 4px;
-    background: var(--paper-bg);
-    color: var(--paper-fg);
-    transition: border-color 0.4s var(--ease), transform 0.5s var(--ease);
-  }
-  .authorcard:hover,
-  .authorcard:focus-visible {
-    border-color: var(--accent);
-    border-style: solid;
-  }
-  @media (hover: hover) {
-    .authorcard:hover {
-      transform: translateY(-4px);
-    }
-  }
-  .authorcard__k {
-    color: var(--paper-fg-faint);
-    font-size: 0.55rem;
-  }
-  .authorcard__seal {
-    margin: auto 0 0.6rem;
-    align-self: flex-start;
-    font-family: var(--font-serif-jp);
-    font-size: clamp(2.6rem, 7vw, 4rem);
-    line-height: 1;
-    color: #d3381c;
-    border: 3px solid #d3381c;
-    border-radius: 5px;
-    padding: 0.1em 0.14em;
-    rotate: -7deg;
-  }
-  .authorcard__title {
-    font-size: clamp(1.05rem, 2.2vw, 1.35rem);
-    line-height: 1.25;
-  }
-  .authorcard__cta {
-    margin-top: 0.7rem;
-    font-size: 0.55rem;
-    color: var(--accent);
   }
 </style>

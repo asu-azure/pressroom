@@ -1,8 +1,7 @@
-import type { PageRow, PageRec, ArtworkRow, ArtworkRec } from './types';
+import type { PageRow, PageRec } from './types';
 
 export const PAGES_BUCKET = 'pages';
 export const ORIGINALS_BUCKET = 'originals';
-export const ART_BUCKET = 'art';
 
 /** Immutable per-page folder — reorders/renames never touch storage. */
 export function pageFolder(workId: string, pageId: string): string {
@@ -19,34 +18,6 @@ export function pageFolder(workId: string, pageId: string): string {
 export function publicUrl(path: string): string {
   const base = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
   return `${base}/storage/v1/object/public/${PAGES_BUCKET}/${path}`;
-}
-
-/** Public URL into the 'art' bucket (artist gallery + portrait). */
-export function artUrl(path: string): string {
-  const base = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
-  return `${base}/storage/v1/object/public/${ART_BUCKET}/${path}`;
-}
-
-/** Immutable per-artwork folder in the 'art' bucket. */
-export function artworkFolder(artworkId: string): string {
-  return `gallery/${artworkId}`;
-}
-
-export function toArtworkRec(row: ArtworkRow): ArtworkRec {
-  return {
-    id: row.id,
-    title: row.title,
-    medium: row.medium,
-    alt: row.alt,
-    sortKey: row.sort_key,
-    featured: row.featured,
-    published: row.published,
-    width: row.width,
-    height: row.height,
-    fullUrl: artUrl(row.image_path),
-    medUrl: artUrl(row.med_path),
-    thumbUrl: artUrl(row.thumb_path),
-  };
 }
 
 export function toPageRec(row: PageRow): PageRec {

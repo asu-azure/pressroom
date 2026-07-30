@@ -49,55 +49,11 @@ export const prerender = true;
 
     <Showcase />
 
-    {/* ============ ARTIST TEASER ============
-        The shelf's only tone flip, and deliberately so: the page has been ink
-        from the top, so one cream spread reads as a different kind of thing and
-        is impossible to scroll past. It is also where the proof-sheet decor
-        (crop marks, registration mark, ruler, hollow watermark) finally earns
-        its keep — all of it shipped in global.css unused. */}
-    <section class="spread spread--paper teaser" id="artist">
-      <div class="paper-grid" aria-hidden="true"></div>
-      <span class="wm-line wm-line--latin teaser__wm" aria-hidden="true">Artist</span>
-      <span class="crop crop--tl" aria-hidden="true"></span>
-      <span class="crop crop--br" aria-hidden="true"></span>
-      <span class="regmark teaser__reg" aria-hidden="true"></span>
-      <span class="ruler" aria-hidden="true"></span>
-
-      <div class="teaser__inner">
-        <div class="teaser__copy">
-          <span class="mono teaser__k">THE ARTIST BEHIND THESE BOOKS</span>
-          <h2 class="serif teaser__title">
-            <span class="reveal-mask"><span data-line>この本たちを描いたのは誰？</span></span>
-            <span class="reveal-mask"><span data-line>Who is Asu Azure?</span></span>
-          </h2>
-          <p class="teaser__lede">
-            プロフィール、イラスト作品集、依頼について。 — The person who draws them: background,
-            the gallery, and whether commissions are open.
-          </p>
-          <a class="mono teaser__cta" href="/asu" data-flock data-magnetic data-hover>
-            MEET THE ARTIST <span aria-hidden="true">→</span>
-          </a>
-        </div>
-        <span class="teaser__seal" aria-hidden="true">亜</span>
-      </div>
-
-      <div class="chips teaser__chips" aria-hidden="true">
-        <span style="background:#2742f0"></span>
-        <span style="background:#18c4d6"></span>
-        <span style="background:#6aa0ff"></span>
-        <span style="background:#e8a31a"></span>
-        <span style="background:#d3381c"></span>
-        <span style="background:#16140f"></span>
-        <span class="chips__label mono">PROOF</span>
-      </div>
-    </section>
-
     <Library client:only="svelte" />
 
     <footer class="lib-foot">
       <span class="mono">© ASU AZURE</span>
       <span class="lib-foot__links">
-        <a class="mono" href="/asu" data-flock data-magnetic>ASU AZURE ↗</a>
         <a class="mono" href="https://x.com/asukonpeki" data-magnetic>X — @ASUKONPEKI</a>
         <a class="mono lib-foot__studio" href="/studio" data-magnetic>STUDIO ⌘</a>
       </span>
@@ -128,25 +84,6 @@ export const prerender = true;
     // The tagline's entrance lives in Library.svelte, which owns that text: it
     // rewrites #lib-sub on mount and on every language change, so animating it
     // here would just get overwritten when the island hydrates.
-
-    // Artist teaser heading. The CSS parks lines at translateY(110%) in PIXELS,
-    // which a yPercent tween never clears — normalise with y:0 first.
-    document.querySelectorAll<HTMLElement>('.teaser__title .reveal-mask > [data-line]').forEach(
-      (line, i) => {
-        gsap.set(line, { yPercent: 110, y: 0 });
-        gsap.to(line, {
-          yPercent: 0,
-          duration: 1,
-          ease: 'power4.out',
-          delay: i * 0.08,
-          scrollTrigger: {
-            trigger: '.teaser',
-            start: 'top 78%',
-            toggleActions: 'play none none reverse',
-          },
-        });
-      },
-    );
 
     // Contact strip rises as it scrolls in. Reversible, per the house rule —
     // never `once: true`.
@@ -306,79 +243,6 @@ export const prerender = true;
     border-top: 1px solid var(--line);
   }
   .lib-foot a:hover { color: var(--accent); }
-  .lib-foot__links { display: flex; gap: 1.6rem; flex-wrap: wrap; }
+  .lib-foot__links { display: flex; gap: 1.6rem; }
   .lib-foot__studio { color: var(--fg-faint); }
-
-  /* --- Artist teaser (the one cream spread on the shelf) ------------------- */
-  .teaser {
-    position: relative;
-    z-index: 1;
-    padding: clamp(3.5rem, 10vh, 6rem) var(--pad);
-    overflow: hidden;
-  }
-  .teaser__wm { bottom: 4%; right: calc(var(--pad) * 0.6); }
-  .teaser__reg { top: 18%; right: 26%; }
-  .teaser__chips { bottom: clamp(1rem, 3vh, 2rem); left: var(--pad); }
-  .teaser__inner {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: clamp(1.5rem, 5vw, 4rem);
-    max-width: 1240px;
-  }
-  .teaser__copy { max-width: 62ch; }
-  .teaser__k { display: block; font-size: 0.62rem; letter-spacing: 0.18em; color: var(--accent); }
-  .teaser__title {
-    margin-top: 0.7rem;
-    font-size: clamp(1.6rem, 4.4vw, 3rem);
-    font-weight: 440;
-    line-height: 1.18;
-  }
-  .teaser__title .reveal-mask { display: block; }
-  .teaser__title .reveal-mask > [data-line] { display: block; transform: translateY(110%); }
-  .teaser__lede {
-    margin-top: 1.2rem;
-    max-width: 58ch;
-    color: var(--fg-dim);
-    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
-    line-height: 1.75;
-  }
-  .teaser__cta {
-    display: inline-block;
-    margin-top: clamp(1.5rem, 4vh, 2.2rem);
-    padding: 0.9em 1.7em;
-    border: 1px solid var(--line-strong);
-    border-radius: 999px;
-    font-size: 0.62rem;
-    letter-spacing: 0.14em;
-    color: var(--fg);
-    text-decoration: none;
-    transition: background 0.3s var(--ease), border-color 0.3s var(--ease), color 0.3s var(--ease);
-  }
-  .teaser__cta:hover {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-  .teaser__seal {
-    flex-shrink: 0;
-    font-family: var(--font-serif-jp);
-    font-size: clamp(3rem, 8vw, 6rem);
-    line-height: 1;
-    color: #d3381c;
-    border: 3px solid #d3381c;
-    border-radius: 6px;
-    padding: 0.12em 0.16em;
-    rotate: -8deg;
-    opacity: 0.9;
-    user-select: none;
-  }
-  @media (max-width: 760px) {
-    .teaser__seal { display: none; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .teaser__title .reveal-mask > [data-line] { transform: none; }
-  }
 </style>
