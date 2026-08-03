@@ -146,11 +146,19 @@ for the artist's own words, and one language control is less confusing than two.
 `i18n.set()` also dispatches `LANG_EVENT` on `document`, because the teaser is static Astro markup
 and cannot read a Svelte rune. One switcher, two rendering worlds.
 
-**Thai typography** (rules in `global.css`): Royal Institute of Siam is Thai-only — stray Latin and
-digits fall through to Ekkamai by design. Vowel/tone marks stack, so Thai display lines get their
-leading back and drop `text-transform`. Headings use Prompt, not Stack Sans, because its top
-metrics survive `background-clip: text`. **Never split Thai per-character** — `kinetic.ts` guards
-this with `MARK_SCRIPTS`.
+**Thai typography** (rules in `global.css`): there is **no font-family switching by language.**
+Every token stack lists the Latin face first, then Thai, then Japanese, and the browser resolves
+per glyph — so Latin renders identically in all three languages and only Thai codepoints reach the
+Thai face. Don't reintroduce `html[lang='th'] { font-family: … }`; that is exactly what made
+English change shape when the language changed.
+
+Both Thai faces are **loopless** (ไม่มีหัว): Ekkamai Vibe for text, Prompt for display (its top
+metrics survive `background-clip: text`). The looped Royal Institute of Siam was dropped — don't
+add it back without asking; the loop/no-loop choice is the owner's call, not a technical one.
+
+What *does* stay language-conditional is metrics only: Thai vowel/tone marks stack, so Thai display
+lines get their leading back, drop `text-transform` (Thai has no case), and tighten mono tracking.
+**Never split Thai per-character** — `kinetic.ts` guards this with `MARK_SCRIPTS`.
 
 ## The six acts
 

@@ -15,19 +15,12 @@
   font-display: swap;
 }
 
-/* Thai faces, carried over from the retired asu-art one-pager. Only /asu and the
-   homepage artist teaser are trilingual, so these load for Thai copy alone —
-   every one is unicode-ranged to Thai + Latin by the file itself. */
+/* Thai faces, carried over from the retired asu-art one-pager. Both are
+   LOOPLESS (ไม่มีหัว) — the looped Royal Institute of Siam was dropped. They sit
+   after the Latin faces in every token stack, so only Thai glyphs reach them. */
 @font-face {
   font-family: 'Prompt';
   src: url('/fonts/Prompt-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'Royal Institute of Siam';
-  src: url('/fonts/RoyalInstituteOfSiam.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -106,22 +99,25 @@
      Grotesk / JetBrains Mono; only kana and kanji reach the Noto faces, whose
      @font-face carries a CJK unicode-range so Latin-only pages never fetch
      them (see fonts.css). */
-  --font-serif: 'Fraunces', 'Noto Serif JP', Georgia, 'Times New Roman', serif;
+  /* Latin face FIRST in every stack, then Thai, then Japanese. The browser
+     resolves font-family per glyph, so this one ordering gives us: Latin
+     identical in all three languages, Thai from the loopless faces, kana and
+     kanji from Noto. No language-conditional font switching anywhere. */
+  --font-serif: 'Fraunces', 'Ekkamai Vibe', 'Noto Serif JP', Georgia, 'Times New Roman', serif;
   --font-serif-jp: 'Noto Serif JP', serif;
-  --font-display: 'Space Grotesk', 'Noto Sans JP', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Noto Sans JP', ui-monospace, monospace;
+  --font-display: 'Space Grotesk', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Ekkamai Vibe', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;
-  /* Self-hosted EN/TH faces:
+  /* Self-hosted EN/TH faces. Both Thai faces are LOOPLESS (ไม่มีหัว):
      Stack Sans Headline (Latin) → English headings + big display.
-     Prompt (Latin+Thai, generous top metrics) → Thai headings and big display,
-       so a background-clip mega does not shear the vowel/tone marks.
-     Ekkamai Vibe (w300–800, Latin+Thai) → FUI micro-labels + digit fallback.
-     Royal Institute of Siam (Thai-only — no Latin, no digits) → Thai body copy;
-       stray Latin and numerals fall through to Ekkamai by design. */
+     Prompt (Latin+Thai, generous top metrics) → Thai display, so a
+       background-clip mega does not shear the vowel/tone marks.
+     Ekkamai Vibe (w300–800, Latin+Thai) → Thai text + FUI micro-labels.
+     These are only ever reached by Thai glyphs — the Latin face wins first in
+     every stack above. */
   --font-stack: 'Stack Sans Headline', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-prompt: 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-ekkamai: 'Ekkamai Vibe', 'Noto Sans JP', system-ui, sans-serif;
-  --font-royal: 'Royal Institute of Siam', 'Ekkamai Vibe', 'Noto Sans JP', system-ui, sans-serif;
 
   /* Mega display scale — recurring giant emphasis words (SAKAZUKI / GUEST motif) */
   --font-mega: clamp(3rem, 13vw, 11rem);
@@ -326,33 +322,27 @@ a {
 }
 
 /* ---- Thai typography ----
-   Only /asu and the homepage artist teaser are trilingual, so these rules fire
-   for one language on two surfaces. Three things Thai needs that Latin doesn't:
+   NO font-family switching by language. The Thai faces are carried in the base
+   token stacks *after* the Latin ones, so the browser resolves per glyph:
+   Latin always comes from Fraunces / JetBrains / Space Grotesk exactly as it
+   does in Japanese and English, and only Thai codepoints fall through to the
+   Thai face. English therefore looks identical in all three languages.
 
-   1. Royal Institute of Siam is Thai-ONLY (no Latin, no digits). Stray Latin and
-      numerals inside Thai copy fall through to Ekkamai — that is the design, not
-      a missing glyph.
-   2. Vowel and tone marks stack above and below the line, so the tight display
-      leading tuned for Latin (0.86) collides them. Every Thai display line gets
-      room back.
-   3. Prompt has generous top metrics, which is why Thai headings use it rather
-      than Stack Sans: a background-clip:text mega would otherwise shear the
-      marks straight off.
+   Both Thai faces are LOOPLESS (ไม่มีหัว) — Ekkamai Vibe for text, Prompt for
+   display. The looped Royal Institute of Siam was dropped.
 
-   Uppercasing is also dropped — Thai has no case, and text-transform on Thai
-   only risks mangling combining marks. */
-html[lang='th'] body,
-html[lang='th'] .serif {
-  font-family: var(--font-royal);
-}
+   What genuinely does need to change for Thai is metrics, not typefaces:
+
+   1. Vowel and tone marks stack above and below the line, so the tight display
+      leading tuned for Latin (0.86) collides them. Thai display lines get room
+      back.
+   2. Uppercasing is dropped — Thai has no case, and text-transform on Thai only
+      risks mangling combining marks.
+   3. The mono tracking tuned for Latin caps is too wide for Thai. */
 html[lang='th'] .mono {
-  font-family: var(--font-ekkamai);
-  font-weight: 300;
   letter-spacing: 0.06em;
 }
 html[lang='th'] .mega {
-  font-family: var(--font-prompt);
-  font-weight: 400;
   font-synthesis: none;
   line-height: 1.24;
   letter-spacing: 0.01em;

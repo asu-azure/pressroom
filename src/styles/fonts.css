@@ -1,6 +1,7 @@
 /* Self-hosted, subsetted webfonts (replaces the Google Fonts <link>; the
-   Stack Sans / Prompt / Ekkamai / Royal Institute faces stay declared in
-   global.css). Latin faces carry broad Latin ranges so copy edits are safe;
+   Stack Sans / Prompt / Ekkamai faces stay declared in global.css — the looped
+   Royal Institute of Siam was dropped, both Thai faces are now loopless).
+   Latin faces carry broad Latin ranges so copy edits are safe;
    the Noto JP faces are per-glyph subsets of the kanji that actually appear
    in src/ — if new kanji are added (e.g. new JA dict copy), regenerate the
    subsets (they fall back to system JP fonts until then).
