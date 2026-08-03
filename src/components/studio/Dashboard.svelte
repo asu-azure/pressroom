@@ -82,7 +82,10 @@
       <p class="mono">ASU AZURE · STUDIO</p>
       <h1 class="serif dash__title">Pressroom desk</h1>
     </div>
-    <button class="mono dash__signout" onclick={signOut}>SIGN OUT</button>
+    <div class="dash__headActs">
+      <a class="mono dash__artist" href="/studio/artist">ARTIST PAGE →</a>
+      <button class="mono dash__signout" onclick={signOut}>SIGN OUT</button>
+    </div>
   </header>
 
   <form class="dash__new" onsubmit={createWork}>
@@ -153,6 +156,18 @@
   }
   .dash__site:hover {
     color: var(--accent);
+  }
+  .dash__headActs {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    flex-shrink: 0;
+  }
+  .dash__artist {
+    color: var(--accent);
+  }
+  .dash__artist:hover {
+    color: var(--fg);
   }
   .dash__signout,
   .dash__pub,

@@ -81,6 +81,32 @@ const jsonLd = JSON.stringify({
     <link rel="preload" href="/fonts/StackSansHeadline-Regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/SpaceGrotesk-var.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/JetBrainsMono-var.woff2" as="font" type="font/woff2" crossorigin />
+
+    {/* Flock transition handshake. This MUST be inline and in <head>: when a
+        visitor arrives mid-sweep the page has to be covered before its first
+        paint, and a bundled module loads far too late for that. flock.ts takes
+        over the cover and plays the reveal; the timeout is the failsafe for a
+        module that never runs. */}
+    <style is:inline>
+      html.flock-cover::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: #0c0c0d;
+        z-index: 9998;
+        pointer-events: none;
+      }
+    </style>
+    <script is:inline>
+      try {
+        if (sessionStorage.getItem('pr:flock') !== null) {
+          document.documentElement.classList.add('flock-cover');
+          setTimeout(function () {
+            document.documentElement.classList.remove('flock-cover');
+          }, 2500);
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body data-chromeless={chromeless ? 'true' : null}>
     <div class="grid-bg" aria-hidden="true"></div>
@@ -138,8 +164,12 @@ const jsonLd = JSON.stringify({
       import Lenis from 'lenis';
       import { gsap } from 'gsap';
       import { ScrollTrigger } from 'gsap/ScrollTrigger';
+      import { initFlock } from '../scripts/flock';
 
       gsap.registerPlugin(ScrollTrigger);
+
+      // Page-transition sweep for [data-flock] links, and the reveal on arrival.
+      initFlock();
 
       // Mobile browsers fire resize when the URL bar collapses; recomputing every
       // trigger there made start positions jump around mid-scroll.

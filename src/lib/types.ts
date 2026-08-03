@@ -57,20 +57,11 @@ export interface CoverCrop {
   h: number;
 }
 
-export interface Series {
-  id: string;
-  title: string;
-  slug: string;
-  sort: number;
-  created_at: string;
-}
-
 export interface Work {
   id: string;
   slug: string;
   title: string;
   description: string;
-  series_id: string | null;
   status: WorkStatus;
   direction: Direction;
   default_layout: Layout;
@@ -148,4 +139,56 @@ export interface ChapterMark {
   title: string;
   sheet: number;
   coverUrl: string | null;
+}
+
+/** Social/contact links on the artist profile (all optional). */
+export interface ArtistLinks {
+  x?: string; // full URL
+  x_handle?: string; // display form, e.g. "@asukonpeki"
+  email?: string;
+}
+
+/** The /asu page's editable singleton (artist_profile row 1). */
+export interface ArtistProfile {
+  id: number;
+  display_name: string;
+  bio: string; // rich HTML — sanitized through richtext.ts before render
+  portrait_path: string | null; // path in the 'art' bucket
+  craft: string[];
+  links: ArtistLinks;
+  commissions_open: boolean;
+  updated_at: string;
+}
+
+/** DB row shape for `artworks`. */
+export interface ArtworkRow {
+  id: string;
+  title: string;
+  medium: string; // drives the filter chips on /asu
+  alt: string;
+  sort_key: string;
+  featured: boolean;
+  published: boolean;
+  width: number;
+  height: number;
+  image_path: string;
+  med_path: string;
+  thumb_path: string;
+  created_at: string;
+}
+
+/** Artwork enriched with resolved public URLs (see storagePaths.artUrl). */
+export interface ArtworkRec {
+  id: string;
+  title: string;
+  medium: string;
+  alt: string;
+  sortKey: string;
+  featured: boolean;
+  published: boolean;
+  width: number;
+  height: number;
+  fullUrl: string;
+  medUrl: string;
+  thumbUrl: string;
 }

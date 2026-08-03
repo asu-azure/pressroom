@@ -531,7 +531,12 @@
   <!-- Page foot: back link + imprint, always the last leaf (ink) -->
   <footer class="ov-foot spread spread--ink">
     <a class="mono ov-foot__back" href="/" data-magnetic>← {i18n.t('ov.back')}</a>
-    <span class="mono">© ASU AZURE</span>
+    <span class="ov-foot__right">
+      <!-- The artist is reachable from a book too, not only from the shelf.
+           data-flock hands navigation to the bird sweep (see flock.ts). -->
+      <a class="mono ov-foot__artist" href="/asu" data-flock data-magnetic>ASU AZURE ↗</a>
+      <span class="mono">© ASU AZURE</span>
+    </span>
   </footer>
 
   {#if castOpen !== null && castList[castOpen]}
@@ -1184,7 +1189,14 @@
     border-top: 1px solid var(--line);
     padding: clamp(1.6rem, 4vh, 2.4rem) var(--pad);
   }
-  .ov-foot__back:hover {
+  .ov-foot__back:hover,
+  .ov-foot__artist:hover {
     color: var(--accent);
+  }
+  .ov-foot__right {
+    display: flex;
+    align-items: baseline;
+    gap: 1.6rem;
+    flex-wrap: wrap;
   }
 </style>
