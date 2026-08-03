@@ -29,6 +29,18 @@ const ALLOWED_CLASSES = new Set([
   'fore-fig--sm', 'fore-fig--md', 'fore-fig--lg',
 ]);
 
+/**
+ * Classes a <span> may carry: the gradient highlight that the art site's copy
+ * is built around ("I'm <span class="hl hl--g-blue">Asu Azure</span>"). Without
+ * this the sanitizer would keep the span and silently drop its class, so a
+ * highlight would vanish the first time the author saved that field.
+ * Styling only — see the .hl rules in styles/global.css.
+ */
+const ALLOWED_SPAN_CLASSES = new Set([
+  'hl', 'hl--v',
+  'hl--g-blue', 'hl--g-cyan', 'hl--g-amber', 'hl--g-mix',
+]);
+
 /** Images may only point at our own public storage bucket — nothing external. */
 const STORAGE_PREFIX = `${import.meta.env.PUBLIC_SUPABASE_URL ?? ''}/storage/v1/object/public/`;
 
@@ -36,8 +48,9 @@ function isAllowedImageSrc(src: string): boolean {
   return STORAGE_PREFIX.length > '/storage/v1/object/public/'.length && src.startsWith(STORAGE_PREFIX);
 }
 
-function keepClass(value: string): string {
-  return value.split(/\s+/).filter((c) => ALLOWED_CLASSES.has(c)).join(' ');
+function keepClass(tagName: string, value: string): string {
+  const allowed = tagName === 'SPAN' ? ALLOWED_SPAN_CLASSES : ALLOWED_CLASSES;
+  return value.split(/\s+/).filter((c) => allowed.has(c)).join(' ');
 }
 
 function cleanNode(node: Element): void {
@@ -72,8 +85,8 @@ function cleanNode(node: Element): void {
         else child.removeAttribute('style');
       } else if (attr.name === 'face' && child.tagName === 'FONT') {
         // keep
-      } else if (attr.name === 'class' && child.tagName === 'FIGURE') {
-        const kept = keepClass(attr.value);
+      } else if (attr.name === 'class' && (child.tagName === 'FIGURE' || child.tagName === 'SPAN')) {
+        const kept = keepClass(child.tagName, attr.value);
         if (kept) child.setAttribute('class', kept);
         else child.removeAttribute('class');
       } else if (child.tagName === 'IMG' && (attr.name === 'src' || attr.name === 'alt')) {

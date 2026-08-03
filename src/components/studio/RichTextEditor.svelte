@@ -56,6 +56,44 @@
     emit();
   }
 
+  /**
+   * The design system's gradient highlight — `<span class="hl hl--g-…">`, the
+   * device the artist-page copy is built around ("I'm [Asu Azure]").
+   *
+   * There is no execCommand for it, so the range is wrapped by hand. Pressing it
+   * again inside an existing highlight unwraps, which is the only sane way out
+   * once the selection is inside the span. Without this button the author would
+   * have to type raw HTML, and the whole point is that they never should.
+   */
+  function toggleHighlight(variant: 'blue' | 'amber') {
+    editor.focus();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    const anchor = sel.anchorNode;
+    const host = (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest('span.hl');
+    if (host && editor.contains(host)) {
+      host.replaceWith(...host.childNodes);
+      sel.removeAllRanges();
+      emit();
+      return;
+    }
+
+    if (sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    const span = document.createElement('span');
+    span.className = `hl hl--g-${variant}`;
+    try {
+      // Throws when the selection straddles element boundaries (half a <em>).
+      range.surroundContents(span);
+    } catch {
+      span.append(range.extractContents());
+      range.insertNode(span);
+    }
+    sel.removeAllRanges();
+    emit();
+  }
+
   // --- Figure images: insert, then align / size / caption / remove ---
 
   function setActiveFig(fig: HTMLElement | null) {
@@ -383,6 +421,12 @@
     <button type="button" class="rte__btn" class:is-on={marks.underline} title="Underline (Ctrl+U)" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('underline')}><u>U</u></button>
     <button type="button" class="rte__btn" class:is-on={marks.strikeThrough} title="Strikethrough" onmousedown={(e) => e.preventDefault()} onclick={() => cmd('strikeThrough')}><s>S</s></button>
     <span class="rte__sep" aria-hidden="true"></span>
+    <!-- Gradient highlight. Select words, press once to highlight, press again
+         inside it to remove. Cobalt is the default voice; amber is the warm
+         counterpoint (never red — see the design system in global.css). -->
+    <button type="button" class="rte__btn rte__hl rte__hl--blue" title="Highlight — cobalt" onmousedown={(e) => e.preventDefault()} onclick={() => toggleHighlight('blue')}>H</button>
+    <button type="button" class="rte__btn rte__hl rte__hl--amber" title="Highlight — amber" onmousedown={(e) => e.preventDefault()} onclick={() => toggleHighlight('amber')}>H</button>
+    <span class="rte__sep" aria-hidden="true"></span>
     <!-- TEXT alignment. The image bar below uses word labels, never these
          arrows — the two used to be identical glyphs stacked on top of each
          other, so there was no way to tell which one moved the picture. -->
@@ -519,6 +563,17 @@
     color: #e8a31a;
     border-color: #e8a31a;
   }
+  /* The two highlight buttons carry their own colour so the bar shows which
+     accent you are about to apply, rather than two identical "H"s. */
+  .rte__hl {
+    font-weight: 700;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    -webkit-background-clip: text;
+  }
+  .rte__hl--blue { background-image: linear-gradient(90deg, #2742f0, #6aa0ff); }
+  .rte__hl--amber { background-image: linear-gradient(90deg, #d9930f, #ffd666); }
+  .rte__hl:hover { border-color: var(--line-strong); }
   .rte__sep {
     width: 1px;
     height: 1.2rem;

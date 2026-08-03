@@ -1,9 +1,13 @@
 <script lang="ts">
   import { i18n, type Lang } from '../../lib/i18n.svelte';
 
+  // Thai is offered because the artist teaser below the shelf is trilingual.
+  // Picking it leaves the reader chrome in English by design (i18n.t falls back
+  // to `en`) — the artist's own words are what Thai is here for.
   const langs: { code: Lang; label: string }[] = [
     { code: 'ja', label: '日本語' },
     { code: 'en', label: 'EN' },
+    { code: 'th', label: 'ไทย' },
   ];
 </script>
 

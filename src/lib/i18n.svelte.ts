@@ -1,10 +1,18 @@
 /**
  * Reader-facing UI language. Japanese is the default voice of the site;
  * English is the alternate. The studio (admin) stays English.
+ *
+ * The site has ONE language state (see lib/lang.ts), but this chrome dictionary
+ * only carries `ja` and `en`. Thai exists solely for `/asu` and the homepage
+ * artist teaser, whose copy is author-edited in the Studio; a Thai visitor
+ * therefore reads the artist page in Thai and the reader chrome in English via
+ * the fallback in `t()`. One switcher, no second language control.
  */
-export type Lang = 'ja' | 'en';
+import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from './lang';
 
-const STORAGE_KEY = 'pressroom:lang';
+export type { Lang };
+
+const STORAGE_KEY = LANG_STORAGE_KEY;
 
 const dict = {
   ja: {
@@ -124,12 +132,12 @@ const dict = {
 export type DictKey = keyof (typeof dict)['ja'];
 
 class I18n {
-  lang = $state<Lang>('ja');
+  lang = $state<Lang>(DEFAULT_LANG);
 
   constructor() {
     if (typeof localStorage !== 'undefined') {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === 'en' || saved === 'ja') this.lang = saved;
+      if (isLang(saved)) this.lang = saved;
     }
     // The shell ships <html lang="ja">; a restored preference has to move it too,
     // or screen readers and browser translation read the whole page as Japanese.
@@ -144,10 +152,17 @@ class I18n {
       /* private mode */
     }
     document.documentElement.lang = lang;
+    // Static Astro markup (the homepage artist teaser) cannot read a rune, so
+    // the switch is also announced on the DOM. One control, two rendering
+    // worlds — see applyCopy() in lib/siteCopy.ts.
+    document.dispatchEvent(new CustomEvent<Lang>(LANG_EVENT, { detail: lang }));
   }
 
   t(key: DictKey): string {
-    return dict[this.lang][key] ?? dict.en[key] ?? key;
+    // Indexed loosely on purpose: `th` has no chrome table and must fall through
+    // to English rather than throw.
+    const table = (dict as Record<string, Record<string, string>>)[this.lang];
+    return table?.[key] ?? dict.en[key] ?? key;
   }
 }
 

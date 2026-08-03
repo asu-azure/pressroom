@@ -15,6 +15,52 @@
   font-display: swap;
 }
 
+/* Thai faces, carried over from the retired asu-art one-pager. Only /asu and the
+   homepage artist teaser are trilingual, so these load for Thai copy alone —
+   every one is unicode-ranged to Thai + Latin by the file itself. */
+@font-face {
+  font-family: 'Prompt';
+  src: url('/fonts/Prompt-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Royal Institute of Siam';
+  src: url('/fonts/RoyalInstituteOfSiam.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ekkamai Vibe';
+  src: url('/fonts/EkkamaiVibe-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ekkamai Vibe';
+  src: url('/fonts/EkkamaiVibe-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ekkamai Vibe';
+  src: url('/fonts/EkkamaiVibe-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Ekkamai Vibe';
+  src: url('/fonts/EkkamaiVibe-Heavy.woff2') format('woff2');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* ---- Ink (dark) tone — the default ---- */
   --ink-bg: #0c0c0d;
@@ -65,11 +111,17 @@
   --font-display: 'Space Grotesk', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;
-  /* Stack Sans Headline (Latin) → headings + big display.
-     The art site's Thai faces weren't carried over; their tokens fall back
-     to the grotesk so shared decor classes (.wm-line) still resolve. */
-  --font-stack: 'Stack Sans Headline', 'Noto Sans JP', system-ui, sans-serif;
-  --font-ekkamai: 'Space Grotesk', 'Noto Sans JP', system-ui, sans-serif;
+  /* Self-hosted EN/TH faces:
+     Stack Sans Headline (Latin) → English headings + big display.
+     Prompt (Latin+Thai, generous top metrics) → Thai headings and big display,
+       so a background-clip mega does not shear the vowel/tone marks.
+     Ekkamai Vibe (w300–800, Latin+Thai) → FUI micro-labels + digit fallback.
+     Royal Institute of Siam (Thai-only — no Latin, no digits) → Thai body copy;
+       stray Latin and numerals fall through to Ekkamai by design. */
+  --font-stack: 'Stack Sans Headline', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
+  --font-prompt: 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
+  --font-ekkamai: 'Ekkamai Vibe', 'Noto Sans JP', system-ui, sans-serif;
+  --font-royal: 'Royal Institute of Siam', 'Ekkamai Vibe', 'Noto Sans JP', system-ui, sans-serif;
 
   /* Mega display scale — recurring giant emphasis words (SAKAZUKI / GUEST motif) */
   --font-mega: clamp(3rem, 13vw, 11rem);
@@ -271,6 +323,40 @@ a {
   font-weight: 480;
   text-transform: none;
   letter-spacing: -0.02em;
+}
+
+/* ---- Thai typography ----
+   Only /asu and the homepage artist teaser are trilingual, so these rules fire
+   for one language on two surfaces. Three things Thai needs that Latin doesn't:
+
+   1. Royal Institute of Siam is Thai-ONLY (no Latin, no digits). Stray Latin and
+      numerals inside Thai copy fall through to Ekkamai — that is the design, not
+      a missing glyph.
+   2. Vowel and tone marks stack above and below the line, so the tight display
+      leading tuned for Latin (0.86) collides them. Every Thai display line gets
+      room back.
+   3. Prompt has generous top metrics, which is why Thai headings use it rather
+      than Stack Sans: a background-clip:text mega would otherwise shear the
+      marks straight off.
+
+   Uppercasing is also dropped — Thai has no case, and text-transform on Thai
+   only risks mangling combining marks. */
+html[lang='th'] body,
+html[lang='th'] .serif {
+  font-family: var(--font-royal);
+}
+html[lang='th'] .mono {
+  font-family: var(--font-ekkamai);
+  font-weight: 300;
+  letter-spacing: 0.06em;
+}
+html[lang='th'] .mega {
+  font-family: var(--font-prompt);
+  font-weight: 400;
+  font-synthesis: none;
+  line-height: 1.24;
+  letter-spacing: 0.01em;
+  text-transform: none;
 }
 
 /* ---- Flowing-gradient text (cobalt→cyan→amber, looping) ----
@@ -740,7 +826,7 @@ a {
 /* ============================================================
    MOTION III — cinema-cohesion pass
    film grain, scroll-progress hairline, section index nav,
-   hanko seal, archive drag strip, FUI lightbox.
+   artist signature stamp, archive drag strip, FUI lightbox.
    ============================================================ */
 
 /* ---- Film grain: full-page SVG turbulence, whisper-quiet opacity ---- */
@@ -848,20 +934,46 @@ a {
 }
 @keyframes cue-drop { 0% { transform: translateY(-100%); } 55% { transform: translateY(0); } 100% { transform: translateY(100%); } }
 
-/* ---- Hanko seal (vermillion stamp) ---- */
-.hanko {
-  display: inline-grid;
-  place-items: center;
-  width: clamp(2.9rem, 5vw, 3.6rem);
-  aspect-ratio: 1;
-  background: #d3381c;
-  color: #f6f3ec;
-  font-size: clamp(1.55rem, 2.8vw, 2rem);
-  line-height: 1;
-  border-radius: 5px;
-  rotate: -6deg;
-  box-shadow: 0 4px 18px -6px rgba(211,56,28,0.55);
+/* ---- Marquee ticker (the one class the art site had that this one lacked) ---- */
+.ticker {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 0.85rem 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+.ticker__track {
+  display: flex;
+  width: max-content;
+  white-space: nowrap;
+  animation: ticker-run 36s linear infinite;
+}
+.ticker__track > span { display: inline-block; padding-right: 3.5rem; }
+.ticker__track .tick-accent { color: var(--accent); }
+.ticker:hover .ticker__track { animation-play-state: paused; }
+@keyframes ticker-run { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ticker__track { animation: none; } }
+
+/* ---- Artist signature stamp ----
+   Was a vermillion box holding a single kanji. Retired: the artist's own chibi
+   doodle (src/assets/showcase/stamp.webp) now signs every place that used it —
+   the shelf hero, the artist teaser, the library author card, the /asu hero and
+   each book's synopsis. Sizing is per-site because each placement differs; this
+   rule only carries what they share. */
+.stamp-sig {
+  display: block;
+  rotate: -7deg;
   user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 3px 14px rgba(211, 56, 28, 0.3));
+}
+.stamp-sig img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
 
 /* ---- Artwork media inside a framed figure (row gallery + WebGL ripple canvas) ---- */

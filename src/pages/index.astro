@@ -4,8 +4,17 @@ import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
+import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
+import { DEFAULT_LANG } from '../lib/lang';
 
-export const prerender = true;
+// Was prerendered. The artist teaser below the shelf is now author-edited copy,
+// and a static build would freeze it until the next deploy — the author would
+// save a line in the Studio and see nothing change. Same server-read carve-out
+// as /asu; loadCopy() never throws and falls back to the shipped defaults.
+export const prerender = false;
+
+const copy = await loadCopy();
+const t = copy[DEFAULT_LANG];
 ---
 
 <Base>
@@ -65,20 +74,20 @@ export const prerender = true;
 
       <div class="teaser__inner">
         <div class="teaser__copy">
-          <span class="mono teaser__k">THE ARTIST BEHIND THESE BOOKS</span>
+          <span class="mono teaser__k" data-i18n="teaser.kicker">{t['teaser.kicker']}</span>
           <h2 class="serif teaser__title">
-            <span class="reveal-mask"><span data-line>この本たちを描いたのは誰？</span></span>
-            <span class="reveal-mask"><span data-line>Who is Asu Azure?</span></span>
+            <span class="reveal-mask"><span data-line data-i18n="teaser.title">{t['teaser.title']}</span></span>
           </h2>
-          <p class="teaser__lede">
-            プロフィール、イラスト作品集、依頼について。 — The person who draws them: background,
-            the gallery, and whether commissions are open.
-          </p>
+          <p class="teaser__lede" data-i18n="teaser.lede">{t['teaser.lede']}</p>
           <a class="mono teaser__cta" href="/asu" data-flock data-magnetic data-hover>
-            MEET THE ARTIST <span aria-hidden="true">→</span>
+            <span data-i18n="teaser.cta">{t['teaser.cta']}</span> <span aria-hidden="true">→</span>
           </a>
         </div>
-        <span class="teaser__seal" aria-hidden="true">亜</span>
+        {/* Same chibi signature as the hero and every book's synopsis. */}
+        <picture class="teaser__seal" aria-hidden="true">
+          <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
+          <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
+        </picture>
       </div>
 
       <div class="chips teaser__chips" aria-hidden="true">
@@ -103,14 +112,42 @@ export const prerender = true;
       </span>
     </footer>
   </main>
+
+  {/* Trilingual copy for the artist teaser, so switching costs no request. */}
+  <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
 </Base>
 
 <script>
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { decode } from '../scripts/text';
+  import { applyCopy, readCopyPayload } from '../lib/siteCopy';
+  import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
 
   gsap.registerPlugin(ScrollTrigger);
+
+  // --- artist teaser copy ---------------------------------------------------
+  // The teaser is static Astro markup, so it cannot read the i18n rune that
+  // LangBar writes. It listens for the DOM event that i18n.set() fires instead.
+  {
+    const bundle = readCopyPayload();
+    if (bundle) {
+      const stored = (() => {
+        try {
+          const saved = localStorage.getItem(LANG_STORAGE_KEY);
+          return isLang(saved) ? saved : DEFAULT_LANG;
+        } catch {
+          return DEFAULT_LANG;
+        }
+      })();
+      if (stored !== DEFAULT_LANG) applyCopy(bundle, stored);
+
+      document.addEventListener(LANG_EVENT, (e) => {
+        const next = (e as CustomEvent<Lang>).detail;
+        if (isLang(next)) applyCopy(bundle, next);
+      });
+    }
+  }
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduced) {
@@ -364,16 +401,17 @@ export const prerender = true;
   }
   .teaser__seal {
     flex-shrink: 0;
-    font-family: var(--font-serif-jp);
-    font-size: clamp(3rem, 8vw, 6rem);
-    line-height: 1;
-    color: #d3381c;
-    border: 3px solid #d3381c;
-    border-radius: 6px;
-    padding: 0.12em 0.16em;
+    display: block;
+    width: clamp(5rem, 12vw, 9rem);
     rotate: -8deg;
     opacity: 0.9;
     user-select: none;
+    filter: drop-shadow(0 3px 14px rgba(211, 56, 28, 0.28));
+  }
+  .teaser__seal img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
   @media (max-width: 760px) {
     .teaser__seal { display: none; }

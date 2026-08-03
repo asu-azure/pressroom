@@ -16,6 +16,11 @@ describe('isRichSafe', () => {
     ok('<figure class="fore-fig fore-fig--md"><figcaption>cap</figcaption></figure>');
   });
 
+  it('accepts the gradient highlight spans the page copy is built on', () => {
+    ok('<p>I’m <span class="hl hl--g-blue">Asu Azure</span> — an illustrator.</p>');
+    ok('<p>feel <span class="hl hl--g-amber">alive.</span></p>');
+  });
+
   it('rejects tags outside the allowlist', () => {
     bad('<script>alert(1)</script>');
     bad('<p>ok</p><iframe src="https://evil.test"></iframe>');
@@ -69,5 +74,10 @@ describe('richForServer', () => {
   it('empty in, empty out', () => {
     expect(richForServer('')).toBe('');
     expect(richForServer('   ')).toBe('');
+  });
+
+  it('renders a highlight span through to the page untouched', () => {
+    const html = '<p>build <span class="hl hl--g-blue">characters</span></p>';
+    expect(richForServer(html)).toBe(html);
   });
 });

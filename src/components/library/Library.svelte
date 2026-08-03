@@ -5,6 +5,7 @@
   import { publicUrl } from '../../lib/storagePaths';
   import { i18n } from '../../lib/i18n.svelte';
   import { assemble } from '../../scripts/text';
+  import { stamp, stampStatic } from '../../data/showcase';
   import WorkCard from './WorkCard.svelte';
   import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
@@ -126,7 +127,11 @@
       <div use:rise={cards.length}>
         <a class="authorcard" href="/asu" data-flock data-cursor="MEET" data-hover>
           <span class="mono authorcard__k">{i18n.t('artist.cardK')}</span>
-          <span class="authorcard__seal" aria-hidden="true">亜</span>
+          <!-- Same chibi signature the artist page and the book synopses use. -->
+          <picture class="authorcard__seal" aria-hidden="true">
+            <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
+            <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
+          </picture>
           <span class="serif authorcard__title">{i18n.t('artist.cardTitle')}</span>
           <span class="mono authorcard__cta">{i18n.t('artist.cardCta')} →</span>
         </a>
@@ -182,14 +187,15 @@
   .authorcard__seal {
     margin: auto 0 0.6rem;
     align-self: flex-start;
-    font-family: var(--font-serif-jp);
-    font-size: clamp(2.6rem, 7vw, 4rem);
-    line-height: 1;
-    color: #d3381c;
-    border: 3px solid #d3381c;
-    border-radius: 5px;
-    padding: 0.1em 0.14em;
+    display: block;
+    width: clamp(4.2rem, 10vw, 6.5rem);
     rotate: -7deg;
+    filter: drop-shadow(0 3px 12px rgba(211, 56, 28, 0.28));
+  }
+  .authorcard__seal img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
   .authorcard__title {
     font-size: clamp(1.05rem, 2.2vw, 1.35rem);

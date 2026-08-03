@@ -8,13 +8,23 @@
  * try/catch + empty-state contract from the metadata rule still holds — a
  * Supabase failure degrades to a page that renders, never to a 500.
  *
- * All content comes from Studio → ARTIST (artist_profile row 1 + artworks).
+ * All content comes from Studio → ARTIST: the artist_profile row 1 and artworks
+ * (name, bio, portrait, links, gallery) plus every line of surrounding COPY,
+ * which lives in `site_copy` and is edited on the COPY tab.
+ *
+ * Copy is rendered in the default language and swapped client-side on the
+ * `[data-i18n]` nodes — the mechanism carried over from the retired asu-art
+ * one-pager. Nothing here is hardcoded prose.
+ *
  * Gallery interaction is vanilla (gallery.ts / lightbox.ts) — no island needed.
  */
+import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import { supabaseServer } from '../lib/supabaseServer';
-import { richForServer } from '../lib/richtext';
 import { artUrl, toArtworkRec } from '../lib/storagePaths';
+import { stamp, stampStatic } from '../data/showcase';
+import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
+import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
 import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
 
 export const prerender = false;
@@ -37,11 +47,15 @@ try {
   // Render the shell regardless — see the note above.
 }
 
+// Never throws and never returns empty: falls back to the shipped defaults in
+// src/data/copyKeys.ts, so the page reads in full even with no database.
+const copy = await loadCopy();
+const t = copy[DEFAULT_LANG];
+
+// PROFILE holds the facts that are the same in every language (name, portrait,
+// links, commission status). Every WORD on this page comes from `copy` below —
+// one place per thing, so there is never a second field editing the same text.
 const name = profile?.display_name?.trim() || 'Asu Azure';
-// NOT sanitizeRich: that needs DOMParser, which the Node SSR runtime lacks.
-// The editor sanitizes on write; richForServer validates on read (see richtext.ts).
-const bioHtml = profile?.bio ? richForServer(profile.bio) : '';
-const craft = profile?.craft ?? [];
 const links = profile?.links ?? {};
 const commissionsOpen = profile?.commissions_open ?? false;
 const portrait = profile?.portrait_path ? artUrl(profile.portrait_path) : null;
@@ -59,16 +73,51 @@ const lightboxItems = works.map((w) => ({
   medium: w.medium || '',
 }));
 const pad2 = (n: number) => String(n).padStart(2, '0');
+
+// --- Act backdrops --------------------------------------------------------
+// Scenery photographs carried over from the retired asu-art one-pager. They sit
+// far behind a scrim at low opacity, so they are deliberately encoded small and
+// cheap — quality 60, one width. `getImage` (not <Image>) because these are CSS
+// -positioned layers inside .act__bg, not content images.
+import scnField from '../assets/scenery/IMG_0402.jpg';
+import scnPath from '../assets/scenery/IMG_0364.jpg';
+import scnSea from '../assets/scenery/IMG_1243-w.jpg';
+import scnSky from '../assets/scenery/IMG_3293.jpg';
+import scnHill from '../assets/scenery/IMG_3169-w.jpg';
+import scnStreet from '../assets/scenery/IMG_0705.jpg';
+import scnDusk from '../assets/scenery/IMG_3005.jpg';
+
+const bg = async (img: ImageMetadata, width = 1600) =>
+  (await getImage({ src: img, format: 'webp', width, quality: 60 })).src;
+
+const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.all([
+  bg(scnField), bg(scnPath), bg(scnSea), bg(scnSky), bg(scnHill), bg(scnStreet), bg(scnDusk),
+]);
+
+// The selection act's collage fragments are the author's OWN artwork rather than
+// two hardcoded files — whatever is in the gallery. With an empty gallery the
+// act still stands up on its backdrop, grid and drawn wires.
+const frags = works.slice(0, 2);
 ---
 
 <Base
-  title={`${name} — 作品とプロフィール | Pressroom`}
+  title={t['meta.title']}
   description={`Illustrator ${name} — the artist behind the Pressroom shelf. Gallery, background, and commission status.`}
   image={featured?.fullUrl}
 >
+  {/* Language bar. Only /asu and the shelf teaser are trilingual; the reader
+      chrome falls back to English for a Thai visitor (see lib/lang.ts). */}
+  <nav class="asu__langs mono" aria-label="Language">
+    {LANGS.map((l) => (
+      <button type="button" data-lang={l} aria-pressed={l === DEFAULT_LANG ? 'true' : 'false'}>
+        {LANG_LABEL[l]}
+      </button>
+    ))}
+  </nav>
+
   <main class="asu">
     <!-- ============ 01 · HERO (ink) ============ -->
-    <section class="spread spread--ink asu__hero">
+    <section id="hero" class="spread spread--ink asu__hero" data-draw-scope data-constellation>
       {featured && (
         <div class="asu__heroArt" aria-hidden="true">
           <img src={featured.medUrl} alt="" decoding="async" fetchpriority="high" />
@@ -77,13 +126,78 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
       <div class="bracket bracket--tl" aria-hidden="true"></div>
       <div class="bracket bracket--tr" aria-hidden="true"></div>
 
-      <p class="mono asu__kicker" id="asu-kicker">ILLUSTRATOR · 絵描き</p>
+      <p class="mono asu__kicker" id="asu-kicker" data-i18n="hero.sub">{t['hero.sub']}</p>
       <h1 class="mega asu__name" id="asu-name">{name}</h1>
-      <p class="serif asu__tagline">
-        {commissionsOpen ? '依頼受付中 — COMMISSIONS OPEN' : 'この本たちを描いた人。'}
+      <p
+        class="serif asu__tagline"
+        data-i18n={commissionsOpen ? 'hero.status' : 'hero.statusClosed'}
+      >
+        {commissionsOpen ? t['hero.status'] : t['hero.statusClosed']}
       </p>
-      <span class="asu__seal" aria-hidden="true">亜</span>
+      {/* The artist's own chibi doodle — the same signature that closes every
+          book's synopsis. Animated WebP cannot be paused with CSS, so reduced
+          motion gets the still frame via <picture>. */}
+      <picture class="asu__seal" aria-hidden="true">
+        <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
+        <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
+      </picture>
       <div class="rgb-line" aria-hidden="true"></div>
+    </section>
+
+    <!-- ============ ACT I · FILM (letterboxed opening) ============
+         Interstitials carry no author content beyond their title/subtitle: they
+         are the connective tissue between spreads. Every class here already
+         ships in global.css. -->
+    <section
+      id="act-film"
+      class="act spread spread--ink pillarbox"
+      style="--scrim:0.5; --pb-w:13vw"
+      aria-label="Cinematic intro"
+      data-draw-scope
+    >
+      <div class="act__bg" aria-hidden="true">
+        <img src={bgPath} alt="" loading="lazy" decoding="async" />
+        <img src={bgField} alt="" loading="lazy" decoding="async" />
+        <img src={bgSea} alt="" loading="lazy" decoding="async" />
+        <img src={bgSky} alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="act__scrim" aria-hidden="true"></div>
+      <div class="channel-scan" aria-hidden="true"></div>
+      <div class="act__grid" aria-hidden="true"></div>
+
+      <span class="pillarbox__bar pillarbox__bar--left" aria-hidden="true"></span>
+      <span class="pillarbox__bar pillarbox__bar--right" aria-hidden="true"></span>
+
+      <div class="sidecol sidecol--left mono" aria-hidden="true">
+        <span class="sidecol__item">Sou</span>
+        <span class="sidecol__item sidecol__item--v serif">目を閉じた</span>
+        <span class="sidecol__item">01 / PANORAMA</span>
+      </div>
+      <div class="sidecol sidecol--right mono" aria-hidden="true">
+        <span class="sidecol__item">第一幕</span>
+        <span class="sidecol__item sidecol__item--v serif">目を開いた</span>
+        <span class="sidecol__item">ASU AZURE</span>
+      </div>
+
+      <div class="fui fui--top mono sweep-in" data-sweep aria-hidden="true">
+        <span class="fui__rec">REC</span><span>PANORAMA</span><span>ブルースクリーン</span><span>モノクロ</span><span data-timecode>00:00:00</span><span>f/1.8 · ISO 200</span>
+      </div>
+      <div class="fui fui--bl mono" aria-hidden="true">
+        <span>SCENE 01 — 向日葵畑</span>
+        <span>STORY &amp; ART — ASU AZURE</span>
+      </div>
+
+      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <path data-draw class="is-ink" d="M16 18 H30 M16 18 V30" />
+        <path data-draw class="is-ink" d="M84 82 H70 M84 82 V70" />
+        <line data-draw class="is-warm" x1="30" y1="62" x2="50" y2="56" />
+      </svg>
+
+      <div class="act__inner act-film__inner">
+        <p class="mono act-film__kicker sweep-in" data-sweep>OPENING · 第一幕</p>
+        <h2 class="act__head serif" data-select data-i18n="act.filmTitle">{t['act.filmTitle']}</h2>
+        <p class="act-film__sub serif" data-i18n="act.filmSub">{t['act.filmSub']}</p>
+      </div>
     </section>
 
     <!-- ============ 02 · BIO (paper — the tone flip) ============ -->
@@ -106,9 +220,12 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
       <div class="asu__bioInner">
         <div class="asu__bioHead">
-          <span class="mono asu__num">01 — はじまりの場所 / WHERE IT STARTS</span>
+          <span class="mono asu__num">
+            <span class="asu__numDigits">01</span>
+            <span data-i18n="story.tag">{t['story.tag']}</span>
+          </span>
           <h2 class="serif asu__h2">
-            <span class="reveal-mask"><span data-line>Who is {name}?</span></span>
+            <span class="reveal-mask"><span data-line data-i18n="story.title">{t['story.title']}</span></span>
           </h2>
         </div>
 
@@ -116,28 +233,58 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
           {portrait && (
             <figure class="asu__portrait">
               <img src={portrait} alt={`${name} — portrait`} loading="lazy" decoding="async" />
-              <figcaption class="mono">亜 · {name.toUpperCase()}</figcaption>
+              <figcaption class="mono">{name.toUpperCase()}</figcaption>
             </figure>
           )}
+          {/* Rich copy renders into a DIV, never a P: the editor emits its own
+              <p> blocks and nesting them would break the markup. */}
           <div class="asu__prose fore-rich">
-            {bioHtml ? (
-              <Fragment set:html={bioHtml} />
-            ) : (
-              <p class="mono asu__empty">
-                プロフィールは準備中です。 — Bio not written yet (Studio → ARTIST → PROFILE).
-              </p>
-            )}
+            <div data-i18n-html="story.p1" set:html={t['story.p1']} />
+            <div data-i18n-html="story.p2" set:html={t['story.p2']} />
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ============ ACT II · SCATTER (words blow apart on scroll) ============ -->
+    <section
+      id="act-scatter"
+      class="act spread spread--ink"
+      style="--scrim:0.3"
+      aria-label="Words scatter"
+      data-draw-scope
+    >
+      <div class="act__bg" aria-hidden="true">
+        <img src={bgHill} alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="act__scrim" aria-hidden="true"></div>
+      <div class="act__grid act__grid--blue" aria-hidden="true"></div>
+
+      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <line data-draw class="is-ink" x1="6" y1="30" x2="40" y2="30" />
+        <line data-draw x1="60" y1="70" x2="94" y2="70" />
+        <circle data-draw class="is-warm" cx="78" cy="34" r="6" />
+        <line data-draw class="is-warm" x1="22" y1="74" x2="40" y2="64" />
+      </svg>
+
+      <div class="fui fui--tl mono" aria-hidden="true"><span>02 — SCATTER</span><span>言葉が舞う</span></div>
+      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">DRIFT · TILT · BURST</div>
+
+      <div class="act__inner act-scatter__inner">
+        <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.scatterTitle">{t['act.scatterTitle']}</h2>
+        <p class="mono act-scatter__sub sweep-in" data-sweep>SCROLL TO SCATTER</p>
       </div>
     </section>
 
     <!-- ============ 03 · GALLERY (ink) ============ -->
     <section class="spread spread--ink asu__gallery" id="works">
       <header class="asu__galHead">
-        <span class="mono asu__num asu__num--ink">02 — 作品 / SELECTED WORK</span>
+        <span class="mono asu__num asu__num--ink">
+          <span class="asu__numDigits">02</span>
+          <span data-i18n="works.sub">{t['works.sub']}</span>
+        </span>
         <h2 class="serif asu__h2">
-          <span class="reveal-mask"><span data-line>What I draw.</span></span>
+          <span class="reveal-mask"><span data-line data-i18n="works.title">{t['works.title']}</span></span>
         </h2>
         <span class="mono asu__count">{pad2(works.length)} PCS</span>
       </header>
@@ -172,7 +319,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
           {mediums.length > 1 && (
             <div class="asu__filters mono" role="group" aria-label="Filter by medium">
-              <button type="button" class="asu__chip is-on" data-filter="all" aria-pressed="true">ALL</button>
+              <button type="button" class="asu__chip is-on" data-filter="all" aria-pressed="true" data-i18n="works.filterAll">{t['works.filterAll']}</button>
               {mediums.map((m) => (
                 <button type="button" class="asu__chip" data-filter={m} aria-pressed="false">{m}</button>
               ))}
@@ -208,45 +355,218 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
             </div>
           )}
           <p class="mono asu__hint">
-            <span data-strip-hint>DRAG TO EXPLORE · CLICK TO ENLARGE</span>
+            <span data-strip-hint data-i18n="works.archiveTag">{t['works.archiveTag']}</span>
           </p>
         </>
       )}
     </section>
 
+    <!-- ============ ACT III · CHARACTER (double exposure) ============ -->
+    <section
+      id="act-character"
+      class="act spread spread--ink"
+      style="--scrim:0.4"
+      aria-label="Character"
+      data-draw-scope
+    >
+      <div class="act__bg" aria-hidden="true">
+        <img src={bgStreet} alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="act__scrim" aria-hidden="true"></div>
+      <div class="act__grid" aria-hidden="true"></div>
+
+      <div class="fui fui--tl mono" aria-hidden="true"><span>03 — SUBJECT</span><span>会いたかった人</span></div>
+      <div class="fui fui--tr mono sweep-in" data-sweep aria-hidden="true">DOUBLE EXPOSURE · 多重露光</div>
+
+      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <circle data-draw class="is-warm" cx="72" cy="46" r="9" />
+        <line data-draw class="is-warm" x1="72" y1="30" x2="72" y2="37" />
+        <line data-draw class="is-warm" x1="72" y1="55" x2="72" y2="62" />
+        <line data-draw class="is-ink" x1="30" y1="50" x2="60" y2="48" />
+      </svg>
+
+      {/* The subject is the author's own featured piece — art shipped a
+          placeholder SVG here because it had no database to ask. */}
+      {featured && (
+        <figure class="act-char__figure" aria-hidden="true">
+          <img class="act-char__png" src={featured.medUrl} alt="" loading="lazy" decoding="async" />
+        </figure>
+      )}
+
+      <div class="act__inner act-char__inner">
+        <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.charTitle">{t['act.charTitle']}</h2>
+        <p class="act-char__cap mono sweep-in" data-sweep data-i18n="act.charCap">{t['act.charCap']}</p>
+      </div>
+    </section>
+
     <!-- ============ 04 · CRAFT & COMMISSIONS (paper) ============ -->
-    {(craft.length > 0 || commissionsOpen) && (
-      <section class="spread spread--paper asu__craft">
-        <div class="paper-grid" aria-hidden="true"></div>
-        <span class="crop crop--tr" aria-hidden="true"></span>
-        <div class="asu__craftInner">
-          <div>
-            <span class="mono asu__num">03 — 道具と依頼 / CRAFT &amp; COMMISSIONS</span>
-            <ul class="asu__craftList serif">
-              {craft.map((c) => <li>{c}</li>)}
-            </ul>
-          </div>
-          <aside class="asu__comm" class:list={[commissionsOpen && 'is-open']}>
-            <span class="mono asu__commK">{commissionsOpen ? '● 受付中' : '○ 現在休止中'}</span>
-            <p class="serif">
-              {commissionsOpen
-                ? 'Commissions are open — character work, illustration and cover art.'
-                : 'Commissions are closed for now. Follow along for the next opening.'}
-            </p>
-            {commissionsOpen && links.email && (
-              <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
-                ENQUIRE →
-              </a>
-            )}
-          </aside>
+    {/* Always rendered: the lead and the commission status are editable copy, so
+        gating the section on the craft list would hide words the author just
+        wrote and leave them hunting for why. */}
+    <section class="spread spread--paper asu__craft">
+      <div class="paper-grid" aria-hidden="true"></div>
+      <span class="crop crop--tr" aria-hidden="true"></span>
+      <div class="asu__craftInner">
+        <div>
+          <span class="mono asu__num">
+            <span class="asu__numDigits">03</span>
+            <span data-i18n="craft.title">{t['craft.title']}</span>
+          </span>
+          {/* The lead is rich text — it carries the gradient highlight spans. */}
+          <div class="serif asu__craftLead" data-i18n-html="craft.lead" set:html={t['craft.lead']} />
+          <ul class="asu__craftList serif">
+            <li data-i18n="craft.item1">{t['craft.item1']}</li>
+            <li data-i18n="craft.item2">{t['craft.item2']}</li>
+            <li data-i18n="craft.item3">{t['craft.item3']}</li>
+          </ul>
         </div>
-      </section>
-    )}
+        <aside class="asu__comm" class:list={[commissionsOpen && 'is-open']}>
+          <span class="mono asu__commK">
+            <span aria-hidden="true">{commissionsOpen ? '●' : '○'}</span>
+            <span data-i18n={commissionsOpen ? 'comm.status' : 'comm.statusClosed'}>
+              {commissionsOpen ? t['comm.status'] : t['comm.statusClosed']}
+            </span>
+          </span>
+          <p class="serif" data-i18n="comm.note">{t['comm.note']}</p>
+          {commissionsOpen && links.email && (
+            <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
+              <span data-i18n="comm.cta">{t['comm.cta']}</span> <span aria-hidden="true">→</span>
+            </a>
+          )}
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ ACT IV · SELECTION (marquee sweep) ============ -->
+    <section
+      id="act-select"
+      class="act spread spread--ink"
+      style="--scrim:0.5"
+      aria-label="Selection"
+      data-draw-scope
+    >
+      <div class="act__bg" aria-hidden="true">
+        <img src={bgSky} alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="act__scrim" aria-hidden="true"></div>
+      <div class="act__grid act__grid--blue" aria-hidden="true"></div>
+
+      {frags.map((w, i) => (
+        <figure class={`frag frag--${i + 1}`} aria-hidden="true">
+          <img src={w.thumbUrl} alt="" loading="lazy" decoding="async" />
+          <span class="frag__tag mono">LAYER {i + 2}</span>
+        </figure>
+      ))}
+      <span class="node" style="top:34%; left:24%" aria-hidden="true"></span>
+      <span class="node" style="top:64%; left:78%" aria-hidden="true"></span>
+
+      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <line data-draw x1="24" y1="34" x2="50" y2="48" />
+        <line data-draw x1="78" y1="64" x2="52" y2="52" />
+        <rect data-draw class="is-ink" x="38" y="40" width="24" height="20" />
+      </svg>
+
+      <div class="fui fui--tl mono" aria-hidden="true"><span>04 — EDIT</span><span>選択 / SELECTION</span></div>
+      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">LAYER 1 · OPACITY 100% · NORMAL</div>
+
+      <div class="act__inner act-select__inner">
+        <p class="mono act-select__tool sweep-in" data-sweep>MARQUEE TOOL</p>
+        <h2 class="act__head chroma serif" data-vel>
+          <span class="selbox">
+            <span class="selbox__text" data-i18n="act.selectTitle">{t['act.selectTitle']}</span>
+            <span class="selbox__handle selbox__handle--tl"></span>
+            <span class="selbox__handle selbox__handle--tr"></span>
+            <span class="selbox__handle selbox__handle--bl"></span>
+            <span class="selbox__handle selbox__handle--br"></span>
+            <span class="selbox__handle selbox__handle--t"></span>
+            <span class="selbox__handle selbox__handle--b"></span>
+            <span class="selbox__handle selbox__handle--l"></span>
+            <span class="selbox__handle selbox__handle--r"></span>
+            <span class="selbox__dim mono">W 1920 × H 1080 · 100%</span>
+          </span>
+        </h2>
+      </div>
+    </section>
+
+    <!-- ============ ACT V · 3D PERSPECTIVE TEXT ============ -->
+    <section
+      id="act-3d"
+      class="act spread spread--ink"
+      style="--scrim:0.5"
+      aria-label="3D text"
+      data-draw-scope
+    >
+      <div class="act__bg act-3d__bg" aria-hidden="true">
+        <img src={bgDusk} alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="act__scrim" aria-hidden="true"></div>
+      <div class="act__grid act__grid--blue" aria-hidden="true"></div>
+
+      <span class="node" style="top:28%; left:16%" aria-hidden="true"></span>
+      <span class="node" style="top:70%; left:84%" aria-hidden="true"></span>
+      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <line data-draw x1="16" y1="28" x2="44" y2="42" />
+        <line data-draw class="is-warm" x1="84" y1="70" x2="58" y2="56" />
+        <path data-draw class="is-ink" d="M8 86 H22 M8 86 V72" />
+        <path data-draw class="is-ink" d="M92 14 H78 M92 14 V28" />
+      </svg>
+
+      <div class="fui fui--tl mono" aria-hidden="true"><span>05 — RENDER</span><span>RGB · 3D</span></div>
+      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">CHROMATIC · PERSPECTIVE</div>
+
+      <div class="act__inner act-3d__inner">
+        <p class="mono act-3d__kicker sweep-in" data-sweep>君は今の僕を見て</p>
+        <h2 class="act__head act-3d__head serif" data-3dtext data-i18n="act.threeDTitle">{t['act.threeDTitle']}</h2>
+      </div>
+    </section>
+
+    <!-- ============ ACT VI · GRID FINALE ============ -->
+    <section
+      id="act-grid"
+      class="act spread spread--ink"
+      style="--scrim:0.5"
+      aria-label="Grid finale"
+      data-draw-scope
+    >
+      <div class="act__bg" aria-hidden="true">
+        <img src={bgPath} alt="" loading="lazy" decoding="async" />
+      </div>
+      <div class="act__scrim" aria-hidden="true"></div>
+
+      <div class="stage3d act-grid__stage" aria-hidden="true">
+        <div class="layer3d">
+          <span class="wiregrid"></span>
+          <span class="node" style="top:30%; left:18%"></span>
+          <span class="node" style="top:44%; left:72%"></span>
+          <span class="node" style="top:62%; left:40%"></span>
+          <span class="node" style="top:38%; left:54%"></span>
+        </div>
+      </div>
+
+      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <line data-draw x1="18" y1="30" x2="72" y2="44" />
+        <line data-draw x1="40" y1="62" x2="54" y2="38" />
+        <line data-draw class="is-warm" x1="72" y1="44" x2="54" y2="38" />
+        <line data-draw class="is-ink" x1="18" y1="30" x2="40" y2="62" />
+      </svg>
+
+      <div class="fui fui--tl mono" aria-hidden="true"><span>06 — SPACE</span><span>構造 / STRUCTURE</span></div>
+      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">GRID · NODES · WIRES</div>
+
+      <div class="act__inner act-grid__inner">
+        <h2 class="act__head act-grid__head serif" data-3dtext data-i18n="act.gridTitle">{t['act.gridTitle']}</h2>
+        <p class="act-grid__sub serif" data-i18n="act.gridSub">{t['act.gridSub']}</p>
+      </div>
+    </section>
 
     <!-- ============ 05 · CONTACT + RETURN (ink) ============ -->
-    <footer class="spread spread--ink asu__contact">
+    <footer class="spread spread--ink asu__contact" data-draw-scope data-constellation>
       <span class="bracket bracket--bl" aria-hidden="true"></span>
-      <span class="mono asu__num asu__num--ink">04 — 連絡先 / GET IN TOUCH</span>
+      <span class="mono asu__num asu__num--ink">
+        <span class="asu__numDigits">04</span>
+        <span data-i18n="contact.kicker">{t['contact.kicker']}</span>
+      </span>
+      <p class="mega asu__contactLabel" data-i18n="contact.label">{t['contact.label']}</p>
       <div class="asu__contactRow">
         {links.x && (
           <a class="serif asu__contactLink" href={links.x} target="_blank" rel="noopener me" data-magnetic>
@@ -260,17 +580,20 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
         )}
       </div>
       <a class="mono asu__back" href="/" data-flock="back" data-magnetic>
-        ← 本棚へ戻る / BACK TO THE SHELF
+        <span aria-hidden="true">←</span> <span data-i18n="contact.back">{t['contact.back']}</span>
       </a>
     </footer>
 
-    {/* Persistent return chip — the shelf is never more than one click away. */}
-    <a class="mono asu__backFixed" href="/" data-flock="back" aria-label="Back to the shelf">
-      ← 本棚
+    {/* Persistent return chip — the shelf is never more than one click away.
+        Glyph only: it sits over the artwork and must not grow with the copy. */}
+    <a class="mono asu__backFixed" href="/" data-flock="back" aria-label={t['contact.back']}>
+      <span aria-hidden="true">←</span>
     </a>
   </main>
 
   <script type="application/json" id="asu-lb-data" set:html={JSON.stringify(lightboxItems)} is:inline />
+  {/* All three languages, so switching never waits on a request. */}
+  <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
 </Base>
 
 <script>
@@ -279,11 +602,68 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   import { initGalleries } from '../scripts/gallery';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
   import { decode, assemble } from '../scripts/text';
+  import { assemble as kineticAssemble } from '../scripts/kinetic';
+  import { initCinema } from '../scripts/cinema';
+  import { initChannel } from '../scripts/channel';
+  import { initScatter } from '../scripts/scatter';
+  import { initGrid } from '../scripts/grid3d';
+  import { init3DText } from '../scripts/perspective';
+  import { initSelectSweep } from '../scripts/select';
+  import { initAmbient } from '../scripts/ambient';
+  import { initDraw } from '../scripts/draw';
+  import { initDistortion } from '../scripts/displacement';
+  import { applyCopy, readCopyPayload } from '../lib/siteCopy';
+  import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
 
   gsap.registerPlugin(ScrollTrigger);
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const coarse = window.matchMedia('(pointer: coarse)').matches;
+
+  // --- language -------------------------------------------------------------
+  // Shares one key with the reader chrome, so a visitor picks a language once
+  // for the whole site rather than twice.
+  const LANG_KEY = LANG_STORAGE_KEY;
+  const copyBundle = readCopyPayload();
+
+  function currentLang(): Lang {
+    try {
+      const saved = localStorage.getItem(LANG_KEY);
+      if (isLang(saved)) return saved;
+    } catch {
+      /* private mode */
+    }
+    return DEFAULT_LANG;
+  }
+
+  function setLang(next: Lang) {
+    if (!copyBundle) return;
+    applyCopy(copyBundle, next);
+    try {
+      localStorage.setItem(LANG_KEY, next);
+    } catch {
+      /* private mode */
+    }
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('.asu__langs [data-lang]')) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.lang === next));
+    }
+    // Announced for parity with the shelf's LangBar: any island that mounts here
+    // later picks the choice up without another storage read.
+    document.dispatchEvent(new CustomEvent<Lang>(LANG_EVENT, { detail: next }));
+  }
+
+  if (copyBundle) {
+    // The server rendered DEFAULT_LANG; honour a stored preference before the
+    // hero animations read any text off the DOM.
+    const saved = currentLang();
+    if (saved !== DEFAULT_LANG) setLang(saved);
+
+    document.querySelector('.asu__langs')?.addEventListener('click', (e) => {
+      const btn = (e.target as Element | null)?.closest<HTMLElement>('[data-lang]');
+      const next = btn?.dataset.lang;
+      if (isLang(next)) setLang(next);
+    });
+  }
 
   // --- hero -----------------------------------------------------------------
   if (!reduced) {
@@ -365,6 +745,48 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
       window.dispatchEvent(new Event('resize'));
     });
   });
+
+  // --- the six acts ---------------------------------------------------------
+  // Each module owns its own reduced-motion / coarse-pointer fallback, so these
+  // are called unconditionally and opt themselves down. Mirrors the wiring of
+  // the retired asu-art one-pager.
+  const heroEl = document.getElementById('hero');
+  if (heroEl) initCinema(heroEl, { reduced });
+
+  const filmEl = document.getElementById('act-film');
+  if (filmEl) {
+    initCinema(filmEl, { reduced });
+    initChannel(filmEl, { reduced });
+  }
+
+  const scatterEl = document.getElementById('act-scatter');
+  if (scatterEl) initScatter(scatterEl, { reduced, coarse });
+
+  const gridEl = document.getElementById('act-grid');
+  if (gridEl) initGrid(gridEl, { reduced, coarse });
+
+  document.querySelectorAll<HTMLElement>('[data-select]').forEach((el) => initSelectSweep(el, { reduced }));
+  document.querySelectorAll<HTMLElement>('[data-constellation]').forEach((el) => initAmbient(el, { reduced }));
+  document.querySelectorAll<HTMLElement>('[data-3dtext]').forEach((el) => init3DText(el, { reduced }));
+  initDraw(document, { reduced });
+
+  // Kinetic assemble on the act headings that ask for it. `assemble` here is
+  // kinetic.ts's per-character version — NOT the one text.ts exports for the
+  // hero name, which is why it is imported under an alias.
+  if (!reduced) {
+    document.querySelectorAll<HTMLElement>('[data-assemble]').forEach((el) => kineticAssemble(el, { reduced }));
+  }
+
+  // WebGL ripple on hover, desktop only and only where the context exists.
+  if (!coarse && !reduced) {
+    let webgl = false;
+    try {
+      webgl = !!document.createElement('canvas').getContext('webgl');
+    } catch {
+      webgl = false;
+    }
+    if (webgl) document.querySelectorAll<HTMLElement>('[data-art]').forEach(initDistortion);
+  }
 </script>
 
 <style>
@@ -376,6 +798,50 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     font-size: 0.62rem;
     letter-spacing: 0.18em;
     color: var(--accent);
+  }
+  /* The section number is decoration, not copy — it never enters the editor,
+     so the author cannot accidentally renumber the page. */
+  .asu__numDigits {
+    opacity: 0.6;
+  }
+  .asu__numDigits::after {
+    content: ' — ';
+  }
+
+  /* ---------- language bar ---------- */
+  .asu__langs {
+    position: fixed;
+    top: clamp(0.6rem, 2vh, 1.1rem);
+    right: clamp(0.6rem, 2vw, 1.4rem);
+    z-index: 40;
+    display: flex;
+    gap: 0.25rem;
+  }
+  .asu__langs button {
+    padding: 0.3rem 0.55rem;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    border: 1px solid var(--line);
+    color: var(--fg-dim);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+  }
+  .asu__langs button:hover {
+    color: var(--fg);
+    border-color: var(--line-strong);
+  }
+  .asu__langs button[aria-pressed='true'] {
+    color: var(--ink-fg);
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  @media (max-width: 640px) {
+    .asu__langs button {
+      padding: 0.25rem 0.4rem;
+      font-size: 0.52rem;
+    }
   }
   .asu__num--ink {
     color: var(--accent);
@@ -454,18 +920,18 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     right: clamp(1.5rem, 6vw, 5rem);
     top: clamp(5rem, 14vh, 9rem);
     z-index: 1;
-    font-family: var(--font-serif-jp);
-    font-size: clamp(3.4rem, 9vw, 7rem);
-    line-height: 1;
-    color: #d3381c;
+    display: block;
+    width: clamp(5.5rem, 13vw, 10rem);
     opacity: 0.92;
     rotate: -8deg;
-    padding: 0.12em 0.16em;
-    border: 3px solid #d3381c;
-    border-radius: 6px;
     pointer-events: none;
     user-select: none;
     filter: drop-shadow(0 3px 14px rgba(211, 56, 28, 0.32));
+  }
+  .asu__seal img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
   .asu__hero .rgb-line {
     margin-top: clamp(1.6rem, 4vh, 2.6rem);
@@ -654,6 +1120,13 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     align-items: start;
     max-width: 1100px;
   }
+  .asu__craftLead {
+    margin-top: 1.1rem;
+    max-width: 46ch;
+    font-size: clamp(1.1rem, 2.2vw, 1.6rem);
+    line-height: 1.45;
+    color: var(--fg);
+  }
   .asu__craftList {
     list-style: none;
     margin-top: 1.2rem;
@@ -706,6 +1179,12 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     position: relative;
     z-index: 1;
     padding: clamp(4rem, 12vh, 7rem) var(--pad) clamp(5rem, 14vh, 8rem);
+  }
+  .asu__contactLabel {
+    margin-top: 0.8rem;
+    font-size: clamp(1.6rem, 6vw, 4rem);
+    line-height: 1.05;
+    color: var(--fg);
   }
   .asu__contactRow {
     margin-top: 1.2rem;
@@ -771,7 +1250,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   }
   @media (max-width: 640px) {
     .asu__seal {
-      font-size: 2.6rem;
+      width: 4.6rem;
       right: 1rem;
       top: 4.5rem;
     }

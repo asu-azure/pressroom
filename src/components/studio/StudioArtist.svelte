@@ -13,13 +13,13 @@
   import { supabase } from '../../lib/supabase';
   import { requireSession, watchSignOut } from '../../lib/authGuard';
   import { ART_BUCKET, artUrl } from '../../lib/storagePaths';
-  import { uploadArtworkImages, uploadPortrait, uploadBioImage, artworkPaths } from '../../lib/artImage';
-  import RichTextEditor from './RichTextEditor.svelte';
+  import { uploadArtworkImages, uploadPortrait, artworkPaths } from '../../lib/artImage';
+  import StudioCopy from './StudioCopy.svelte';
   import type { ArtistProfile, ArtworkRow } from '../../lib/types';
 
   const FLIP_MS = 180;
 
-  let tab = $state<'profile' | 'gallery'>('profile');
+  let tab = $state<'profile' | 'gallery' | 'copy'>('profile');
   let ready = $state(false);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
@@ -27,9 +27,7 @@
   // --- profile ---------------------------------------------------------------
   let profile = $state({
     display_name: '',
-    bio: '',
     portrait_path: null as string | null,
-    craftText: '',
     x: '',
     x_handle: '',
     email: '',
@@ -65,9 +63,7 @@
     const row = data as ArtistProfile;
     profile = {
       display_name: row.display_name ?? '',
-      bio: row.bio ?? '',
       portrait_path: row.portrait_path,
-      craftText: (row.craft ?? []).join('\n'),
       x: row.links?.x ?? '',
       x_handle: row.links?.x_handle ?? '',
       email: row.links?.email ?? '',
@@ -94,14 +90,11 @@
     error = null;
     const { error: err } = await supabase
       .from('artist_profile')
+      // `bio` and `craft` are intentionally NOT written: those words live in
+      // site_copy now (all three languages). The columns stay for old rows.
       .update({
         display_name: profile.display_name.trim() || 'Asu Azure',
-        bio: profile.bio,
         portrait_path: profile.portrait_path,
-        craft: profile.craftText
-          .split('\n')
-          .map((l) => l.trim())
-          .filter(Boolean),
         links: { x: profile.x.trim(), x_handle: profile.x_handle.trim(), email: profile.email.trim() },
         commissions_open: profile.commissions_open,
       })
@@ -260,6 +253,7 @@
     <button class:is-on={tab === 'gallery'} onclick={() => (tab = 'gallery')}>
       GALLERY · {items.length}
     </button>
+    <button class:is-on={tab === 'copy'} onclick={() => (tab = 'copy')}>COPY · JA/EN/TH</button>
   </nav>
 
   {#if error}<p class="mono sa__error">{error}</p>{/if}
@@ -289,22 +283,17 @@
         </div>
       </div>
 
-      <div class="sa__field sa__field--wide">
-        <span class="mono">BIO — 自己紹介 (RICH TEXT; IMAGES ALLOWED)</span>
-        <RichTextEditor
-          value={profile.bio}
-          onChange={(html) => (profile.bio = html)}
-          uploadImage={uploadBioImage}
-          placeholder="Who you are, what you draw, where the stories come from…"
-        />
+      <!-- Bio and craft lines used to live here as single-language fields. They
+           moved to COPY, where they exist in all three languages — one place per
+           thing, so there is never a second field editing the same words. -->
+      <div class="sa__field sa__field--wide sa__moved">
+        <span class="mono">BIO · CRAFT LINES · EVERY OTHER WORD ON /asu</span>
+        <p class="mono">
+          These moved to the <button type="button" onclick={() => (tab = 'copy')}>COPY</button> tab,
+          where you write them in 日本語 / ENGLISH / ไทย. This tab keeps only what is the same in
+          every language: your name, portrait, links and whether commissions are open.
+        </p>
       </div>
-
-      <label class="sa__field">
-        <span class="mono">CRAFT — ONE PER LINE</span>
-        <textarea bind:value={profile.craftText} rows="4"
-          placeholder={'Clip Studio Paint · fully digital\nCharacter design · illustration · cover art'}
-        ></textarea>
-      </label>
 
       <div class="sa__field">
         <span class="mono">LINKS</span>
@@ -324,6 +313,8 @@
         </button>
       </div>
     </div>
+  {:else if tab === 'copy'}
+    <StudioCopy />
   {:else}
     <div class="sa__gallery">
       <div class="sa__upload">
@@ -493,6 +484,24 @@
   .sa__field textarea:focus {
     outline: none;
     border-color: var(--accent);
+  }
+  /* Signpost left where the bio and craft fields used to be, so the muscle
+     memory of looking for them here still lands somewhere useful. */
+  .sa__moved p {
+    margin: 0.4rem 0 0;
+    max-width: 60ch;
+    font-size: 0.7rem;
+    line-height: 1.65;
+    color: var(--fg-dim);
+  }
+  .sa__moved button {
+    padding: 0.1rem 0.4rem;
+    background: var(--accent);
+    border: 1px solid var(--accent);
+    color: var(--ink-fg);
+    font: inherit;
+    font-size: 0.68rem;
+    cursor: pointer;
   }
   .sa__portrait {
     display: flex;
