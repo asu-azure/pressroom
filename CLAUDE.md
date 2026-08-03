@@ -156,9 +156,16 @@ Both Thai faces are **loopless** (ไม่มีหัว): Ekkamai Vibe for te
 metrics survive `background-clip: text`). The looped Royal Institute of Siam was dropped — don't
 add it back without asking; the loop/no-loop choice is the owner's call, not a technical one.
 
-What *does* stay language-conditional is metrics only: Thai vowel/tone marks stack, so Thai display
-lines get their leading back, drop `text-transform` (Thai has no case), and tighten mono tracking.
-**Never split Thai per-character** — `kinetic.ts` guards this with `MARK_SCRIPTS`.
+What stays language-conditional is **leading only, scoped to `[data-i18n]`**. Thai vowel/tone marks
+stack, so display type at 0.86 line-height collides them — but the fix must only reach elements
+that actually hold Thai. Every Thai string arrives through a copy key, so those attributes mark
+exactly the right elements. An unscoped `html[lang='th'] .mega` rule previously un-uppercased and
+re-tracked the Latin `PRESSROOM` masthead.
+
+Do **not** add `text-transform: none` or letter-spacing overrides for Thai: Thai codepoints have no
+uppercase mapping, so `uppercase` is already a no-op on them — such rules only damage the Latin
+sharing the selector. **Never split Thai per-character** — `kinetic.ts` guards this with
+`MARK_SCRIPTS`.
 
 ## The six acts
 

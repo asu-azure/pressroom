@@ -331,22 +331,25 @@ a {
    Both Thai faces are LOOPLESS (ไม่มีหัว) — Ekkamai Vibe for text, Prompt for
    display. The looped Royal Institute of Siam was dropped.
 
-   What genuinely does need to change for Thai is metrics, not typefaces:
+   The one thing Thai still needs is leading: vowel and tone marks stack above
+   and below the line, so display type set at 0.86 line-height collides them.
 
-   1. Vowel and tone marks stack above and below the line, so the tight display
-      leading tuned for Latin (0.86) collides them. Thai display lines get room
-      back.
-   2. Uppercasing is dropped — Thai has no case, and text-transform on Thai only
-      risks mangling combining marks.
-   3. The mono tracking tuned for Latin caps is too wide for Thai. */
-html[lang='th'] .mono {
-  letter-spacing: 0.06em;
-}
-html[lang='th'] .mega {
+   That fix is scoped to `[data-i18n]` — and the scoping is the important part.
+   Every Thai string on this site arrives through a copy key, so those
+   attributes mark exactly the elements that hold Thai and nothing else. Brand
+   type like the PRESSROOM masthead is Latin in all three languages and must not
+   move. An unscoped `html[lang='th'] .mega` rule previously un-uppercased and
+   re-tracked that masthead, which is precisely the bug this replaces.
+
+   Do NOT add `text-transform: none` back: Thai codepoints have no uppercase
+   mapping, so `uppercase` is already a no-op on them. It only ever damaged the
+   Latin sharing the rule. Same for letter-spacing overrides. */
+html[lang='th'] .mega[data-i18n],
+html[lang='th'] .mega[data-i18n-html],
+html[lang='th'] .act__head[data-i18n],
+html[lang='th'] .act__head[data-i18n-html] {
   font-synthesis: none;
   line-height: 1.24;
-  letter-spacing: 0.01em;
-  text-transform: none;
 }
 
 /* ---- Flowing-gradient text (cobalt→cyan→amber, looping) ----
