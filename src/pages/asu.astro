@@ -47,6 +47,20 @@ try {
   // Render the shell regardless — see the note above.
 }
 
+// Dev scaffolding. With an empty gallery this page collapses to its empty state,
+// so `npm run dev` stands in the repo's own showcase art to make the layout
+// visible. Real rows always win, and the guard is statically false in a
+// production build — the dynamic import keeps the module and its images out of
+// the bundle entirely. The DEV test sits directly in the `if` so the branch
+// folds away rather than relying on a const propagating into it.
+// See src/data/galleryPlaceholders.ts.
+let placeholders: typeof import('../data/galleryPlaceholders') | null = null;
+if (import.meta.env.DEV && works.length === 0) {
+  placeholders = await import('../data/galleryPlaceholders');
+  works = await placeholders.placeholderWorks();
+}
+const usingPlaceholders = placeholders !== null;
+
 // Never throws and never returns empty: falls back to the shipped defaults in
 // src/data/copyKeys.ts, so the page reads in full even with no database.
 const copy = await loadCopy();
@@ -56,9 +70,15 @@ const t = copy[DEFAULT_LANG];
 // links, commission status). Every WORD on this page comes from `copy` below —
 // one place per thing, so there is never a second field editing the same text.
 const name = profile?.display_name?.trim() || 'Asu Azure';
-const links = profile?.links ?? {};
-const commissionsOpen = profile?.commissions_open ?? false;
-const portrait = profile?.portrait_path ? artUrl(profile.portrait_path) : null;
+const links = placeholders ? placeholders.PLACEHOLDER_LINKS : profile?.links ?? {};
+const commissionsOpen = placeholders
+  ? placeholders.PLACEHOLDER_COMMISSIONS_OPEN
+  : profile?.commissions_open ?? false;
+const portrait = profile?.portrait_path
+  ? artUrl(profile.portrait_path)
+  : placeholders
+    ? await placeholders.placeholderPortrait()
+    : null;
 
 // The featured piece leads the gallery as a big editorial row; the rest ride the
 // drag strip. Falls back to the first work so the layout never loses its anchor.
@@ -287,6 +307,9 @@ const frags = works.slice(0, 2);
           <span class="reveal-mask"><span data-line data-i18n="works.title">{t['works.title']}</span></span>
         </h2>
         <span class="mono asu__count">{pad2(works.length)} PCS</span>
+        {usingPlaceholders && (
+          <span class="mono asu__phTag">PLACEHOLDER · DEV ONLY</span>
+        )}
       </header>
 
       {works.length === 0 ? (
@@ -1021,6 +1044,16 @@ const frags = works.slice(0, 2);
   .asu__count {
     color: var(--fg-faint);
     margin-top: 0.5rem;
+  }
+  /* Dev only — never rendered in a build. Amber so a screenshot of the dev
+     page can't be mistaken for a populated gallery. */
+  .asu__phTag {
+    justify-self: start;
+    margin-top: 0.4rem;
+    padding: 0.4em 0.8em;
+    font-size: 0.55rem;
+    color: #e8a31a;
+    border: 1px dashed #e8a31a;
   }
   .asu__feature {
     margin-top: clamp(2rem, 5vh, 3rem);
