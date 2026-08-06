@@ -15,11 +15,17 @@
   import { ART_BUCKET, artUrl } from '../../lib/storagePaths';
   import { uploadArtworkImages, uploadPortrait, artworkPaths } from '../../lib/artImage';
   import StudioCopy from './StudioCopy.svelte';
+  import {
+    SCENE_SLOTS,
+    MODE_LABEL,
+    type SceneMode,
+    type ScenesRecord,
+  } from '../../data/sceneSlots';
   import type { ArtistProfile, ArtworkRow } from '../../lib/types';
 
   const FLIP_MS = 180;
 
-  let tab = $state<'profile' | 'gallery' | 'copy'>('profile');
+  let tab = $state<'profile' | 'gallery' | 'copy' | 'scenes'>('profile');
   let ready = $state(false);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
@@ -32,9 +38,16 @@
     x_handle: '',
     email: '',
     commissions_open: false,
+    commissions_show: true,
   });
   let savingProfile = $state(false);
   let portraitBusy = $state(false);
+
+  // --- scenes ----------------------------------------------------------------
+  // Only overrides are stored, exactly like site_copy: a slot the author has
+  // not touched has no entry and the page uses its registry fallback.
+  let scenes = $state<ScenesRecord>({});
+  let savingScenes = $state(false);
 
   // --- gallery ---------------------------------------------------------------
   let items = $state<ArtworkRow[]>([]);
@@ -68,7 +81,9 @@
       x_handle: row.links?.x_handle ?? '',
       email: row.links?.email ?? '',
       commissions_open: row.commissions_open ?? false,
+      commissions_show: row.commissions_show ?? true,
     };
+    scenes = (row.scenes ?? {}) as ScenesRecord;
   }
 
   async function loadGallery() {
@@ -97,11 +112,61 @@
         portrait_path: profile.portrait_path,
         links: { x: profile.x.trim(), x_handle: profile.x_handle.trim(), email: profile.email.trim() },
         commissions_open: profile.commissions_open,
+        commissions_show: profile.commissions_show,
       })
       .eq('id', 1);
     savingProfile = false;
     if (err) error = err.message;
     else flash('PROFILE SAVED');
+  }
+
+  // --- scenes ----------------------------------------------------------------
+
+  /** What a slot is set to right now — its stored mode, or its fallback. */
+  function modeOf(key: string): SceneMode {
+    const slot = SCENE_SLOTS.find((s) => s.key === key)!;
+    return scenes[key]?.mode ?? slot.fallback;
+  }
+
+  function setMode(key: string, mode: SceneMode) {
+    const slot = SCENE_SLOTS.find((s) => s.key === key)!;
+    // Back at the fallback with no art chosen = no override at all, which is
+    // what makes RESET work and keeps the column to real choices only.
+    const art = scenes[key]?.art ?? [];
+    if (mode === slot.fallback && art.length === 0) {
+      const { [key]: _drop, ...rest } = scenes;
+      scenes = rest;
+      return;
+    }
+    scenes = { ...scenes, [key]: { mode, art } };
+  }
+
+  /** Click a thumbnail: select it, or deselect if it was already chosen. */
+  function toggleArt(key: string, id: string) {
+    const slot = SCENE_SLOTS.find((s) => s.key === key)!;
+    const mode = modeOf(key);
+    const current = scenes[key]?.art ?? [];
+    let art: string[];
+    if (current.includes(id)) art = current.filter((x) => x !== id);
+    else art = [...current, id].slice(-slot.count); // oldest drops out
+    scenes = { ...scenes, [key]: { mode, art } };
+  }
+
+  function resetSlot(key: string) {
+    const { [key]: _drop, ...rest } = scenes;
+    scenes = rest;
+  }
+
+  async function saveScenes() {
+    savingScenes = true;
+    error = null;
+    const { error: err } = await supabase
+      .from('artist_profile')
+      .update({ scenes })
+      .eq('id', 1);
+    savingScenes = false;
+    if (err) error = err.message;
+    else flash('SCENES SAVED');
   }
 
   async function onPickPortrait(e: Event) {
@@ -253,6 +318,7 @@
     <button class:is-on={tab === 'gallery'} onclick={() => (tab = 'gallery')}>
       GALLERY · {items.length}
     </button>
+    <button class:is-on={tab === 'scenes'} onclick={() => (tab = 'scenes')}>SCENES</button>
     <button class:is-on={tab === 'copy'} onclick={() => (tab = 'copy')}>COPY · JA/EN/TH</button>
   </nav>
 
@@ -302,10 +368,24 @@
         <input type="email" bind:value={profile.email} placeholder="contact@…" aria-label="Contact email" />
       </div>
 
-      <label class="sa__check">
-        <input type="checkbox" bind:checked={profile.commissions_open} />
-        <span class="mono">COMMISSIONS OPEN</span>
-      </label>
+      <!-- Two switches, deliberately: one decides whether commissions are
+           mentioned on /asu at all, the other which line shows when they are.
+           Hiding takes the hero line AND the panel in the craft section. -->
+      <div class="sa__field">
+        <span class="mono">COMMISSIONS</span>
+        <label class="sa__check">
+          <input type="checkbox" bind:checked={profile.commissions_show} />
+          <span class="mono">SHOW ON THE PAGE</span>
+        </label>
+        <label class="sa__check" class:sa__check--muted={!profile.commissions_show}>
+          <input
+            type="checkbox"
+            bind:checked={profile.commissions_open}
+            disabled={!profile.commissions_show}
+          />
+          <span class="mono">OPEN FOR WORK</span>
+        </label>
+      </div>
 
       <div class="sa__save">
         <button class="mono sa__primary" onclick={saveProfile} disabled={savingProfile}>
@@ -315,6 +395,79 @@
     </div>
   {:else if tab === 'copy'}
     <StudioCopy />
+  {:else if tab === 'scenes'}
+    <!-- Generated from src/data/sceneSlots.ts, so these appear in the order a
+         visitor scrolls past them and adding a slot needs no change here. -->
+    <div class="sa__scenes">
+      <p class="mono sa__hint">
+        WHERE YOUR OWN WORK APPEARS OUTSIDE THE GALLERY · PHOTO KEEPS THE SCENERY ·
+        PLATE PINS A PIECE ON TOP · BACKDROP HANDS THE WHOLE BACKGROUND OVER
+      </p>
+
+      {#if items.length === 0}
+        <p class="mono sa__none">
+          UPLOAD ARTWORK IN THE GALLERY TAB FIRST — THERE IS NOTHING TO PLACE YET.
+        </p>
+      {:else}
+        {#each SCENE_SLOTS as slot (slot.key)}
+          {@const mode = modeOf(slot.key)}
+          {@const chosen = scenes[slot.key]?.art ?? []}
+          <section class="sa__slot">
+            <header class="sa__slotHead">
+              <span class="mono sa__slotSection">{slot.section}</span>
+              <strong class="sa__slotLabel">{slot.label}</strong>
+              <span class="sa__slotHint">{slot.hint}</span>
+            </header>
+
+            <div class="sa__modes mono" role="group" aria-label={`${slot.label} treatment`}>
+              {#each slot.modes as m}
+                <button
+                  type="button"
+                  class="sa__mode"
+                  class:is-on={mode === m}
+                  aria-pressed={mode === m}
+                  onclick={() => setMode(slot.key, m)}
+                >
+                  {MODE_LABEL[m]}
+                </button>
+              {/each}
+              {#if scenes[slot.key]}
+                <button type="button" class="sa__mode sa__mode--reset" onclick={() => resetSlot(slot.key)}>
+                  RESET
+                </button>
+              {/if}
+            </div>
+
+            {#if mode === 'plate' || mode === 'backdrop'}
+              <p class="mono sa__pickHint">
+                {chosen.length === 0
+                  ? `NOTHING PICKED — CHOOSING AUTOMATICALLY. TAP TO PICK ${slot.count === 2 ? 'TWO' : 'ONE'}.`
+                  : `${chosen.length} OF ${slot.count} PICKED`}
+              </p>
+              <div class="sa__picker">
+                {#each items.filter((a) => a.published) as a (a.id)}
+                  <button
+                    type="button"
+                    class="sa__pick"
+                    class:is-on={chosen.includes(a.id)}
+                    title={a.title}
+                    onclick={() => toggleArt(slot.key, a.id)}
+                  >
+                    <img src={artUrl(a.thumb_path)} alt={a.title} loading="lazy" />
+                  </button>
+                {/each}
+              </div>
+            {/if}
+          </section>
+        {/each}
+
+        <div class="sa__save">
+          <button class="mono sa__primary" onclick={saveScenes} disabled={savingScenes}>
+            {savingScenes ? 'SAVING…' : 'SAVE SCENES'}
+          </button>
+        </div>
+      {/if}
+    </div>
   {:else}
     <div class="sa__gallery">
       <div class="sa__upload">
@@ -522,6 +675,105 @@
     align-items: center;
     gap: 0.6rem;
     align-self: end;
+  }
+  /* OPEN FOR WORK is meaningless while commissions are hidden — dimmed rather
+     than removed, so the setting does not appear to have been lost. */
+  .sa__check--muted {
+    opacity: 0.45;
+  }
+
+  /* ---- SCENES tab ---- */
+  .sa__scenes {
+    display: grid;
+    gap: clamp(1rem, 2.5vh, 1.6rem);
+  }
+  .sa__slot {
+    display: grid;
+    gap: 0.6rem;
+    padding: clamp(0.9rem, 2vw, 1.2rem);
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+  }
+  .sa__slotHead {
+    display: grid;
+    gap: 0.2rem;
+  }
+  .sa__slotSection {
+    font-size: 0.58rem;
+    color: var(--accent);
+  }
+  .sa__slotLabel {
+    font-weight: 500;
+  }
+  .sa__slotHint {
+    font-size: 0.82rem;
+    color: var(--fg-faint);
+  }
+  .sa__modes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .sa__mode {
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--fg-dim);
+    font: inherit;
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    padding: 0.55em 1em;
+    cursor: pointer;
+    transition: color 0.25s var(--ease), border-color 0.25s var(--ease),
+      background 0.25s var(--ease);
+  }
+  .sa__mode:hover {
+    color: var(--fg);
+    border-color: var(--fg-dim);
+  }
+  .sa__mode.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .sa__mode--reset {
+    margin-left: auto;
+  }
+  .sa__pickHint {
+    font-size: 0.58rem;
+    color: var(--fg-faint);
+  }
+  /* A scroller, not a wrap: with twenty pieces a wrapping grid would push the
+     next slot off the screen and make the tab impossible to scan. */
+  .sa__picker {
+    display: flex;
+    gap: 0.4rem;
+    overflow-x: auto;
+    padding-bottom: 0.3rem;
+    scrollbar-width: thin;
+  }
+  .sa__pick {
+    flex: 0 0 auto;
+    padding: 0;
+    background: none;
+    border: 1px solid var(--line-strong);
+    cursor: pointer;
+    line-height: 0;
+    transition: border-color 0.2s var(--ease), opacity 0.2s var(--ease);
+    opacity: 0.65;
+  }
+  .sa__pick:hover {
+    opacity: 1;
+  }
+  .sa__pick.is-on {
+    border-color: var(--accent);
+    border-width: 2px;
+    opacity: 1;
+  }
+  .sa__pick img {
+    width: 68px;
+    height: 68px;
+    object-fit: cover;
+    display: block;
   }
   .sa__btn,
   .sa__primary,

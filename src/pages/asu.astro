@@ -16,14 +16,19 @@
  * `[data-i18n]` nodes — the mechanism carried over from the retired asu-art
  * one-pager. Nothing here is hardcoded prose.
  *
- * Gallery interaction is vanilla (gallery.ts / lightbox.ts) — no island needed.
+ * The gallery is a masonry grid of every published piece; clicking one opens
+ * the vanilla lightbox (lightbox.ts) — no island needed. Where the author's own
+ * artwork appears OUTSIDE that grid is decided per section by the scene slots
+ * (src/data/sceneSlots.ts, resolved through src/lib/scenes.ts).
  */
 import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
+import ActScene from '../components/ActScene.astro';
 import { supabaseServer } from '../lib/supabaseServer';
 import { artUrl, toArtworkRec } from '../lib/storagePaths';
 import { stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
+import { resolveScenes } from '../lib/scenes';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
 import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
 
@@ -47,20 +52,6 @@ try {
   // Render the shell regardless — see the note above.
 }
 
-// Dev scaffolding. With an empty gallery this page collapses to its empty state,
-// so `npm run dev` stands in the repo's own showcase art to make the layout
-// visible. Real rows always win, and the guard is statically false in a
-// production build — the dynamic import keeps the module and its images out of
-// the bundle entirely. The DEV test sits directly in the `if` so the branch
-// folds away rather than relying on a const propagating into it.
-// See src/data/galleryPlaceholders.ts.
-let placeholders: typeof import('../data/galleryPlaceholders') | null = null;
-if (import.meta.env.DEV && works.length === 0) {
-  placeholders = await import('../data/galleryPlaceholders');
-  works = await placeholders.placeholderWorks();
-}
-const usingPlaceholders = placeholders !== null;
-
 // Never throws and never returns empty: falls back to the shipped defaults in
 // src/data/copyKeys.ts, so the page reads in full even with no database.
 const copy = await loadCopy();
@@ -70,24 +61,35 @@ const t = copy[DEFAULT_LANG];
 // links, commission status). Every WORD on this page comes from `copy` below —
 // one place per thing, so there is never a second field editing the same text.
 const name = profile?.display_name?.trim() || 'Asu Azure';
-const links = placeholders ? placeholders.PLACEHOLDER_LINKS : profile?.links ?? {};
-const commissionsOpen = placeholders
-  ? placeholders.PLACEHOLDER_COMMISSIONS_OPEN
-  : profile?.commissions_open ?? false;
-const portrait = profile?.portrait_path
-  ? artUrl(profile.portrait_path)
-  : placeholders
-    ? await placeholders.placeholderPortrait()
-    : null;
+const links = profile?.links ?? {};
+const commissionsOpen = profile?.commissions_open ?? false;
+// Separate from open/closed: that picks WHICH line, this picks whether to
+// mention commissions at all. Defaults on, so an old row reads as it did.
+const commissionsShow = profile?.commissions_show ?? true;
+const portrait = profile?.portrait_path ? artUrl(profile.portrait_path) : null;
 
-// The featured piece leads the gallery as a big editorial row; the rest ride the
-// drag strip. Falls back to the first work so the layout never loses its anchor.
+// The featured piece leads the gallery at full width; the rest follow it into
+// the masonry. Falls back to the first work so the grid never loses its anchor.
 const featured = works.find((w) => w.featured) ?? works[0] ?? null;
 const rest = featured ? works.filter((w) => w.id !== featured.id) : works;
 const mediums = [...new Set(works.map((w) => w.medium).filter(Boolean))].sort();
 
+// The order a visitor actually sees, which is NOT sort order — the featured
+// piece is pulled to the front. The lightbox indexes against this, so its
+// counter agrees with the number printed on the tile that opened it.
+const displayOrder = featured ? [featured, ...rest] : works;
+const lbIndex = new Map(displayOrder.map((w, i) => [w.id, i]));
+
+// Where the author's own artwork appears outside the gallery. Never throws and
+// always answers for every registered slot — see lib/scenes.ts.
+const scenes = resolveScenes(profile?.scenes, works);
+// The two cream spreads carry their art in the flow beside the words rather
+// than pinned over a photo — a paper spread has no scrim to lift it off.
+const bioPlate = scenes['bio.plate'].mode === 'plate' ? scenes['bio.plate'].recs : [];
+const craftPlate = scenes['craft.plate'].mode === 'plate' ? scenes['craft.plate'].recs : [];
+
 /** Lightbox manifest — full-size URLs serialized for the vanilla viewer. */
-const lightboxItems = works.map((w) => ({
+const lightboxItems = displayOrder.map((w) => ({
   src: w.fullUrl,
   alt: w.alt || w.title || 'Artwork by Asu Azure',
   medium: w.medium || '',
@@ -114,10 +116,10 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
   bg(scnField), bg(scnPath), bg(scnSea), bg(scnSky), bg(scnHill), bg(scnStreet), bg(scnDusk),
 ]);
 
-// The selection act's collage fragments are the author's OWN artwork rather than
-// two hardcoded files — whatever is in the gallery. With an empty gallery the
-// act still stands up on its backdrop, grid and drawn wires.
-const frags = works.slice(0, 2);
+// Every act's imagery now comes through its scene slot (see <ActScene>), so the
+// author decides per section whether it keeps its photograph, wears a plate of
+// their own work, or hands the whole backdrop over to a drawing. With an empty
+// gallery each slot degrades to its photograph and the acts still stand up.
 ---
 
 <Base
@@ -148,12 +150,14 @@ const frags = works.slice(0, 2);
 
       <p class="mono asu__kicker" id="asu-kicker" data-i18n="hero.sub">{t['hero.sub']}</p>
       <h1 class="mega asu__name" id="asu-name">{name}</h1>
-      <p
-        class="serif asu__tagline"
-        data-i18n={commissionsOpen ? 'hero.status' : 'hero.statusClosed'}
-      >
-        {commissionsOpen ? t['hero.status'] : t['hero.statusClosed']}
-      </p>
+      {commissionsShow && (
+        <p
+          class="serif asu__tagline"
+          data-i18n={commissionsOpen ? 'hero.status' : 'hero.statusClosed'}
+        >
+          {commissionsOpen ? t['hero.status'] : t['hero.statusClosed']}
+        </p>
+      )}
       {/* The artist's own chibi doodle — the same signature that closes every
           book's synopsis. Animated WebP cannot be paused with CSS, so reduced
           motion gets the still frame via <picture>. */}
@@ -175,12 +179,7 @@ const frags = works.slice(0, 2);
       aria-label="Cinematic intro"
       data-draw-scope
     >
-      <div class="act__bg" aria-hidden="true">
-        <img src={bgPath} alt="" loading="lazy" decoding="async" />
-        <img src={bgField} alt="" loading="lazy" decoding="async" />
-        <img src={bgSea} alt="" loading="lazy" decoding="async" />
-        <img src={bgSky} alt="" loading="lazy" decoding="async" />
-      </div>
+      <ActScene scene={scenes['act.film']} photos={[bgPath, bgField, bgSea, bgSky]} />
       <div class="act__scrim" aria-hidden="true"></div>
       <div class="channel-scan" aria-hidden="true"></div>
       <div class="act__grid" aria-hidden="true"></div>
@@ -249,12 +248,23 @@ const frags = works.slice(0, 2);
           </h2>
         </div>
 
-        <div class="asu__bioBody">
-          {portrait && (
+        {/* The side column holds the portrait if there is one, otherwise the
+            artwork chosen for the `bio.plate` slot. With neither, the body
+            collapses to one column — without that modifier the prose would be
+            placed in the 300px portrait track and read as a narrow ribbon. */}
+        <div class:list={['asu__bioBody', !portrait && bioPlate.length === 0 && 'asu__bioBody--solo']}>
+          {portrait ? (
             <figure class="asu__portrait">
               <img src={portrait} alt={`${name} — portrait`} loading="lazy" decoding="async" />
               <figcaption class="mono">{name.toUpperCase()}</figcaption>
             </figure>
+          ) : (
+            bioPlate.map((w) => (
+              <figure class="plate plate--flow">
+                <img src={w.medUrl} alt={w.alt || w.title} loading="lazy" decoding="async" />
+                <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
+              </figure>
+            ))
           )}
           {/* Rich copy renders into a DIV, never a P: the editor emits its own
               <p> blocks and nesting them would break the markup. */}
@@ -274,9 +284,7 @@ const frags = works.slice(0, 2);
       aria-label="Words scatter"
       data-draw-scope
     >
-      <div class="act__bg" aria-hidden="true">
-        <img src={bgHill} alt="" loading="lazy" decoding="async" />
-      </div>
+      <ActScene scene={scenes['act.scatter']} photos={[bgHill]} />
       <div class="act__scrim" aria-hidden="true"></div>
       <div class="act__grid act__grid--blue" aria-hidden="true"></div>
 
@@ -307,9 +315,6 @@ const frags = works.slice(0, 2);
           <span class="reveal-mask"><span data-line data-i18n="works.title">{t['works.title']}</span></span>
         </h2>
         <span class="mono asu__count">{pad2(works.length)} PCS</span>
-        {usingPlaceholders && (
-          <span class="mono asu__phTag">PLACEHOLDER · DEV ONLY</span>
-        )}
       </header>
 
       {works.length === 0 ? (
@@ -318,28 +323,6 @@ const frags = works.slice(0, 2);
         </p>
       ) : (
         <>
-          {featured && (
-            <div class="asu__feature" data-lb-open={0}>
-              <figure class="asu__frame tile" data-cursor="VIEW">
-                <img
-                  src={featured.fullUrl}
-                  srcset={`${featured.medUrl} 900w, ${featured.fullUrl} 1600w`}
-                  sizes="(max-width: 760px) 100vw, 55vw"
-                  alt={featured.alt || featured.title}
-                  width={featured.width}
-                  height={featured.height}
-                  loading="eager"
-                  decoding="async"
-                />
-              </figure>
-              <div class="asu__featureMeta">
-                <span class="serif asu__idx">01</span>
-                <span class="mono asu__medium">{featured.medium || 'ARTWORK'}</span>
-                <h3 class="serif asu__title">{featured.title || 'Untitled'}</h3>
-              </div>
-            </div>
-          )}
-
           {mediums.length > 1 && (
             <div class="asu__filters mono" role="group" aria-label="Filter by medium">
               <button type="button" class="asu__chip is-on" data-filter="all" aria-pressed="true" data-i18n="works.filterAll">{t['works.filterAll']}</button>
@@ -349,36 +332,61 @@ const frags = works.slice(0, 2);
             </div>
           )}
 
-          {rest.length > 0 && (
-            <div class="gallery asu__strip">
-              <div class="gallery__track" data-gallery data-cursor="DRAG">
-                {rest.map((w, i) => (
-                  <button
-                    type="button"
-                    class="tile asu__tile"
-                    data-medium={w.medium}
-                    data-lb-open={works.findIndex((x) => x.id === w.id)}
-                    aria-label={`${w.title || 'Untitled'} — open larger`}
-                  >
-                    <img
-                      src={w.medUrl}
-                      srcset={`${w.thumbUrl} 320w, ${w.medUrl} 900w`}
-                      sizes="(max-width: 640px) 64vw, 22vw"
-                      alt={w.alt || w.title}
-                      width={w.width}
-                      height={w.height}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <span class="tile__num mono">{pad2(i + 2)}</span>
-                    {w.medium && <span class="tile__tag mono">{w.medium}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Masonry, not a strip: nineteen pieces in one horizontal drag row
+              meant hundreds of rem of travel to reach the last one, and this is
+              a portfolio — every piece should be visible at a glance. Column
+              layout also means nothing is cropped, which matters when the work
+              runs from 0.36 to 1.34 aspect. */}
+          <div class="asu__grid">
+            {featured && (
+              <button
+                type="button"
+                class="tile tile--natural asu__tile asu__tile--lead"
+                data-medium={featured.medium}
+                data-lb-open={lbIndex.get(featured.id)}
+                data-cursor="VIEW"
+                aria-label={`${featured.title || 'Untitled'} — open larger`}
+              >
+                <img
+                  src={featured.medUrl}
+                  srcset={`${featured.medUrl} 900w, ${featured.fullUrl} 1600w`}
+                  sizes="(max-width: 760px) 100vw, 60vw"
+                  alt={featured.alt || featured.title}
+                  width={featured.width}
+                  height={featured.height}
+                  loading="eager"
+                  decoding="async"
+                />
+                <span class="tile__num mono">01</span>
+                {featured.medium && <span class="tile__tag mono">{featured.medium}</span>}
+              </button>
+            )}
+            {rest.map((w, i) => (
+              <button
+                type="button"
+                class="tile tile--natural asu__tile"
+                data-medium={w.medium}
+                data-lb-open={lbIndex.get(w.id)}
+                data-cursor="VIEW"
+                aria-label={`${w.title || 'Untitled'} — open larger`}
+              >
+                <img
+                  src={w.medUrl}
+                  srcset={`${w.thumbUrl} 320w, ${w.medUrl} 900w`}
+                  sizes="(max-width: 640px) 92vw, (max-width: 1100px) 44vw, 23vw"
+                  alt={w.alt || w.title}
+                  width={w.width}
+                  height={w.height}
+                  loading="lazy"
+                  decoding="async"
+                />
+                <span class="tile__num mono">{pad2(i + 2)}</span>
+                {w.medium && <span class="tile__tag mono">{w.medium}</span>}
+              </button>
+            ))}
+          </div>
           <p class="mono asu__hint">
-            <span data-strip-hint data-i18n="works.archiveTag">{t['works.archiveTag']}</span>
+            <span data-i18n="works.archiveTag">{t['works.archiveTag']}</span>
           </p>
         </>
       )}
@@ -392,9 +400,7 @@ const frags = works.slice(0, 2);
       aria-label="Character"
       data-draw-scope
     >
-      <div class="act__bg" aria-hidden="true">
-        <img src={bgStreet} alt="" loading="lazy" decoding="async" />
-      </div>
+      <ActScene scene={scenes['act.character']} photos={[bgStreet]} variant="char" />
       <div class="act__scrim" aria-hidden="true"></div>
       <div class="act__grid" aria-hidden="true"></div>
 
@@ -407,14 +413,6 @@ const frags = works.slice(0, 2);
         <line data-draw class="is-warm" x1="72" y1="55" x2="72" y2="62" />
         <line data-draw class="is-ink" x1="30" y1="50" x2="60" y2="48" />
       </svg>
-
-      {/* The subject is the author's own featured piece — art shipped a
-          placeholder SVG here because it had no database to ask. */}
-      {featured && (
-        <figure class="act-char__figure" aria-hidden="true">
-          <img class="act-char__png" src={featured.medUrl} alt="" loading="lazy" decoding="async" />
-        </figure>
-      )}
 
       <div class="act__inner act-char__inner">
         <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.charTitle">{t['act.charTitle']}</h2>
@@ -443,20 +441,35 @@ const frags = works.slice(0, 2);
             <li data-i18n="craft.item3">{t['craft.item3']}</li>
           </ul>
         </div>
-        <aside class="asu__comm" class:list={[commissionsOpen && 'is-open']}>
-          <span class="mono asu__commK">
-            <span aria-hidden="true">{commissionsOpen ? '●' : '○'}</span>
-            <span data-i18n={commissionsOpen ? 'comm.status' : 'comm.statusClosed'}>
-              {commissionsOpen ? t['comm.status'] : t['comm.statusClosed']}
-            </span>
-          </span>
-          <p class="serif" data-i18n="comm.note">{t['comm.note']}</p>
-          {commissionsOpen && links.email && (
-            <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
-              <span data-i18n="comm.cta">{t['comm.cta']}</span> <span aria-hidden="true">→</span>
-            </a>
+        {/* The side column carries the commission panel, the chosen artwork, or
+            both — the two settings are independent, so each does exactly what
+            its switch says. Hiding commissions takes the status, the note and
+            the mail button together: there is no half state where a visitor
+            reads the note but cannot tell whether you are open. */}
+        <div class="asu__craftSide">
+          {commissionsShow && (
+            <aside class="asu__comm" class:list={[commissionsOpen && 'is-open']}>
+              <span class="mono asu__commK">
+                <span aria-hidden="true">{commissionsOpen ? '●' : '○'}</span>
+                <span data-i18n={commissionsOpen ? 'comm.status' : 'comm.statusClosed'}>
+                  {commissionsOpen ? t['comm.status'] : t['comm.statusClosed']}
+                </span>
+              </span>
+              <p class="serif" data-i18n="comm.note">{t['comm.note']}</p>
+              {commissionsOpen && links.email && (
+                <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
+                  <span data-i18n="comm.cta">{t['comm.cta']}</span> <span aria-hidden="true">→</span>
+                </a>
+              )}
+            </aside>
           )}
-        </aside>
+          {craftPlate.map((w) => (
+            <figure class="plate plate--flow">
+              <img src={w.medUrl} alt={w.alt || w.title} loading="lazy" decoding="async" />
+              <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
+            </figure>
+          ))}
+        </div>
       </div>
     </section>
 
@@ -468,18 +481,10 @@ const frags = works.slice(0, 2);
       aria-label="Selection"
       data-draw-scope
     >
-      <div class="act__bg" aria-hidden="true">
-        <img src={bgSky} alt="" loading="lazy" decoding="async" />
-      </div>
+      <ActScene scene={scenes['act.select']} photos={[bgSky]} variant="frag" />
       <div class="act__scrim" aria-hidden="true"></div>
       <div class="act__grid act__grid--blue" aria-hidden="true"></div>
 
-      {frags.map((w, i) => (
-        <figure class={`frag frag--${i + 1}`} aria-hidden="true">
-          <img src={w.thumbUrl} alt="" loading="lazy" decoding="async" />
-          <span class="frag__tag mono">LAYER {i + 2}</span>
-        </figure>
-      ))}
       <span class="node" style="top:34%; left:24%" aria-hidden="true"></span>
       <span class="node" style="top:64%; left:78%" aria-hidden="true"></span>
 
@@ -519,9 +524,7 @@ const frags = works.slice(0, 2);
       aria-label="3D text"
       data-draw-scope
     >
-      <div class="act__bg act-3d__bg" aria-hidden="true">
-        <img src={bgDusk} alt="" loading="lazy" decoding="async" />
-      </div>
+      <ActScene scene={scenes['act.3d']} photos={[bgDusk]} bgClass="act-3d__bg" />
       <div class="act__scrim" aria-hidden="true"></div>
       <div class="act__grid act__grid--blue" aria-hidden="true"></div>
 
@@ -551,9 +554,7 @@ const frags = works.slice(0, 2);
       aria-label="Grid finale"
       data-draw-scope
     >
-      <div class="act__bg" aria-hidden="true">
-        <img src={bgPath} alt="" loading="lazy" decoding="async" />
-      </div>
+      <ActScene scene={scenes['act.grid']} photos={[bgPath]} />
       <div class="act__scrim" aria-hidden="true"></div>
 
       <div class="stage3d act-grid__stage" aria-hidden="true">
@@ -622,7 +623,6 @@ const frags = works.slice(0, 2);
 <script>
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
-  import { initGalleries } from '../scripts/gallery';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
   import { decode, assemble } from '../scripts/text';
   import { assemble as kineticAssemble } from '../scripts/kinetic';
@@ -731,9 +731,7 @@ const frags = works.slice(0, 2);
     }
   }
 
-  // --- gallery + lightbox ---------------------------------------------------
-  initGalleries({ prefersReduced: reduced, coarsePointer: coarse });
-
+  // --- gallery lightbox -----------------------------------------------------
   let items: LightboxItem[] = [];
   try {
     items = JSON.parse(document.getElementById('asu-lb-data')?.textContent ?? '[]');
@@ -742,7 +740,7 @@ const frags = works.slice(0, 2);
   }
   if (items.length) {
     const lb = initLightbox(items, { reduced });
-    // Delegated so the drag-cancel handler in gallery.ts can veto a click first.
+    // Delegated, so tiles added or filtered after mount need no rewiring.
     document.addEventListener('click', (e) => {
       const el = (e.target as Element | null)?.closest<HTMLElement>('[data-lb-open]');
       if (!el) return;
@@ -993,6 +991,11 @@ const frags = works.slice(0, 2);
     gap: clamp(1.5rem, 4vw, 3rem);
     align-items: start;
   }
+  /* Nothing in the side column — otherwise the prose would be placed in the
+     300px portrait track and read as a narrow ribbon. */
+  .asu__bioBody--solo {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .asu__portrait {
     margin: 0;
   }
@@ -1045,52 +1048,33 @@ const frags = works.slice(0, 2);
     color: var(--fg-faint);
     margin-top: 0.5rem;
   }
-  /* Dev only — never rendered in a build. Amber so a screenshot of the dev
-     page can't be mistaken for a populated gallery. */
-  .asu__phTag {
-    justify-self: start;
-    margin-top: 0.4rem;
-    padding: 0.4em 0.8em;
-    font-size: 0.55rem;
-    color: #e8a31a;
-    border: 1px dashed #e8a31a;
-  }
-  .asu__feature {
+  /* Masonry by CSS columns rather than grid: the pieces have wildly different
+     aspect ratios and columns is the one layout that packs them without either
+     cropping or leaving holes. Reading order runs DOWN each column, which is
+     the usual bargain for masonry and fine for a gallery. */
+  .asu__grid {
     margin-top: clamp(2rem, 5vh, 3rem);
-    display: grid;
-    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-    gap: clamp(1.5rem, 4vw, 3rem);
-    align-items: center;
-    cursor: pointer;
+    columns: 4;
+    column-gap: clamp(0.6rem, 1.4vw, 1rem);
   }
-  .asu__frame {
-    margin: 0;
-    aspect-ratio: 4 / 5;
-    overflow: hidden;
-    border: 1px solid var(--line);
-  }
-  .asu__frame img {
+  .asu__grid > .tile {
+    break-inside: avoid;
+    margin-bottom: clamp(0.6rem, 1.4vw, 1rem);
     width: 100%;
-    height: 100%;
-    object-fit: cover;
   }
-  .asu__featureMeta {
-    display: grid;
-    gap: 0.5rem;
-    align-content: center;
+  /* The featured piece leads the section so it opens on one image rather than a
+     wall of thumbnails. Constrained by WIDTH, not height: capping the height
+     would mean cropping it, and not cropping is the whole point of the grid
+     below. Centred, because a lone left-aligned lead reads as a mistake. */
+  /* Selector matches `.asu__grid > .tile` above, which also sets a width. */
+  .asu__grid > .asu__tile--lead {
+    column-span: all;
+    width: min(100%, 60ch);
+    margin: 0 auto clamp(1.2rem, 3vw, 2rem);
   }
-  .asu__idx {
-    font-size: clamp(3rem, 9vw, 6.5rem);
-    line-height: 0.9;
-    color: var(--accent);
-  }
-  .asu__medium {
-    color: var(--fg-faint);
-  }
-  .asu__title {
-    font-size: clamp(1.3rem, 3vw, 2.1rem);
-    font-weight: 440;
-  }
+  @media (max-width: 1100px) { .asu__grid { columns: 3; } }
+  @media (max-width: 760px)  { .asu__grid { columns: 2; } }
+  @media (max-width: 460px)  { .asu__grid { columns: 1; } }
   .asu__filters {
     margin-top: clamp(2rem, 5vh, 3rem);
     display: flex;
@@ -1118,9 +1102,6 @@ const frags = works.slice(0, 2);
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
-  }
-  .asu__strip {
-    margin-top: clamp(1.5rem, 4vh, 2.4rem);
   }
   .asu__tile {
     background: none;
@@ -1171,6 +1152,11 @@ const frags = works.slice(0, 2);
   .asu__craftList li {
     padding-bottom: 0.7rem;
     border-bottom: 1px solid var(--line);
+  }
+  .asu__craftSide {
+    display: grid;
+    gap: clamp(1rem, 2.5vw, 1.6rem);
+    align-content: start;
   }
   .asu__comm {
     padding: 1.4rem 1.5rem;

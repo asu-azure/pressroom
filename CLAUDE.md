@@ -71,12 +71,15 @@ text. See `src/lib/richtext.ts` and its tests.
 1. Run `supabase/schema.sql` then `supabase/storage.sql` in the SQL editor — replace
    `AUTHOR_UID` with the author user's `auth.users.id` first.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
-   `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`.
+   `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
+   `scenes.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
    the `site_copy` overrides table — the page still renders without it (defaults ship in code),
-   but nothing can be edited.
+   but nothing can be edited. `scenes.sql` adds two columns to `artist_profile`: `scenes`
+   (per-section artwork placement) and `commissions_show`. Both default safely, so the page
+   renders without it — but the SCENES tab and the commission visibility switch cannot save.
 3. Create the author user (email+password) in Auth, then **disable public signups**.
 4. Put the project URL + anon key in `.env`.
 
@@ -98,8 +101,9 @@ text. See `src/lib/richtext.ts` and its tests.
 
 - Everything on `/asu` is editable at `/studio/artist`, split so there is **one place per thing**:
   - **PROFILE** — only what is the same in every language: display name, portrait, links,
-    commissions flag.
+    commissions flags.
   - **COPY** — every word on the page, in 日本語 / ENGLISH / ไทย. See the section below.
+  - **SCENES** — where artwork appears outside the gallery. See the section below.
   - **GALLERY** — artwork upload, drag-reorder, retitle, feature, publish, delete.
 - `artist_profile.bio` and `artist_profile.craft` are **no longer read or written.** Those words
   moved to `site_copy` (`story.p1`, `story.p2`, `craft.item1–3`) so they exist in all three
@@ -110,12 +114,44 @@ text. See `src/lib/richtext.ts` and its tests.
   already use ~71 MB; at ~370 KB per artwork there is room for well over a thousand pieces.
 - Unlike work deletion, **deleting an artwork also deletes its three storage objects.** A gallery
   churns far more than a published book, and the paths are known without listing the bucket.
-- `featured` is exclusive — the page leads with one big editorial piece and the toggle unsets the
-  others.
+- **The gallery is a masonry grid** (CSS columns), not the drag strip it started as: nineteen
+  pieces in one horizontal track meant hundreds of rem of dragging, and an illustrator's work runs
+  0.36 to 1.34 aspect, so nothing is cropped. `.tile--natural` is the modifier that undoes the
+  base `.tile`'s 4/5 crop — don't change `.tile` itself, the library cards borrow from it.
+  Featured leads at `column-span: all`, constrained by width so it too stays uncropped.
+- **`displayOrder`, not sort order, drives the lightbox.** Featured is pulled to the front of the
+  grid, so indexing the manifest by `sort_key` would make the counter disagree with the number
+  printed on the tile that opened it.
+- `featured` is exclusive — the page leads with that piece and the toggle unsets the others.
+- Two separate commission switches: `commissions_open` picks WHICH line shows,
+  `commissions_show` picks whether commissions are mentioned at all. Hiding takes the hero line
+  and the whole craft-section panel together.
 - Gallery order uses fractional index keys like pages: a drag is one row UPDATE.
 - Seeding from the old site: `node scripts/seed-artist.mjs` (`--dry` needs no credentials and just
   proves the pipeline). The bio it writes is an **AI-written draft carried over from asu-art** —
   rewrite it in your own voice.
+
+## Artwork outside the gallery — the scene slots
+
+Same registry-in-code, overrides-in-the-database shape as page copy, for the same reasons.
+
+- **`src/data/sceneSlots.ts`** defines each slot: key, the section a visitor sees, label, hint,
+  which of the four modes it offers, how many pieces it places, and its fallback.
+- **Three treatments.** `photo` keeps the scenery photograph; `plate` keeps the photograph and
+  pins the drawing on it, framed and rotated; `backdrop` hands the whole background over. A
+  drawing behind the acts' scrim at `cover` goes muddy and loses its subject, so `.act__bg--art`
+  is `contain`, nudged off centre and dimmed — a plate laid on the spread, never wallpaper.
+- **`src/lib/scenes.ts`** — `resolveScenes()` is pure and answers for every registered slot no
+  matter what is in the column: junk, an unoffered mode, or an artwork id deleted since all fall
+  through to the fallback, and an art mode with an empty gallery degrades to the photograph. Two
+  fallbacks reproduce the page's original composition on purpose — the character act leads with
+  the featured piece, the selection act collages the first two. Tested in `scenes.test.ts`.
+- **`src/components/ActScene.astro`** renders one act's backdrop plus its plates. Two acts were
+  designed around a specific composition and keep it via `variant`: `frag` (the selection act's
+  two rotated fragments) and `char` (the character act's double exposure).
+- The two cream spreads use `.plate--flow` instead: a paper spread has no scrim to lift art off,
+  so their plate sits in the flow beside the words rather than pinned over them.
+- **Adding a slot = one entry in `sceneSlots.ts` + one `scenes['key']` read.** No migration.
 
 ## Page copy — `site_copy` + the code-side registry
 
@@ -173,9 +209,14 @@ sharing the selector. **Never split Thai per-character** — `kinetic.ts` guards
 **act-scatter** → gallery → **act-character** → craft → **act-select** → **act-3d** →
 **act-grid** → contact.
 
-- **All the CSS was already here.** `global.css` shipped the entire Editorial FUI system —
-  `.act*`, `.pillarbox`, `.sidecol`, `.fui`, `.selbox`, `.wiregrid`, `.draw-svg` — unused. Reuse it;
-  do not add parallel styles.
+- **Most of the CSS was already here.** `global.css` shipped the Editorial FUI system —
+  `.act__*`, `.pillarbox`, `.sidecol`, `.fui`, `.selbox`, `.wiregrid`, `.draw-svg` — unused. Reuse
+  it; do not add parallel styles.
+- **But the per-act inner layout was NOT** — `.act-film__*`, `.act-scatter__*`, `.act-char__*`,
+  `.act-select__*`, `.act-3d__*`, `.act-grid__*` and `.frag*` were left behind when the markup came
+  across, so every act's text block was unstyled and the character subject and collage fragments
+  rendered as raw images. Ported verbatim from `art/src/pages/index.astro` (~lines 778-828). If
+  anything else from the art site looks wrong here, check that repo before writing new rules.
 - Modules in `src/scripts/`: `cinema`, `channel`, `scatter`, `grid3d`, `perspective`, `select`,
   `ambient`, `draw`, `displacement`, `kinetic`. Each owns its own reduced-motion / coarse-pointer
   fallback, so the page calls them unconditionally.
@@ -186,8 +227,9 @@ sharing the selector. **Never split Thai per-character** — `kinetic.ts` guards
   needs `DrawSVGPlugin`, which ships in the public `gsap` package since 3.13.
 - Act backdrops are scenery photos in `src/assets/scenery/`, encoded through `getImage()` at
   quality 60 — they sit behind a scrim and must never be full-quality.
-- The character act's subject and the selection act's collage fragments are the author's **own
-  artworks** from the gallery, not fixed files. With an empty gallery the acts still stand up.
+- Every act's imagery is the author's **own artwork** where they want it, not fixed files — the
+  scene slots above decide, per act, between the photograph, a pinned plate and a full backdrop.
+  With an empty gallery each slot degrades to its photograph and the acts still stand up.
 
 ## The artist signature stamp
 

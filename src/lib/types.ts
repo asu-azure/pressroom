@@ -1,3 +1,5 @@
+import type { ScenesRecord } from '../data/sceneSlots';
+
 export type WorkStatus = 'ongoing' | 'complete' | 'oneshot';
 export type Direction = 'rtl' | 'ltr';
 export type Layout = 'single' | 'double';
@@ -157,6 +159,17 @@ export interface ArtistProfile {
   craft: string[];
   links: ArtistLinks;
   commissions_open: boolean;
+  /**
+   * Whether to mention commissions at all — separate from open/closed, which
+   * only picks WHICH line to show. Optional because rows predate the column
+   * (supabase/scenes.sql); readers default it to true.
+   */
+  commissions_show?: boolean;
+  /**
+   * Per-section artwork placement overrides, keyed by scene slot. Registry and
+   * shape live in src/data/sceneSlots.ts; resolved by src/lib/scenes.ts.
+   */
+  scenes?: ScenesRecord;
   updated_at: string;
 }
 

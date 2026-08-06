@@ -115,15 +115,11 @@ export const COPY_FIELDS: CopyField[] = [
     hint: 'Shown when that switch is off.',
     defaults: { en: 'COMMISSIONS · CLOSED', th: 'รับงานคอมมิชชั่น · ปิดชั่วคราว', ja: 'コミッション受付停止中' },
   },
-  {
-    key: 'hero.title1', section: 'hero', label: 'Headline — first line', type: 'line',
-    hint: 'The huge display type. Keep it short; it is set very large.',
-    defaults: { en: 'Illustration', th: 'ภาพประกอบ', ja: 'イラストと' },
-  },
-  {
-    key: 'hero.title2', section: 'hero', label: 'Headline — second line', type: 'line',
-    defaults: { en: '& stories.', th: 'และเรื่องราว', ja: '物語。' },
-  },
+  // `hero.title1` / `hero.title2` used to live here — a two-line display
+  // headline carried over from the asu-art one-pager. The artist's own name
+  // took that slot when the site was merged in, so no `data-i18n` ever rendered
+  // them and the fields edited nothing. Removed rather than re-rendered; any
+  // override already saved is ignored by loadCopy (see siteCopy.ts).
   {
     key: 'hero.sub', section: 'hero', label: 'Subtitle', type: 'line',
     hint: 'Uppercase mono, separated by · dots.',
@@ -158,9 +154,11 @@ export const COPY_FIELDS: CopyField[] = [
     defaults: { en: 'SHOWCASE — TAP TO VIEW', th: 'แกลเลอรี — แตะเพื่อชมภาพเต็ม', ja: 'ギャラリー — タップで拡大' },
   },
   {
-    key: 'works.archiveTag', section: 'works', label: 'Archive strip label', type: 'line',
-    hint: 'Above the drag-to-scroll row of every piece.',
-    defaults: { en: 'ARCHIVE — DRAG TO EXPLORE', th: 'คลังผลงาน — ลากเพื่อชม', ja: 'アーカイブ — ドラッグで見る' },
+    // Wording corrected when the drag strip became a grid — "drag to explore"
+    // described an interaction that no longer exists.
+    key: 'works.archiveTag', section: 'works', label: 'Archive label', type: 'line',
+    hint: 'The small line under the grid of every piece.',
+    defaults: { en: 'ARCHIVE — TAP ANY PIECE', th: 'คลังผลงาน — แตะเพื่อชม', ja: 'アーカイブ — タップで拡大' },
   },
   {
     key: 'works.filterAll', section: 'works', label: 'Filter chip — "all"', type: 'line',

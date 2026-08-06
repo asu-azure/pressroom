@@ -490,6 +490,128 @@ html[lang='th'] .act__head[data-i18n-html] {
   letter-spacing: -0.02em;
 }
 
+/* ---- Per-act inner layout ----------------------------------------------
+   Carried over from the sibling art site (art/src/pages/index.astro). The
+   six acts' markup came across when /asu was merged in; these rules did not,
+   so every act's text block, the character act's subject and the selection
+   act's collage fragments were rendering unstyled. Same values, so the acts
+   read exactly as they were designed to. */
+.act-film__inner { position: relative; text-align: center; }
+.act-film__kicker { color: rgba(246, 243, 236, 0.75); margin-bottom: 1rem; }
+.act-film__sub {
+  color: rgba(246, 243, 236, 0.82);
+  font-size: clamp(1.05rem, 2.4vw, 1.6rem);
+  max-width: 40ch;
+  margin: 1.2rem auto 0;
+}
+.act-film__vtext {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(246, 243, 236, 0.85);
+  font-size: clamp(1rem, 2vw, 1.6rem);
+  letter-spacing: 0.3em;
+}
+.act-film__vtext--l { left: clamp(-1rem, -2vw, -2rem); }
+.act-film__vtext--r { right: clamp(-1rem, -2vw, -2rem); }
+
+.act-scatter__inner { text-align: center; }
+.act-scatter__sub { color: rgba(246, 243, 236, 0.78); margin-top: 1rem; }
+
+.act-char__inner { max-width: 50ch; }
+.act-char__cap { color: rgba(246, 243, 236, 0.7); margin-top: 1rem; }
+.act-char__figure {
+  position: absolute;
+  inset: 0 clamp(2%, 6vw, 9%) 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  z-index: 3;
+  margin: 0;
+  pointer-events: none;
+}
+.act-char__png {
+  height: 84%;
+  width: auto;
+  max-width: 46vw;
+  opacity: 0.72;
+  mix-blend-mode: screen;
+  filter: drop-shadow(0 14px 50px rgba(0, 0, 0, 0.5));
+}
+
+.act-select__inner { text-align: center; }
+.act-select__tool { color: rgba(246, 243, 236, 0.75); margin-bottom: 1.4rem; }
+.act-select__inner .act__head { display: inline-block; }
+
+.act-3d__inner { text-align: center; }
+.act-3d__kicker { color: rgba(246, 243, 236, 0.78); margin-bottom: 1.4rem; }
+.act-3d__head { font-size: clamp(2.6rem, 9vw, 7rem); }
+.act-3d__bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 45, 120, 0.18),
+    rgba(24, 196, 214, 0.18) 40%,
+    rgba(106, 160, 255, 0.18) 70%,
+    rgba(232, 163, 26, 0.16)
+  );
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.act-grid__stage { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.act-grid__inner { text-align: center; }
+.act-grid__head { font-size: clamp(2.6rem, 9vw, 7rem); }
+.act-grid__sub {
+  color: rgba(246, 243, 236, 0.82);
+  font-size: clamp(1.05rem, 2.4vw, 1.6rem);
+  max-width: 40ch;
+  margin: 1.2rem auto 0;
+}
+
+/* Collage fragments pinned over an act (selection act, and any slot set to
+   PLATE — see .plate below, which is the same recipe placed by the author). */
+.frag {
+  position: absolute;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.85);
+  z-index: 3;
+}
+.frag img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.frag__tag {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.32rem;
+  color: #f4f1ea;
+  mix-blend-mode: difference;
+}
+.frag--1 {
+  width: clamp(110px, 15vw, 230px);
+  aspect-ratio: 3 / 4;
+  left: 13%;
+  top: 20%;
+  transform: rotate(-3deg);
+}
+.frag--2 {
+  width: clamp(100px, 13vw, 200px);
+  aspect-ratio: 4 / 5;
+  right: 11%;
+  bottom: 16%;
+  transform: rotate(4deg);
+}
+
+@media (max-width: 760px) {
+  .act-film__vtext { display: none; }
+  .act-char__png { opacity: 0.5; max-width: 70vw; }
+  .act-char__figure { justify-content: center; inset: 0; }
+  .frag { display: none; }
+}
+
 /* ---- Cinematic letterbox bars (height scrubbed by JS via --bar-h) ---- */
 .letterbox__bar {
   position: absolute;
@@ -1018,26 +1140,9 @@ html[lang='th'] .act__head[data-i18n-html] {
   background: var(--accent);
   border-color: var(--accent);
 }
-.gallery {
-  position: relative;
-  overflow: hidden;
-  cursor: grab;
-}
-.gallery:active { cursor: grabbing; }
-.gallery__track {
-  display: flex;
-  gap: clamp(0.8rem, 2vw, 1.6rem);
-  width: max-content;
-  touch-action: pan-y;   /* horizontal is ours; keep vertical page scroll native */
-  will-change: transform;
-  user-select: none;     /* a drag is a scroll, not a selection */
-}
-.gallery__track .tile { width: clamp(15rem, 26vw, 24rem); flex: 0 0 auto; }
-/* mid-drag: don't let tile hover-zoom fight the track's motion */
-.gallery__track.is-dragging .tile img { transition: none; }
-/* native fallback (coarse pointer / reduced motion): a real scroller, thin scrollbar */
-.gallery--native { overflow-x: auto; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
-.gallery--native .gallery__track { touch-action: auto; }
+/* The drag-scroll gallery (.gallery/.gallery__track, scripts/gallery.ts) is
+   gone: /asu's gallery is a masonry grid now. Nineteen pieces in one horizontal
+   strip meant ~400rem of dragging to reach the last one. */
 .tile {
   position: relative;
   display: block;
@@ -1099,6 +1204,66 @@ html[lang='th'] .act__head[data-i18n-html] {
   color: #f4f1ea;
   mix-blend-mode: difference;
   font-size: 0.58rem;
+}
+/* Natural-height variant for the masonry gallery: the base .tile crops every
+   piece to 4/5, which is right for a strip of even cards and wrong for an
+   illustrator's portfolio — these run 0.36 to 1.34 aspect. Everything else
+   about a tile (border, hover zoom, cobalt frame sweep, tags) is inherited. */
+.tile--natural { aspect-ratio: auto; }
+.tile--natural img { position: static; width: 100%; height: auto; }
+
+/* ---- Artwork placed outside the gallery (see data/sceneSlots.ts) --------
+   PLATE: the .frag recipe, but positioned by the slot rather than by the act,
+   so any section can carry one piece without it reading as wallpaper. */
+.plate {
+  position: absolute;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.85);
+  z-index: 3;
+  width: clamp(120px, 17vw, 260px);
+  pointer-events: none;
+}
+.plate img { display: block; width: 100%; height: auto; }
+.plate__tag {
+  position: absolute;
+  left: 0.4rem;
+  bottom: 0.32rem;
+  color: #f4f1ea;
+  mix-blend-mode: difference;
+  font-size: 0.58rem;
+}
+/* Two placements, so a plate never lands on the act's own title. */
+.plate--r { right: clamp(3%, 7vw, 10%); top: 22%; transform: rotate(2.5deg); }
+.plate--l { left: clamp(3%, 7vw, 10%); bottom: 18%; transform: rotate(-2.5deg); }
+
+/* Plates on the cream spreads sit IN the flow beside the words, not over them:
+   a paper spread has no scrim to lift art off, and an absolute plate would
+   collide with the prose. */
+.plate--flow {
+  position: relative;
+  width: 100%;
+  transform: none;
+  box-shadow: 0 18px 40px -26px rgba(0, 0, 0, 0.55);
+}
+.plate--flow .plate__tag { color: var(--fg); mix-blend-mode: normal; }
+
+/* BACKDROP: the author's drawing instead of the scenery photograph. Photos are
+   full-bleed `cover` under a scrim; a drawing treated that way goes muddy and
+   loses its subject, so it is contained, nudged off centre and dimmed — a plate
+   laid on the spread rather than wallpaper. */
+.act__bg--art img {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 72% 50%;
+  opacity: 0.5;
+}
+@media (max-width: 760px) {
+  .plate:not(.plate--flow) { display: none; }
+  .act__bg--art img { object-position: 50% 42%; opacity: 0.38; }
 }
 @media (max-width: 760px) { .gallery__track .tile { width: min(62vw, 17rem); } }
 

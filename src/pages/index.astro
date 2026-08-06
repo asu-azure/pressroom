@@ -346,46 +346,68 @@ const t = copy[DEFAULT_LANG];
   .lib-foot__links { display: flex; gap: 1.6rem; flex-wrap: wrap; }
   .lib-foot__studio { color: var(--fg-faint); }
 
-  /* --- Artist teaser (the one cream spread on the shelf) ------------------- */
+  /* --- Artist teaser (the one cream spread on the shelf) -------------------
+     A BAND, not a spread. It sits between the showcase strip and the actual
+     bookshelf, so every extra centimetre here is one the reader scrolls past
+     before reaching the books. The copy is untouched — it is laid out across
+     the width instead of stacked down it, which roughly halves the height. */
   .teaser {
     position: relative;
     z-index: 1;
-    padding: clamp(3.5rem, 10vh, 6rem) var(--pad);
+    padding: clamp(1.75rem, 4.5vh, 2.75rem) var(--pad);
     overflow: hidden;
   }
-  .teaser__wm { bottom: 4%; right: calc(var(--pad) * 0.6); }
-  .teaser__reg { top: 18%; right: 26%; }
-  .teaser__chips { bottom: clamp(1rem, 3vh, 2rem); left: var(--pad); }
+  .teaser__wm { bottom: 2%; right: calc(var(--pad) * 0.6); font-size: clamp(3rem, 9vw, 6rem); }
+  .teaser__reg { top: 14%; right: 30%; }
+  .teaser__chips { bottom: clamp(0.5rem, 1.5vh, 1rem); left: var(--pad); }
   .teaser__inner {
     position: relative;
     z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: clamp(1.5rem, 5vw, 4rem);
+    gap: clamp(1.25rem, 4vw, 3rem);
     max-width: 1240px;
   }
-  .teaser__copy { max-width: 62ch; }
-  .teaser__k { display: block; font-size: 0.62rem; letter-spacing: 0.18em; color: var(--accent); }
+  .teaser__copy {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem clamp(1.25rem, 3.5vw, 2.75rem);
+    max-width: none;
+    flex: 1;
+  }
+  .teaser__k {
+    display: block;
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    grid-column: 1;
+  }
   .teaser__title {
-    margin-top: 0.7rem;
-    font-size: clamp(1.6rem, 4.4vw, 3rem);
+    margin-top: 0.2rem;
+    font-size: clamp(1.5rem, 3vw, 2rem);
     font-weight: 440;
     line-height: 1.18;
+    grid-column: 1;
   }
   .teaser__title .reveal-mask { display: block; }
   .teaser__title .reveal-mask > [data-line] { display: block; transform: translateY(110%); }
   .teaser__lede {
-    margin-top: 1.2rem;
-    max-width: 58ch;
+    margin-top: 0;
+    max-width: 46ch;
     color: var(--fg-dim);
-    font-size: clamp(0.95rem, 1.5vw, 1.05rem);
-    line-height: 1.75;
+    font-size: clamp(0.88rem, 1.3vw, 0.98rem);
+    line-height: 1.65;
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
   .teaser__cta {
     display: inline-block;
-    margin-top: clamp(1.5rem, 4vh, 2.2rem);
-    padding: 0.9em 1.7em;
+    margin-top: 0.9rem;
+    grid-column: 2;
+    justify-self: start;
+    padding: 0.75em 1.4em;
     border: 1px solid var(--line-strong);
     border-radius: 999px;
     font-size: 0.62rem;
@@ -402,7 +424,7 @@ const t = copy[DEFAULT_LANG];
   .teaser__seal {
     flex-shrink: 0;
     display: block;
-    width: clamp(5rem, 12vw, 9rem);
+    width: clamp(3.5rem, 8vw, 6rem);
     rotate: -8deg;
     opacity: 0.9;
     user-select: none;
@@ -412,6 +434,13 @@ const t = copy[DEFAULT_LANG];
     display: block;
     width: 100%;
     height: auto;
+  }
+  /* Below the band's two-column width the copy stacks again — a 46ch lede
+     beside a heading needs room that a phone does not have. */
+  @media (max-width: 900px) {
+    .teaser__copy { grid-template-columns: minmax(0, 1fr); }
+    .teaser__lede { grid-column: 1; grid-row: auto; margin-top: 0.7rem; }
+    .teaser__cta { grid-column: 1; }
   }
   @media (max-width: 760px) {
     .teaser__seal { display: none; }

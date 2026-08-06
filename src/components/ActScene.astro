@@ -1,0 +1,69 @@
+---
+/**
+ * One act's imagery, resolved from its scene slot (src/data/sceneSlots.ts).
+ *
+ * Three treatments, chosen per section by the author in Studio → ARTIST → SCENES:
+ *  - photo     the shipped scenery photograph(s), i.e. the act as designed
+ *  - backdrop  their drawing instead, contained and dimmed (.act__bg--art) so it
+ *              reads as a plate laid on the spread rather than wallpaper
+ *  - plate     the photograph stays and their drawing is pinned on top, framed
+ *
+ * Only the backdrop layer and the plates live here. The scrim and grid overlays
+ * stay in the page because they vary per act (`.act__grid--blue`, `--scrim`).
+ */
+import type { ResolvedScene } from '../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  /** Scenery photo URLs. act-film cycles four; every other act passes one. */
+  photos: string[];
+  /**
+   * How this act carries a drawing when the mode is `plate`. Two acts were
+   * designed around a specific composition and keep it: `frag` is the selection
+   * act's two-piece collage (.frag--1 / .frag--2), `char` is the character
+   * act's big double exposure. `plate` is the generic pinned frame.
+   */
+  variant?: 'plate' | 'frag' | 'char';
+  /** Extra class on the backdrop layer — the 3D act tints its own (.act-3d__bg). */
+  bgClass?: string;
+}
+
+const { scene, photos, variant = 'plate', bgClass } = Astro.props;
+
+// A drawing takes over the backdrop only in `backdrop` mode; `plate` keeps the
+// photograph underneath so the act still has its scene.
+const artBackdrop = scene.mode === 'backdrop' ? scene.recs[0] : null;
+const plates = scene.mode === 'plate' ? scene.recs : [];
+---
+
+<div class:list={['act__bg', bgClass, artBackdrop && 'act__bg--art']} aria-hidden="true">
+  {artBackdrop ? (
+    <img src={artBackdrop.medUrl} alt="" loading="lazy" decoding="async" />
+  ) : (
+    photos.map((src) => <img src={src} alt="" loading="lazy" decoding="async" />)
+  )}
+</div>
+
+{plates.map((w, i) => {
+  if (variant === 'frag') {
+    return (
+      <figure class={`frag frag--${i + 1}`} aria-hidden="true">
+        <img src={w.thumbUrl} alt="" loading="lazy" decoding="async" />
+        <span class="frag__tag mono">LAYER {i + 2}</span>
+      </figure>
+    );
+  }
+  if (variant === 'char') {
+    return (
+      <figure class="act-char__figure" aria-hidden="true">
+        <img class="act-char__png" src={w.medUrl} alt="" loading="lazy" decoding="async" />
+      </figure>
+    );
+  }
+  return (
+    <figure class={`plate ${i % 2 === 0 ? 'plate--r' : 'plate--l'}`} aria-hidden="true">
+      <img src={w.medUrl} alt="" loading="lazy" decoding="async" />
+      <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
+    </figure>
+  );
+})}
