@@ -221,7 +221,7 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
 
     <!-- ============ 02 · BIO (paper — the tone flip) ============ -->
     <section class="spread spread--paper asu__bio">
-      <div class="paper-grid" aria-hidden="true"></div>
+      <div class="paper-grid paper-grid--margin" aria-hidden="true"></div>
       <span class="wm-line wm-line--latin asu__wm" aria-hidden="true">Artist</span>
       <span class="crop crop--tl" aria-hidden="true"></span>
       <span class="crop crop--br" aria-hidden="true"></span>
@@ -268,7 +268,7 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
           )}
           {/* Rich copy renders into a DIV, never a P: the editor emits its own
               <p> blocks and nesting them would break the markup. */}
-          <div class="asu__prose fore-rich">
+          <div class="asu__prose authored">
             <div data-i18n-html="story.p1" set:html={t['story.p1']} />
             <div data-i18n-html="story.p2" set:html={t['story.p2']} />
           </div>
@@ -1017,8 +1017,23 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
     line-height: 1.85;
     color: var(--fg-dim);
   }
-  .asu__prose :global(p) {
-    margin-bottom: 1em;
+  /* Each paragraph rules itself from its own top edge, so anything above it
+     cannot knock the text off the lines — the section's .paper-grid cannot do
+     this because its rules start at the section edge. `lh` is the paragraph's own
+     computed line box, so the pitch matches by construction (calc of font-size ×
+     line-height drifts, the used font-size being rounded). Gap is one line. */
+  /* Two shapes to cover: the shipped defaults are inline HTML inside the
+     [data-i18n-html] wrapper (no <p> at all), but once the author edits the copy
+     RichTextEditor emits real <p> blocks inside it. Rule the paragraphs when they
+     exist, otherwise the wrapper — :has() keeps the two from double-ruling. */
+  .asu__prose :global(p),
+  .asu__prose > :global(div:not(:has(p))) {
+    margin: 0 0 1lh;
+    background-image: repeating-linear-gradient(
+      180deg,
+      transparent 0 calc(1lh - 1px),
+      var(--rule-blue) calc(1lh - 1px) 1lh
+    );
   }
   .asu__prose :global(strong) {
     color: var(--fg);

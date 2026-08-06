@@ -64,14 +64,24 @@
   --ink-line: rgba(244, 241, 234, 0.10);
   --ink-line-strong: rgba(244, 241, 234, 0.22);
 
-  /* ---- Paper (cream) tone ---- */
-  --paper-bg: #e9e4d8;
-  --paper-bg-soft: #f1ece2;
-  --paper-fg: #16140f;
-  --paper-fg-dim: #5f5a4e;
-  --paper-fg-faint: #a8a08e;
-  --paper-line: rgba(22, 20, 15, 0.14);
-  --paper-line-strong: rgba(22, 20, 15, 0.30);
+  /* ---- Paper tone — Thai school-notebook stock ----
+     A faintly blue-white sheet ruled in blue, with the red margin rule down the
+     left. Replaces the retired cream proof-sheet; see .paper-grid below. */
+  --paper-bg: #e4e8ee;
+  --paper-bg-soft: #eff2f7;
+  --paper-fg: #121822;
+  --paper-fg-dim: #44526a;
+  --paper-fg-faint: #93a2b8;
+  --paper-line: rgba(38, 82, 158, 0.16);
+  --paper-line-strong: rgba(38, 82, 158, 0.34);
+
+  /* Notebook ruling — shared by .paper-grid and the paper decor marks. Red is
+     paper stock here (margin rule, registration mark), never a brand or
+     interactive colour: the accent is still cobalt, the warm one still amber. */
+  --rule-blue: rgba(63, 111, 191, 0.18);
+  --rule-red: rgba(199, 58, 66, 0.38);
+  --paper-ink-line: rgba(19, 34, 66, 0.45);
+  --rule-step: clamp(26px, 3.4vh, 34px);
 
   /* One cobalt accent — reads on both tones (kai-group / financial-create) */
   --ink: #2742f0;          /* kept name: this var IS "the accent" across the site */
@@ -105,6 +115,19 @@
      kanji from Noto. No language-conditional font switching anywhere. */
   --font-serif: 'Fraunces', 'Ekkamai Vibe', 'Noto Serif JP', Georgia, 'Times New Roman', serif;
   --font-serif-jp: 'Noto Serif JP', serif;
+  /* ---- Author-written Japanese ----
+     The Noto JP webfonts are per-glyph subsets of the kanji found in src/, but
+     author copy lives in Supabase and can contain any kanji — 56% of the synopsis
+     was missing from the subset and fell through to a generic `serif`, whose CJK
+     the browser resolves from <html lang>. That is exactly why the same Japanese
+     text rendered as clean mincho under 日本語 but mixed mincho with gothic under
+     EN and ไทย. These stacks name real Japanese system faces instead: one font per
+     paragraph, zero bytes downloaded, and no dependence on the lang attribute.
+     ⚠ Never list 'Noto Serif JP' / 'Noto Sans JP' here — those are the subsetted
+     webfonts and would reintroduce the same partial-coverage split. The system
+     Noto below is the CJK-suffixed family name, which cannot collide with them. */
+  --font-serif-authored: 'Fraunces', 'Ekkamai Vibe', 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'MS Mincho', Georgia, serif;
+  --font-display-authored: 'Space Grotesk', 'Prompt', 'Yu Gothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Meiryo', system-ui, sans-serif;
   --font-display: 'Space Grotesk', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Ekkamai Vibe', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;
@@ -243,6 +266,14 @@ a {
   font-family: var(--font-serif);
   font-weight: 400;
   font-optical-sizing: auto;
+}
+
+/* Text that came from the database — work titles, character names, the synopsis,
+   the bio. Put this on ANY element rendering author copy, alongside .serif if the
+   element has it (this wins, being later in the file at equal specificity).
+   See --font-serif-authored for why the webfont must not be used here. */
+.authored {
+  font-family: var(--font-serif-authored);
 }
 
 /* Animated gradient highlight that sweeps over a key phrase on first view
@@ -534,6 +565,12 @@ html[lang='th'] .act__head[data-i18n-html] {
   height: 84%;
   width: auto;
   max-width: 46vw;
+  /* height is definite and max-width clamps the derived width, so the box stops
+     matching the artwork's ratio as the window narrows — without object-fit the
+     default `fill` squashes the subject horizontally. `bottom` keeps them
+     standing on the baseline the flex-end figure already aligns to. */
+  object-fit: contain;
+  object-position: bottom;
   opacity: 0.72;
   mix-blend-mode: screen;
   filter: drop-shadow(0 14px 50px rgba(0, 0, 0, 0.5));
@@ -1352,19 +1389,38 @@ html.lb-open { overflow: hidden; }
    All decorative: z 0–1 under the section's z-2 content.
    ============================================================ */
 
-/* Faint cobalt blueprint grid tuned for cream paper */
+/* Notebook ruling: blue horizontal rules only. The vertical grid this started as
+   was one system too many next to the red margin rule — a school notebook is
+   lines for writing, not graph paper. */
 .paper-grid {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(rgba(39,66,240,0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(39,66,240,0.08) 1px, transparent 1px);
-  background-size: clamp(40px, 6vw, 80px) clamp(40px, 6vw, 80px);
+    repeating-linear-gradient(180deg, var(--rule-blue) 0 1px, transparent 1px var(--rule-step));
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
 }
+/* The red margin rule, as on a school exercise book. Offset from the section's
+   own --pad so it lands in the gutter left of the text at every width. The
+   parent's mask covers this pseudo too, so it fades top and bottom with the
+   rules instead of butting into the section edge. */
+.paper-grid::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--pad) * 0.55);
+  width: 1px;
+  background: var(--rule-red);
+}
+/* Written pages (bio, synopsis): their paragraphs carry their own ruling, pitched
+   to the text's line box so the words ride the lines. A second set of rules from
+   the sheet would run at a different pitch and beat against them, which is what
+   made long copy hard to read in the first place — so here the sheet contributes
+   the margin rule only. */
+.paper-grid--margin { background-image: none; }
 
 /* Giant outlined kanji watermark (scroll-parallaxed via [data-wm]).
    Each paper section carries a trilingual hollow cluster: the vertical kanji
@@ -1377,7 +1433,7 @@ html.lb-open { overflow: hidden; }
   z-index: 0;
   line-height: 1;
   color: transparent;
-  -webkit-text-stroke: 1.5px var(--wm-stroke, rgba(22, 20, 15, 0.15));
+  -webkit-text-stroke: 1.5px var(--wm-stroke, rgba(19, 34, 66, 0.15));
   transition: -webkit-text-stroke-color 0.8s var(--ease);
   /* glint: a faint light band travels through the hollow letterforms */
   background-image: linear-gradient(115deg, transparent 42%, rgba(39, 66, 240, 0.13) 50%, transparent 58%);
@@ -1429,7 +1485,7 @@ html.lb-open { overflow: hidden; }
   z-index: 1;
   pointer-events: none;
 }
-.crop::before, .crop::after { content: ''; position: absolute; background: rgba(22,20,15,0.5); }
+.crop::before, .crop::after { content: ''; position: absolute; background: rgba(19,34,66,0.45); }
 .crop::before { top: 0; left: 38%; right: 0; height: 1px; }
 .crop::after  { left: 0; top: 38%; bottom: 0; width: 1px; }
 .crop--tl { top: 1rem; left: 1rem; }
@@ -1437,17 +1493,18 @@ html.lb-open { overflow: hidden; }
 .crop--bl { bottom: 1rem; left: 1rem; transform: scaleY(-1); }
 .crop--br { bottom: 1rem; right: 1rem; transform: scale(-1); }
 
-/* Registration mark ⊕ */
+/* Registration mark ⊕ — red, as on a real press proof. This is the one place
+   the notebook's red reads as a mark rather than ruling. */
 .regmark {
   position: absolute;
   z-index: 1;
   width: clamp(14px, 1.6vw, 20px);
   aspect-ratio: 1;
-  border: 1px solid rgba(22,20,15,0.45);
+  border: 1px solid rgba(199,58,66,0.60);
   border-radius: 50%;
   pointer-events: none;
 }
-.regmark::before, .regmark::after { content: ''; position: absolute; background: rgba(22,20,15,0.45); }
+.regmark::before, .regmark::after { content: ''; position: absolute; background: rgba(199,58,66,0.60); }
 .regmark::before { left: -28%; right: -28%; top: 50%; height: 1px; }
 .regmark::after  { top: -28%; bottom: -28%; left: 50%; width: 1px; }
 
@@ -1460,7 +1517,7 @@ html.lb-open { overflow: hidden; }
   width: 14px;
   z-index: 1;
   pointer-events: none;
-  color: rgba(22,20,15,0.35);
+  color: rgba(19,34,66,0.32);
   background-image:
     repeating-linear-gradient(180deg, currentColor 0 1px, transparent 1px 12px),
     repeating-linear-gradient(180deg, currentColor 0 1.5px, transparent 1.5px 60px);
@@ -1481,8 +1538,8 @@ html.lb-open { overflow: hidden; }
 .chips span { width: clamp(10px, 1.2vw, 15px); aspect-ratio: 1; }
 .chips .chips__label { width: auto; aspect-ratio: auto; margin-left: 0.6em; font-size: 0.55rem; color: var(--fg-faint); }
 
-/* Drawn-geometry stroke tuned for cream paper (cobalt default is fine; ink-white isn't) */
-.draw-svg [data-draw].is-dark { stroke: rgba(22, 20, 15, 0.45); }
+/* Drawn-geometry stroke tuned for notebook paper (cobalt default is fine; ink-white isn't) */
+.draw-svg [data-draw].is-dark { stroke: var(--paper-ink-line); }
 
 /* Limit a draw overlay to the first viewport of a very tall section so the
    percent-based geometry stays composed instead of stretching across screens */

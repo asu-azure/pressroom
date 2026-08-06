@@ -87,6 +87,25 @@ text. See `src/lib/richtext.ts` and its tests.
 
 - Tokens & utilities live in `src/styles/global.css` (CSS custom properties — reuse, don't
   hardcode). Signature spreads `.spread--ink` / `.spread--paper` flip the semantic tokens.
+  **`motion.css` loads after `global.css` and re-declares both spreads at equal specificity,
+  so it wins the cascade.** Its values now read the `--paper-*` / token names with literals only
+  as standalone fallbacks; if you retone a spread, check that file too or your token edit will
+  appear to do nothing.
+- **Paper is a Thai school notebook, not cream proof-sheet.** Faintly blue-white stock
+  (`--paper-bg`), blue horizontal ruling (`.paper-grid`), red margin rule down the gutter. Red
+  (`--rule-red`) is *paper stock* — the margin rule and the registration mark only. It is never
+  an interactive or brand colour: the accent is still cobalt and the warm counterpoint is still
+  amber, so the rule below is unchanged for everything that is not ruled paper.
+  **Lines only — no grid.** The vertical grid was dropped; next to the red margin rule it read
+  as one system too many.
+- **Long-form prose rules itself.** `.paper-grid` is `inset:0` on its section, so its rules start
+  at the section edge — an unknowable distance above the first baseline — and any pitch that
+  disagrees with the text *beats* against it (30.6px rules under a 37.8px line box is what made
+  the synopsis unreadable). So the bio and the synopsis use `.paper-grid--margin` (margin rule
+  only) and each `<p>` draws its own ruling pitched in **`lh`** — the element's own computed line
+  box, which matches by construction. Don't "simplify" that to `calc(font-size × line-height)`:
+  the browser rounds the used font-size, which drifts 0.015px per line. Paragraph gaps are `1lh`,
+  so the rhythm carries across paragraphs. Don't reintroduce section ruling there.
 - Serif narrates (Fraunces), grotesk punches (Space Grotesk / Stack Sans Headline), mono
   micro-labels (JetBrains Mono `.mono`). One cobalt accent `#2742f0`; warm counterpoint is
   sunflower amber `#e8a31a`, not red. "Printer's proof-sheet" decor (crop marks, registration
@@ -187,6 +206,17 @@ Every token stack lists the Latin face first, then Thai, then Japanese, and the 
 per glyph — so Latin renders identically in all three languages and only Thai codepoints reach the
 Thai face. Don't reintroduce `html[lang='th'] { font-family: … }`; that is exactly what made
 English change shape when the language changed.
+
+**Author-written Japanese must use `.authored` / `--font-serif-authored`.** The Noto JP webfonts
+in `public/fonts/` are per-glyph subsets of the kanji present in **`src/`**. Author copy lives in
+Supabase, so its kanji were never candidates: 56% of one synopsis was missing from the subset.
+The `@font-face` claims the whole CJK `unicode-range`, so the browser commits to Noto, finds the
+glyph absent, and falls through per glyph to a generic `serif` — whose CJK it resolves from
+`<html lang>`. Signature: **the same Japanese looks right under 日本語 and mixes mincho with gothic
+under EN/ไทย.** Any element rendering database text (work titles, character names, synopsis, bio)
+needs `.authored`, which names real system JP faces — one font per paragraph, zero bytes, no `lang`
+dependence. Never put `'Noto Serif JP'` / `'Noto Sans JP'` in those stacks; the `Noto … CJK JP`
+names are the *system* families and are safe.
 
 Both Thai faces are **loopless** (ไม่มีหัว): Ekkamai Vibe for text, Prompt for display (its top
 metrics survive `background-clip: text`). The looped Royal Institute of Siam was dropped — don't

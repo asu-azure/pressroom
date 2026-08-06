@@ -18,7 +18,11 @@
    edge. Child CSS should reference the semantic vars, never hardcoded hex. */
 .spread { transition: background-color .6s var(--ease), color .6s var(--ease); }
 .spread--ink   { --bg:#0c0c0d; --fg:#f4f1ea; --fg-dim:#9a968c; --fg-faint:#57544c; --line:rgba(244,241,234,.10); --line-strong:rgba(244,241,234,.22); background:var(--bg); color:var(--fg); }
-.spread--paper { --bg:#e9e4d8; --fg:#16140f; --fg-dim:#5f5a4e; --fg-faint:#a8a08e; --line:rgba(22,20,15,.14);  --line-strong:rgba(22,20,15,.30);  background:var(--bg); color:var(--fg); }
+/* NOTE: this file loads AFTER global.css, so at equal specificity these win.
+   Each value therefore reads global.css's token first and keeps the literal only
+   as a standalone fallback — otherwise retoning paper here silently overrides
+   the design tokens and editing them appears to do nothing. */
+.spread--paper { --bg:var(--paper-bg,#e8edf6); --fg:var(--paper-fg,#121822); --fg-dim:var(--paper-fg-dim,#4c5a71); --fg-faint:var(--paper-fg-faint,#93a2b8); --line:var(--paper-line,rgba(38,82,158,.16));  --line-strong:var(--paper-line-strong,rgba(38,82,158,.34));  background:var(--bg); color:var(--fg); }
 
 /* ---- 2. Mask-reveal: a line of text rises out from behind a clip -----------
    Wrap each line: <span class="reveal-mask"><span>Text</span></span>

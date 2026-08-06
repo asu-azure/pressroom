@@ -43,7 +43,7 @@
         title={i18n.t('ov.locked')}>🔒</span>{/if}
   </span>
   <span class="card__meta">
-    <span class="card__title serif">{work.title}</span>
+    <span class="card__title serif authored">{work.title}</span>
     {#if work.tags.length}
       <span class="card__tags mono">{work.tags.join(' / ')}</span>
     {/if}

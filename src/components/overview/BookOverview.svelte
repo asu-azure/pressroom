@@ -312,7 +312,7 @@
       {/if}
       <div class="ov-hero__text">
         <p class="mono ov-hero__kicker" use:decodeIn>ASU AZURE · PRESSROOM</p>
-        <h1 class="ov-hero__title serif" use:titleIn>{work.title}</h1>
+        <h1 class="ov-hero__title serif authored" use:titleIn>{work.title}</h1>
         <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
           {i18n.t(statusKey)}
           {#if work.tags.length}· {work.tags.join(' / ')}{/if}
@@ -484,11 +484,11 @@
                 {#if c.iconUrl}
                   <img src={c.iconUrl} alt="" loading="lazy" draggable="false" />
                 {:else}
-                  <span class="serif ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
+                  <span class="serif authored ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
                 {/if}
                 <span class="mono ov-castTile__num">{pad2(i + 1)}</span>
               </span>
-              <span class="serif ov-castTile__name">{c.name}</span>
+              <span class="serif authored ov-castTile__name">{c.name}</span>
               {#if c.role}
                 <span class="mono ov-castTile__role">{c.role}</span>
               {/if}
@@ -502,7 +502,7 @@
   <!-- ACT IV: synopsis — the spoiler leaf, last before the imprint (paper) -->
   {#if forewordHtml}
     <section class="ov-fore spread spread--paper">
-      <div class="paper-grid" aria-hidden="true"></div>
+      <div class="paper-grid paper-grid--margin" aria-hidden="true"></div>
       <div class="crop crop--tl" aria-hidden="true"></div>
       <div class="crop crop--tr" aria-hidden="true"></div>
       <div class="crop crop--bl" aria-hidden="true"></div>
@@ -511,7 +511,7 @@
       <div class="ov-fore__inner">
         <p class="mono ov-fore__label" use:headingIn>✳ {i18n.t('ov.foreword')}</p>
         <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
-        <div class="ov-fore__body serif" use:revealChildren>
+        <div class="ov-fore__body serif authored" use:revealChildren>
           {@html forewordHtml}
         </div>
         <div class="ov-fore__sig">
@@ -577,6 +577,10 @@
     top: 8%;
     right: 4%;
     --wm-stroke: rgba(244, 241, 234, 0.09);
+    /* This watermark is the work title's first character — author text. Global
+       .watermark pins --font-serif-jp (the subsetted webfont) and sits later in
+       global.css than .authored, so it would win; this scoped rule outranks both. */
+    font-family: var(--font-serif-authored);
   }
   /* "Scroll for more" cue — proof-sheet flavour: mono label, registration
      hairline, a cobalt chevron that bounces. Fades once the reader scrolls. */
@@ -913,14 +917,30 @@
     display: block;
     clear: both;
   }
-  .ov-fore__body :global(p) {
-    margin: 0 0 1.2em;
+  /* Each paragraph rules itself from its own top edge, so a heading, figure or
+     blockquote above it cannot knock the text off the lines — which is why this
+     lives here and not on the section's .paper-grid, whose rules start at the
+     section edge an unknowable distance above the first baseline.
+     `lh` is the element's OWN computed line box, so the pitch matches the text by
+     construction. calc(font-size × line-height) is not equivalent: the browser
+     rounds the used font-size, which left a 0.015px drift per line. Gap between
+     paragraphs is exactly one line, so the rhythm carries: a blank ruled line. */
+  .ov-fore__body :global(p),
+  .ov-fore__body > :global(div:not(:has(p))) {
+    margin: 0 0 1lh;
+    background-image: repeating-linear-gradient(
+      180deg,
+      transparent 0 calc(1lh - 1px),
+      var(--rule-blue) calc(1lh - 1px) 1lh
+    );
   }
+  /* Authored stack, not --font-serif: these headings are author text too, so the
+     subsetted webfont would split them across two faces exactly like the body. */
   .ov-fore__body :global(h1),
   .ov-fore__body :global(h2),
   .ov-fore__body :global(h3),
   .ov-fore__body :global(h4) {
-    font-family: var(--font-serif);
+    font-family: var(--font-serif-authored);
     line-height: 1.25;
     margin: 1.2em 0 0.5em;
   }
