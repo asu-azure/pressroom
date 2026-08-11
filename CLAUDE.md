@@ -11,9 +11,15 @@ browser at upload time), arranges pages (drag-drop order, RTL/LTR, forced two-pa
 attaches margin notes readers can see. Readers browse a public library and read with their choice
 of single/double layout and scroll/flip mode. Public read, author-only write.
 
-**The visitor journey is shelf first, artist second.** `/` is the bookshelf; three entry points
-lead to `/asu` (a cream teaser spread, an "author card" as the last card in the grid, and a footer
-link), and the trip plays the bird-flock wipe. `/asu` always offers a route back.
+**The visitor journey is shelf first, artist second.** `/` is the bookshelf; **two** entry points
+lead to `/asu` — the artist teaser, which now sits **after** the grid (a visitor who has just looked
+through the work is the one ready to ask who made it), and a footer link. The trip plays the
+bird-flock wipe. `/asu` always offers a route back.
+
+The teaser is **ink**, not the cream spread it used to be: below the grid a tone flip would land as
+a bright slab between two dark blocks. Its proof-sheet decor is retoned in `index.astro`'s scoped
+styles — the classes are authored against cream in `global.css` and would vanish on ink. The
+"author card" that used to close the grid is gone; it and the teaser were adjacent duplicates.
 
 ## ⚠️ Identity separation (hard rule)
 
@@ -176,6 +182,25 @@ Same registry-in-code, overrides-in-the-database shape as page copy, for the sam
 
 Every word on `/asu` and the homepage artist teaser is author-edited, in three languages.
 
+- **COPY previews live.** The tab runs the real page in an iframe beside the form. Because the
+  Studio is same-origin with it, and `applyCopy(bundle, lang, root)` already takes a root, typing
+  paints straight into the preview document — no receiver script, no `postMessage`. Clicking a line
+  in the preview jumps to its field; focusing a field scrolls the preview to it and follows the
+  section's `page` to `/asu`, `/` or `/lookbook`.
+  **⚠ Every preview-only behaviour — the click handler, the hover outline, the link guard that stops
+  `data-flock` navigation — is injected INTO the iframe from `StudioCopy.svelte`. None of it lives
+  in the pages, so a visitor can never receive editing chrome. Keep it that way.** Verified by
+  build: `is-copytarget` / `data-fieldkey` appear in the `StudioArtist` bundle only, loaded solely
+  by `/studio/artist`.
+  A key is previewable only if it renders through `data-i18n` / `data-i18n-html`; otherwise the
+  field shows NOT VISIBLE (`meta.title` goes to `<title>`; the commission and hero-status pairs are
+  written as ternaries so only one of each is ever in the DOM, and both vanish when
+  `commissions_show` is off).
+- **Both Studio tabs group by page.** `PAGE_GROUPS` in `copyKeys.ts` is the single source, consumed
+  by COPY and SCENES alike, and every `CopySection` / `SceneSlot` declares its `page`
+  (`'asu' | 'home' | 'lookbook'`). ⚠ **A new section or slot with no `page` will not appear in the
+  Studio at all.** Section order within a group must match that page's scroll order — when a page's
+  layout changes, move the registry entries with it, or the author is editing blind.
 - **The registry lives in code**: `src/data/copyKeys.ts` defines each field's key, section, human
   label, hint, and its default in all three languages. **The database stores only overrides.**
   Three consequences worth keeping: the Studio form is *generated* from the registry so its
@@ -233,11 +258,41 @@ uppercase mapping, so `uppercase` is already a no-op on them — such rules only
 sharing the selector. **Never split Thai per-character** — `kinetic.ts` guards this with
 `MARK_SCRIPTS`.
 
-## The six acts
+## The six acts — extracted, not deleted
 
-`/asu` runs the full cinematic structure from the art site: hero → **act-film** → bio →
-**act-scatter** → gallery → **act-character** → craft → **act-select** → **act-3d** →
-**act-grid** → contact.
+**`/asu` is a portfolio now**: short hero → gallery (01) → about (02) → contact (03). Four sections.
+The art is visible without scrolling; the bio and craft/commissions spreads merged into one paper
+section, because two cream spreads back to back read as one idea interrupted once the acts that
+separated them were gone.
+
+**The six cinematic acts live in `src/components/acts/` and are rendered by `/lookbook`.** They were
+extracted rather than deleted, and the reasoning matters: the design *vocabulary* is in
+`global.css` + `motion.css` + `src/scripts/`, so deleting act markup would not have lost the system
+— but the **compositions** (backdrop + FUI corners + drawn geometry + heading, per act) exist
+nowhere else. `/lookbook` is what stops them rotting unseen; if an act breaks, that page shows it.
+Reusing one costs a single import.
+
+- Each act carries its **own `<script>`** for its section-scoped effect (`ActFilm` → cinema+channel,
+  `ActScatter` → scatter, `ActGrid` → grid3d), so dropping the component in is all that is needed.
+- The attribute sweeps several acts share — `[data-select]`, `[data-3dtext]`, `[data-assemble]`,
+  `initDraw` — live in **`ActRuntime.astro`**, included **once** per page. Putting them in each act
+  would re-register them per act.
+- **`/lookbook` reads the author's real copy and scenes** (`prerender = false`, `loadCopy()`,
+  `resolveScenes(profile.scenes, works)`), and carries the same language switcher as `/asu`. It was
+  first written data-free "for robustness" and that silently broke the Studio: the six act sections
+  in COPY and SCENES still edit these acts, so with defaults hardcoded there, **every act box in the
+  Studio changed nothing anywhere** — while the author had already written all twelve act lines in
+  three languages. If you ever make this page data-free again, delete those Studio sections in the
+  same commit. Failure still degrades: the query is wrapped and `loadCopy()` falls back on its own.
+  Unlisted — reachable only from Studio's `VIEW /lookbook ↗`.
+- **The registries deliberately still carry all six acts.** `sceneSlots.ts` keeps `act.*` slots and
+  `copyKeys.ts` keeps the act titles/subtitles: `scenes.test.ts` covers those slots by name, and any
+  override the author already saved would be orphaned if they were removed.
+- `.selbox.is-armed` (marching ants, handles, W×H readout) is **never toggled by any script** and
+  never has been — dormant CSS shipped with the system, not a regression.
+
+For reference, the retired long-form order was: hero → act-film → bio → act-scatter → gallery →
+act-character → craft → act-select → act-3d → act-grid → contact.
 
 - **Most of the CSS was already here.** `global.css` shipped the Editorial FUI system —
   `.act__*`, `.pillarbox`, `.sidecol`, `.fui`, `.selbox`, `.wiregrid`, `.draw-svg` — unused. Reuse
@@ -265,7 +320,8 @@ sharing the selector. **Never split Thai per-character** — `kinetic.ts` guards
 
 The vermillion box holding a single kanji is **retired**. The artist's own animated chibi doodle
 (`stamp` / `stampStatic` in `src/data/showcase.ts`) now signs the shelf hero, the artist teaser, the
-library author card, the `/asu` hero and every book's synopsis. Animated WebP cannot be paused with
+the `/asu` hero and every book's synopsis (the library author card that also used it is retired).
+Animated WebP cannot be paused with
 CSS, so each placement uses `<picture>` with the still frame under `prefers-reduced-motion`.
 
 ## The bird-flock transition

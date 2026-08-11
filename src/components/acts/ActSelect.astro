@@ -1,0 +1,60 @@
+---
+/** ACT IV · SELECTION — the marquee sweep. `variant="frag"` gives the scene slot
+ *  its two rotated collage fragments. See ActFilm.astro for why these live as
+ *  components. */
+import ActScene from '../ActScene.astro';
+import type { ResolvedScene } from '../../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  photos: string[];
+  t: Record<string, string>;
+}
+
+const { scene, photos, t } = Astro.props;
+---
+
+<section
+  id="act-select"
+  class="act spread spread--ink"
+  style="--scrim:0.5"
+  aria-label="Selection"
+  data-draw-scope
+>
+  <ActScene scene={scene} photos={photos} variant="frag" />
+  <div class="act__scrim" aria-hidden="true"></div>
+  <div class="act__grid act__grid--blue" aria-hidden="true"></div>
+
+  <span class="node" style="top:34%; left:24%" aria-hidden="true"></span>
+  <span class="node" style="top:64%; left:78%" aria-hidden="true"></span>
+
+  <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <line data-draw x1="24" y1="34" x2="50" y2="48" />
+    <line data-draw x1="78" y1="64" x2="52" y2="52" />
+    {/* The marquee "selects" the whole text block. Widened when the subtitle
+        was added — at the old 40→60 band it cut straight through the new
+        line, since this geometry is percentage-based and cannot reflow. */}
+    <rect data-draw class="is-ink" x="30" y="32" width="40" height="36" />
+  </svg>
+
+  <div class="fui fui--tl mono" aria-hidden="true"><span>04 — EDIT</span><span>選択 / SELECTION</span></div>
+  <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">LAYER 1 · OPACITY 100% · NORMAL</div>
+
+  <div class="act__inner act-select__inner">
+    <h2 class="act__head chroma serif" data-vel>
+      <span class="selbox">
+        <span class="selbox__text" data-i18n="act.selectTitle">{t['act.selectTitle']}</span>
+        <span class="selbox__handle selbox__handle--tl"></span>
+        <span class="selbox__handle selbox__handle--tr"></span>
+        <span class="selbox__handle selbox__handle--bl"></span>
+        <span class="selbox__handle selbox__handle--br"></span>
+        <span class="selbox__handle selbox__handle--t"></span>
+        <span class="selbox__handle selbox__handle--b"></span>
+        <span class="selbox__handle selbox__handle--l"></span>
+        <span class="selbox__handle selbox__handle--r"></span>
+        <span class="selbox__dim mono">W 1920 × H 1080 · 100%</span>
+      </span>
+    </h2>
+    <p class="act__sub serif" data-i18n="act.selectSub">{t['act.selectSub']}</p>
+  </div>
+</section>

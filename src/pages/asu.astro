@@ -21,9 +21,7 @@
  * artwork appears OUTSIDE that grid is decided per section by the scene slots
  * (src/data/sceneSlots.ts, resolved through src/lib/scenes.ts).
  */
-import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
-import ActScene from '../components/ActScene.astro';
 import { supabaseServer } from '../lib/supabaseServer';
 import { artUrl, toArtworkRec } from '../lib/storagePaths';
 import { stamp, stampStatic } from '../data/showcase';
@@ -96,30 +94,13 @@ const lightboxItems = displayOrder.map((w) => ({
 }));
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
-// --- Act backdrops --------------------------------------------------------
-// Scenery photographs carried over from the retired asu-art one-pager. They sit
-// far behind a scrim at low opacity, so they are deliberately encoded small and
-// cheap — quality 60, one width. `getImage` (not <Image>) because these are CSS
-// -positioned layers inside .act__bg, not content images.
-import scnField from '../assets/scenery/IMG_0402.jpg';
-import scnPath from '../assets/scenery/IMG_0364.jpg';
-import scnSea from '../assets/scenery/IMG_1243-w.jpg';
-import scnSky from '../assets/scenery/IMG_3293.jpg';
-import scnHill from '../assets/scenery/IMG_3169-w.jpg';
-import scnStreet from '../assets/scenery/IMG_0705.jpg';
-import scnDusk from '../assets/scenery/IMG_3005.jpg';
-
-const bg = async (img: ImageMetadata, width = 1600) =>
-  (await getImage({ src: img, format: 'webp', width, quality: 60 })).src;
-
-const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.all([
-  bg(scnField), bg(scnPath), bg(scnSea), bg(scnSky), bg(scnHill), bg(scnStreet), bg(scnDusk),
-]);
-
-// Every act's imagery now comes through its scene slot (see <ActScene>), so the
-// author decides per section whether it keeps its photograph, wears a plate of
-// their own work, or hands the whole backdrop over to a drawing. With an empty
-// gallery each slot degrades to its photograph and the acts still stand up.
+// The scenery photographs and the six acts they backed moved to
+// src/components/acts/ when this page became a plain portfolio — /lookbook
+// renders them now. Only the two paper-spread plate slots are read here.
+//
+// `resolveScenes()` still answers for every registered slot, act slots included:
+// the registry is deliberately left whole so saved author overrides are not
+// orphaned and scenes.test.ts keeps covering them.
 ---
 
 <Base
@@ -138,7 +119,7 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
   </nav>
 
   <main class="asu">
-    <!-- ============ 01 · HERO (ink) ============ -->
+    <!-- ============ 00 · HERO (ink) ============ -->
     <section id="hero" class="spread spread--ink asu__hero" data-draw-scope data-constellation>
       {featured && (
         <div class="asu__heroArt" aria-hidden="true">
@@ -168,147 +149,11 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
       <div class="rgb-line" aria-hidden="true"></div>
     </section>
 
-    <!-- ============ ACT I · FILM (letterboxed opening) ============
-         Interstitials carry no author content beyond their title/subtitle: they
-         are the connective tissue between spreads. Every class here already
-         ships in global.css. -->
-    <section
-      id="act-film"
-      class="act spread spread--ink pillarbox"
-      style="--scrim:0.5; --pb-w:13vw"
-      aria-label="Cinematic intro"
-      data-draw-scope
-    >
-      <ActScene scene={scenes['act.film']} photos={[bgPath, bgField, bgSea, bgSky]} />
-      <div class="act__scrim" aria-hidden="true"></div>
-      <div class="channel-scan" aria-hidden="true"></div>
-      <div class="act__grid" aria-hidden="true"></div>
-
-      <span class="pillarbox__bar pillarbox__bar--left" aria-hidden="true"></span>
-      <span class="pillarbox__bar pillarbox__bar--right" aria-hidden="true"></span>
-
-      <div class="sidecol sidecol--left mono" aria-hidden="true">
-        <span class="sidecol__item">Sou</span>
-        <span class="sidecol__item sidecol__item--v serif">目を閉じた</span>
-        <span class="sidecol__item">01 / PANORAMA</span>
-      </div>
-      <div class="sidecol sidecol--right mono" aria-hidden="true">
-        <span class="sidecol__item">第一幕</span>
-        <span class="sidecol__item sidecol__item--v serif">目を開いた</span>
-        <span class="sidecol__item">ASU AZURE</span>
-      </div>
-
-      <div class="fui fui--top mono sweep-in" data-sweep aria-hidden="true">
-        <span class="fui__rec">REC</span><span>PANORAMA</span><span>ブルースクリーン</span><span>モノクロ</span><span data-timecode>00:00:00</span><span>f/1.8 · ISO 200</span>
-      </div>
-      <div class="fui fui--bl mono" aria-hidden="true">
-        <span>SCENE 01 — 向日葵畑</span>
-        <span>STORY &amp; ART — ASU AZURE</span>
-      </div>
-
-      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <path data-draw class="is-ink" d="M16 18 H30 M16 18 V30" />
-        <path data-draw class="is-ink" d="M84 82 H70 M84 82 V70" />
-        <line data-draw class="is-warm" x1="30" y1="62" x2="50" y2="56" />
-      </svg>
-
-      <div class="act__inner act-film__inner">
-        <p class="mono act-film__kicker sweep-in" data-sweep>OPENING · 第一幕</p>
-        <h2 class="act__head serif" data-select data-i18n="act.filmTitle">{t['act.filmTitle']}</h2>
-        <p class="act-film__sub serif" data-i18n="act.filmSub">{t['act.filmSub']}</p>
-      </div>
-    </section>
-
-    <!-- ============ 02 · BIO (paper — the tone flip) ============ -->
-    <section class="spread spread--paper asu__bio">
-      <div class="paper-grid paper-grid--margin" aria-hidden="true"></div>
-      <span class="wm-line wm-line--latin asu__wm" aria-hidden="true">Artist</span>
-      <span class="crop crop--tl" aria-hidden="true"></span>
-      <span class="crop crop--br" aria-hidden="true"></span>
-      <span class="regmark asu__reg" aria-hidden="true"></span>
-      <span class="ruler" aria-hidden="true"></span>
-      <div class="chips asu__chips" aria-hidden="true">
-        <span style="background:#2742f0"></span>
-        <span style="background:#18c4d6"></span>
-        <span style="background:#6aa0ff"></span>
-        <span style="background:#e8a31a"></span>
-        <span style="background:#d3381c"></span>
-        <span style="background:#16140f"></span>
-        <span class="chips__label mono">PROOF</span>
-      </div>
-
-      <div class="asu__bioInner">
-        <div class="asu__bioHead">
-          <span class="mono asu__num">
-            <span class="asu__numDigits">01</span>
-            <span data-i18n="story.tag">{t['story.tag']}</span>
-          </span>
-          <h2 class="serif asu__h2">
-            <span class="reveal-mask"><span data-line data-i18n="story.title">{t['story.title']}</span></span>
-          </h2>
-        </div>
-
-        {/* The side column holds the portrait if there is one, otherwise the
-            artwork chosen for the `bio.plate` slot. With neither, the body
-            collapses to one column — without that modifier the prose would be
-            placed in the 300px portrait track and read as a narrow ribbon. */}
-        <div class:list={['asu__bioBody', !portrait && bioPlate.length === 0 && 'asu__bioBody--solo']}>
-          {portrait ? (
-            <figure class="asu__portrait">
-              <img src={portrait} alt={`${name} — portrait`} loading="lazy" decoding="async" />
-              <figcaption class="mono">{name.toUpperCase()}</figcaption>
-            </figure>
-          ) : (
-            bioPlate.map((w) => (
-              <figure class="plate plate--flow">
-                <img src={w.medUrl} alt={w.alt || w.title} loading="lazy" decoding="async" />
-                <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
-              </figure>
-            ))
-          )}
-          {/* Rich copy renders into a DIV, never a P: the editor emits its own
-              <p> blocks and nesting them would break the markup. */}
-          <div class="asu__prose authored">
-            <div data-i18n-html="story.p1" set:html={t['story.p1']} />
-            <div data-i18n-html="story.p2" set:html={t['story.p2']} />
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ ACT II · SCATTER (words blow apart on scroll) ============ -->
-    <section
-      id="act-scatter"
-      class="act spread spread--ink"
-      style="--scrim:0.3"
-      aria-label="Words scatter"
-      data-draw-scope
-    >
-      <ActScene scene={scenes['act.scatter']} photos={[bgHill]} />
-      <div class="act__scrim" aria-hidden="true"></div>
-      <div class="act__grid act__grid--blue" aria-hidden="true"></div>
-
-      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <line data-draw class="is-ink" x1="6" y1="30" x2="40" y2="30" />
-        <line data-draw x1="60" y1="70" x2="94" y2="70" />
-        <circle data-draw class="is-warm" cx="78" cy="34" r="6" />
-        <line data-draw class="is-warm" x1="22" y1="74" x2="40" y2="64" />
-      </svg>
-
-      <div class="fui fui--tl mono" aria-hidden="true"><span>02 — SCATTER</span><span>言葉が舞う</span></div>
-      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">DRIFT · TILT · BURST</div>
-
-      <div class="act__inner act-scatter__inner">
-        <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.scatterTitle">{t['act.scatterTitle']}</h2>
-        <p class="mono act-scatter__sub sweep-in" data-sweep>SCROLL TO SCATTER</p>
-      </div>
-    </section>
-
-    <!-- ============ 03 · GALLERY (ink) ============ -->
+    <!-- ============ 01 · GALLERY (ink) — the art, first ============ -->
     <section class="spread spread--ink asu__gallery" id="works">
       <header class="asu__galHead">
         <span class="mono asu__num asu__num--ink">
-          <span class="asu__numDigits">02</span>
+          <span class="asu__numDigits">01</span>
           <span data-i18n="works.sub">{t['works.sub']}</span>
         </span>
         <h2 class="serif asu__h2">
@@ -392,202 +237,115 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
       )}
     </section>
 
-    <!-- ============ ACT III · CHARACTER (double exposure) ============ -->
-    <section
-      id="act-character"
-      class="act spread spread--ink"
-      style="--scrim:0.4"
-      aria-label="Character"
-      data-draw-scope
-    >
-      <ActScene scene={scenes['act.character']} photos={[bgStreet]} variant="char" />
-      <div class="act__scrim" aria-hidden="true"></div>
-      <div class="act__grid" aria-hidden="true"></div>
-
-      <div class="fui fui--tl mono" aria-hidden="true"><span>03 — SUBJECT</span><span>会いたかった人</span></div>
-      <div class="fui fui--tr mono sweep-in" data-sweep aria-hidden="true">DOUBLE EXPOSURE · 多重露光</div>
-
-      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <circle data-draw class="is-warm" cx="72" cy="46" r="9" />
-        <line data-draw class="is-warm" x1="72" y1="30" x2="72" y2="37" />
-        <line data-draw class="is-warm" x1="72" y1="55" x2="72" y2="62" />
-        <line data-draw class="is-ink" x1="30" y1="50" x2="60" y2="48" />
-      </svg>
-
-      <div class="act__inner act-char__inner">
-        <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.charTitle">{t['act.charTitle']}</h2>
-        <p class="act-char__cap mono sweep-in" data-sweep data-i18n="act.charCap">{t['act.charCap']}</p>
+    <!-- ============ 02 · ABOUT (paper — the one tone flip) ============ -->
+    {/* The bio spread and the craft/commissions spread merged into a single
+        section when /asu became a portfolio: two cream spreads either side of an
+        interstitial made sense when acts separated them, but back to back they
+        read as one idea interrupted. One set of proof-sheet decor now, not two. */}
+    <section class="spread spread--paper asu__about">
+      <div class="paper-grid paper-grid--margin" aria-hidden="true"></div>
+      <span class="wm-line wm-line--latin asu__wm" aria-hidden="true">Artist</span>
+      <span class="crop crop--tl" aria-hidden="true"></span>
+      <span class="crop crop--br" aria-hidden="true"></span>
+      <span class="regmark asu__reg" aria-hidden="true"></span>
+      <span class="ruler" aria-hidden="true"></span>
+      <div class="chips asu__chips" aria-hidden="true">
+        <span style="background:#2742f0"></span>
+        <span style="background:#18c4d6"></span>
+        <span style="background:#6aa0ff"></span>
+        <span style="background:#e8a31a"></span>
+        <span style="background:#d3381c"></span>
+        <span style="background:#121822"></span>
+        <span class="chips__label mono">PROOF</span>
       </div>
-    </section>
 
-    <!-- ============ 04 · CRAFT & COMMISSIONS (paper) ============ -->
-    {/* Always rendered: the lead and the commission status are editable copy, so
-        gating the section on the craft list would hide words the author just
-        wrote and leave them hunting for why. */}
-    <section class="spread spread--paper asu__craft">
-      <div class="paper-grid" aria-hidden="true"></div>
-      <span class="crop crop--tr" aria-hidden="true"></span>
-      <div class="asu__craftInner">
-        <div>
+      <div class="asu__bioInner">
+        <div class="asu__bioHead">
           <span class="mono asu__num">
-            <span class="asu__numDigits">03</span>
-            <span data-i18n="craft.title">{t['craft.title']}</span>
+            <span class="asu__numDigits">02</span>
+            <span data-i18n="story.tag">{t['story.tag']}</span>
           </span>
-          {/* The lead is rich text — it carries the gradient highlight spans. */}
-          <div class="serif asu__craftLead" data-i18n-html="craft.lead" set:html={t['craft.lead']} />
-          <ul class="asu__craftList serif">
-            <li data-i18n="craft.item1">{t['craft.item1']}</li>
-            <li data-i18n="craft.item2">{t['craft.item2']}</li>
-            <li data-i18n="craft.item3">{t['craft.item3']}</li>
-          </ul>
+          <h2 class="serif asu__h2">
+            <span class="reveal-mask"><span data-line data-i18n="story.title">{t['story.title']}</span></span>
+          </h2>
         </div>
-        {/* The side column carries the commission panel, the chosen artwork, or
-            both — the two settings are independent, so each does exactly what
-            its switch says. Hiding commissions takes the status, the note and
-            the mail button together: there is no half state where a visitor
-            reads the note but cannot tell whether you are open. */}
-        <div class="asu__craftSide">
-          {commissionsShow && (
-            <aside class="asu__comm" class:list={[commissionsOpen && 'is-open']}>
-              <span class="mono asu__commK">
-                <span aria-hidden="true">{commissionsOpen ? '●' : '○'}</span>
-                <span data-i18n={commissionsOpen ? 'comm.status' : 'comm.statusClosed'}>
-                  {commissionsOpen ? t['comm.status'] : t['comm.statusClosed']}
-                </span>
-              </span>
-              <p class="serif" data-i18n="comm.note">{t['comm.note']}</p>
-              {commissionsOpen && links.email && (
-                <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
-                  <span data-i18n="comm.cta">{t['comm.cta']}</span> <span aria-hidden="true">→</span>
-                </a>
-              )}
-            </aside>
-          )}
-          {craftPlate.map((w) => (
-            <figure class="plate plate--flow">
-              <img src={w.medUrl} alt={w.alt || w.title} loading="lazy" decoding="async" />
-              <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
+
+        {/* The side column holds the portrait if there is one, otherwise the
+            artwork chosen for the `bio.plate` slot. With neither, the body
+            collapses to one column — without that modifier the prose would be
+            placed in the 300px portrait track and read as a narrow ribbon. */}
+        <div class:list={['asu__bioBody', !portrait && bioPlate.length === 0 && 'asu__bioBody--solo']}>
+          {portrait ? (
+            <figure class="asu__portrait">
+              <img src={portrait} alt={`${name} — portrait`} loading="lazy" decoding="async" />
+              <figcaption class="mono">{name.toUpperCase()}</figcaption>
             </figure>
-          ))}
+          ) : (
+            bioPlate.map((w) => (
+              <figure class="plate plate--flow">
+                <img src={w.medUrl} alt={w.alt || w.title} loading="lazy" decoding="async" />
+                <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
+              </figure>
+            ))
+          )}
+          {/* Rich copy renders into a DIV, never a P: the editor emits its own
+              <p> blocks and nesting them would break the markup. */}
+          <div class="asu__prose authored">
+            <div data-i18n-html="story.p1" set:html={t['story.p1']} />
+            <div data-i18n-html="story.p2" set:html={t['story.p2']} />
+          </div>
+        </div>
+
+        {/* Craft + commissions, folded in under the story. Always rendered: the
+            lead and the commission status are editable copy, so gating on the
+            craft list would hide words the author just wrote. */}
+        <div class="asu__craftInner asu__aboutCraft">
+          <div>
+            <span class="mono asu__craftK" data-i18n="craft.title">{t['craft.title']}</span>
+            {/* The lead is rich text — it carries the gradient highlight spans. */}
+            <div class="serif asu__craftLead" data-i18n-html="craft.lead" set:html={t['craft.lead']} />
+            <ul class="asu__craftList serif">
+              <li data-i18n="craft.item1">{t['craft.item1']}</li>
+              <li data-i18n="craft.item2">{t['craft.item2']}</li>
+              <li data-i18n="craft.item3">{t['craft.item3']}</li>
+            </ul>
+          </div>
+          {/* Hiding commissions takes the status, the note and the mail button
+              together: there is no half state where a visitor reads the note but
+              cannot tell whether you are open. */}
+          <div class="asu__craftSide">
+            {commissionsShow && (
+              <aside class="asu__comm" class:list={[commissionsOpen && 'is-open']}>
+                <span class="mono asu__commK">
+                  <span aria-hidden="true">{commissionsOpen ? '●' : '○'}</span>
+                  <span data-i18n={commissionsOpen ? 'comm.status' : 'comm.statusClosed'}>
+                    {commissionsOpen ? t['comm.status'] : t['comm.statusClosed']}
+                  </span>
+                </span>
+                <p class="serif" data-i18n="comm.note">{t['comm.note']}</p>
+                {commissionsOpen && links.email && (
+                  <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
+                    <span data-i18n="comm.cta">{t['comm.cta']}</span> <span aria-hidden="true">→</span>
+                  </a>
+                )}
+              </aside>
+            )}
+            {craftPlate.map((w) => (
+              <figure class="plate plate--flow">
+                <img src={w.medUrl} alt={w.alt || w.title} loading="lazy" decoding="async" />
+                <span class="plate__tag mono">{w.title || 'ARTWORK'}</span>
+              </figure>
+            ))}
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- ============ ACT IV · SELECTION (marquee sweep) ============ -->
-    <section
-      id="act-select"
-      class="act spread spread--ink"
-      style="--scrim:0.5"
-      aria-label="Selection"
-      data-draw-scope
-    >
-      <ActScene scene={scenes['act.select']} photos={[bgSky]} variant="frag" />
-      <div class="act__scrim" aria-hidden="true"></div>
-      <div class="act__grid act__grid--blue" aria-hidden="true"></div>
-
-      <span class="node" style="top:34%; left:24%" aria-hidden="true"></span>
-      <span class="node" style="top:64%; left:78%" aria-hidden="true"></span>
-
-      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <line data-draw x1="24" y1="34" x2="50" y2="48" />
-        <line data-draw x1="78" y1="64" x2="52" y2="52" />
-        <rect data-draw class="is-ink" x="38" y="40" width="24" height="20" />
-      </svg>
-
-      <div class="fui fui--tl mono" aria-hidden="true"><span>04 — EDIT</span><span>選択 / SELECTION</span></div>
-      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">LAYER 1 · OPACITY 100% · NORMAL</div>
-
-      <div class="act__inner act-select__inner">
-        <p class="mono act-select__tool sweep-in" data-sweep>MARQUEE TOOL</p>
-        <h2 class="act__head chroma serif" data-vel>
-          <span class="selbox">
-            <span class="selbox__text" data-i18n="act.selectTitle">{t['act.selectTitle']}</span>
-            <span class="selbox__handle selbox__handle--tl"></span>
-            <span class="selbox__handle selbox__handle--tr"></span>
-            <span class="selbox__handle selbox__handle--bl"></span>
-            <span class="selbox__handle selbox__handle--br"></span>
-            <span class="selbox__handle selbox__handle--t"></span>
-            <span class="selbox__handle selbox__handle--b"></span>
-            <span class="selbox__handle selbox__handle--l"></span>
-            <span class="selbox__handle selbox__handle--r"></span>
-            <span class="selbox__dim mono">W 1920 × H 1080 · 100%</span>
-          </span>
-        </h2>
-      </div>
-    </section>
-
-    <!-- ============ ACT V · 3D PERSPECTIVE TEXT ============ -->
-    <section
-      id="act-3d"
-      class="act spread spread--ink"
-      style="--scrim:0.5"
-      aria-label="3D text"
-      data-draw-scope
-    >
-      <ActScene scene={scenes['act.3d']} photos={[bgDusk]} bgClass="act-3d__bg" />
-      <div class="act__scrim" aria-hidden="true"></div>
-      <div class="act__grid act__grid--blue" aria-hidden="true"></div>
-
-      <span class="node" style="top:28%; left:16%" aria-hidden="true"></span>
-      <span class="node" style="top:70%; left:84%" aria-hidden="true"></span>
-      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <line data-draw x1="16" y1="28" x2="44" y2="42" />
-        <line data-draw class="is-warm" x1="84" y1="70" x2="58" y2="56" />
-        <path data-draw class="is-ink" d="M8 86 H22 M8 86 V72" />
-        <path data-draw class="is-ink" d="M92 14 H78 M92 14 V28" />
-      </svg>
-
-      <div class="fui fui--tl mono" aria-hidden="true"><span>05 — RENDER</span><span>RGB · 3D</span></div>
-      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">CHROMATIC · PERSPECTIVE</div>
-
-      <div class="act__inner act-3d__inner">
-        <p class="mono act-3d__kicker sweep-in" data-sweep>君は今の僕を見て</p>
-        <h2 class="act__head act-3d__head serif" data-3dtext data-i18n="act.threeDTitle">{t['act.threeDTitle']}</h2>
-      </div>
-    </section>
-
-    <!-- ============ ACT VI · GRID FINALE ============ -->
-    <section
-      id="act-grid"
-      class="act spread spread--ink"
-      style="--scrim:0.5"
-      aria-label="Grid finale"
-      data-draw-scope
-    >
-      <ActScene scene={scenes['act.grid']} photos={[bgPath]} />
-      <div class="act__scrim" aria-hidden="true"></div>
-
-      <div class="stage3d act-grid__stage" aria-hidden="true">
-        <div class="layer3d">
-          <span class="wiregrid"></span>
-          <span class="node" style="top:30%; left:18%"></span>
-          <span class="node" style="top:44%; left:72%"></span>
-          <span class="node" style="top:62%; left:40%"></span>
-          <span class="node" style="top:38%; left:54%"></span>
-        </div>
-      </div>
-
-      <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <line data-draw x1="18" y1="30" x2="72" y2="44" />
-        <line data-draw x1="40" y1="62" x2="54" y2="38" />
-        <line data-draw class="is-warm" x1="72" y1="44" x2="54" y2="38" />
-        <line data-draw class="is-ink" x1="18" y1="30" x2="40" y2="62" />
-      </svg>
-
-      <div class="fui fui--tl mono" aria-hidden="true"><span>06 — SPACE</span><span>構造 / STRUCTURE</span></div>
-      <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">GRID · NODES · WIRES</div>
-
-      <div class="act__inner act-grid__inner">
-        <h2 class="act__head act-grid__head serif" data-3dtext data-i18n="act.gridTitle">{t['act.gridTitle']}</h2>
-        <p class="act-grid__sub serif" data-i18n="act.gridSub">{t['act.gridSub']}</p>
-      </div>
-    </section>
-
-    <!-- ============ 05 · CONTACT + RETURN (ink) ============ -->
+    <!-- ============ 03 · CONTACT + RETURN (ink) ============ -->
     <footer class="spread spread--ink asu__contact" data-draw-scope data-constellation>
       <span class="bracket bracket--bl" aria-hidden="true"></span>
       <span class="mono asu__num asu__num--ink">
-        <span class="asu__numDigits">04</span>
+        <span class="asu__numDigits">03</span>
         <span data-i18n="contact.kicker">{t['contact.kicker']}</span>
       </span>
       <p class="mega asu__contactLabel" data-i18n="contact.label">{t['contact.label']}</p>
@@ -625,13 +383,6 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
   import { decode, assemble } from '../scripts/text';
-  import { assemble as kineticAssemble } from '../scripts/kinetic';
-  import { initCinema } from '../scripts/cinema';
-  import { initChannel } from '../scripts/channel';
-  import { initScatter } from '../scripts/scatter';
-  import { initGrid } from '../scripts/grid3d';
-  import { init3DText } from '../scripts/perspective';
-  import { initSelectSweep } from '../scripts/select';
   import { initAmbient } from '../scripts/ambient';
   import { initDraw } from '../scripts/draw';
   import { initDistortion } from '../scripts/displacement';
@@ -767,36 +518,16 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
     });
   });
 
-  // --- the six acts ---------------------------------------------------------
-  // Each module owns its own reduced-motion / coarse-pointer fallback, so these
-  // are called unconditionally and opt themselves down. Mirrors the wiring of
-  // the retired asu-art one-pager.
-  const heroEl = document.getElementById('hero');
-  if (heroEl) initCinema(heroEl, { reduced });
-
-  const filmEl = document.getElementById('act-film');
-  if (filmEl) {
-    initCinema(filmEl, { reduced });
-    initChannel(filmEl, { reduced });
-  }
-
-  const scatterEl = document.getElementById('act-scatter');
-  if (scatterEl) initScatter(scatterEl, { reduced, coarse });
-
-  const gridEl = document.getElementById('act-grid');
-  if (gridEl) initGrid(gridEl, { reduced, coarse });
-
-  document.querySelectorAll<HTMLElement>('[data-select]').forEach((el) => initSelectSweep(el, { reduced }));
+  // --- page effects ---------------------------------------------------------
+  // The six acts moved to src/components/acts/ when this page became a plain
+  // portfolio, and each carries its own script — so only what the remaining
+  // sections actually use is wired here. `[data-select]`, `[data-3dtext]` and
+  // `[data-assemble]` were act-only sweeps and are gone with them; see
+  // components/acts/ActRuntime.astro, which /lookbook includes.
+  // Each module owns its reduced-motion / coarse-pointer fallback, so these are
+  // called unconditionally and opt themselves down.
   document.querySelectorAll<HTMLElement>('[data-constellation]').forEach((el) => initAmbient(el, { reduced }));
-  document.querySelectorAll<HTMLElement>('[data-3dtext]').forEach((el) => init3DText(el, { reduced }));
   initDraw(document, { reduced });
-
-  // Kinetic assemble on the act headings that ask for it. `assemble` here is
-  // kinetic.ts's per-character version — NOT the one text.ts exports for the
-  // hero name, which is why it is imported under an alias.
-  if (!reduced) {
-    document.querySelectorAll<HTMLElement>('[data-assemble]').forEach((el) => kineticAssemble(el, { reduced }));
-  }
 
   // WebGL ripple on hover, desktop only and only where the context exists.
   if (!coarse && !reduced) {
@@ -886,14 +617,18 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
   }
 
   /* ---------- 01 hero ---------- */
+  /* A band, not a screen. This page is a portfolio now: the point is that the
+     work is visible almost immediately, so the hero states who made it and gets
+     out of the way. (It was 78svh when six acts followed it and arrival drama
+     was the job.) */
   .asu__hero {
     position: relative;
     z-index: 1;
-    min-height: 78svh;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
-    padding: clamp(6rem, 16vh, 10rem) var(--pad) clamp(2.5rem, 6vh, 4rem);
+    padding: clamp(4.5rem, 11vh, 7rem) var(--pad) clamp(1.6rem, 4vh, 2.4rem);
     overflow: hidden;
   }
   .asu__heroArt {
@@ -960,12 +695,24 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
     background: var(--accent);
   }
 
-  /* ---------- 02 bio (paper) ---------- */
-  .asu__bio {
+  /* ---------- 02 about (paper) — bio + craft, merged ---------- */
+  .asu__about {
     position: relative;
     z-index: 1;
     padding: clamp(4rem, 12vh, 7rem) var(--pad);
     overflow: hidden;
+  }
+  /* The craft half, sitting under the story inside the same spread. The rule
+     above it is what keeps the two halves reading as one section with two
+     movements rather than two sections that lost their divider. */
+  .asu__aboutCraft {
+    margin-top: clamp(2.6rem, 7vh, 4.5rem);
+    padding-top: clamp(2.2rem, 6vh, 3.6rem);
+    border-top: 1px solid var(--line);
+  }
+  .asu__craftK {
+    display: block;
+    color: var(--fg-faint);
   }
   .asu__wm {
     bottom: 6%;
@@ -1133,13 +880,7 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
     font-size: 0.58rem;
   }
 
-  /* ---------- 04 craft & commissions ---------- */
-  .asu__craft {
-    position: relative;
-    z-index: 1;
-    padding: clamp(3.5rem, 10vh, 6rem) var(--pad);
-    overflow: hidden;
-  }
+  /* ---------- craft & commissions, inside the about spread ---------- */
   .asu__craftInner {
     position: relative;
     z-index: 1;

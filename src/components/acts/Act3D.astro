@@ -1,0 +1,43 @@
+---
+/** ACT V · 3D TEXT — perspective title over the dusk backdrop. `act-3d__bg` tints
+ *  the scene. See ActFilm.astro for why these live as components. */
+import ActScene from '../ActScene.astro';
+import type { ResolvedScene } from '../../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  photos: string[];
+  t: Record<string, string>;
+}
+
+const { scene, photos, t } = Astro.props;
+---
+
+<section
+  id="act-3d"
+  class="act spread spread--ink"
+  style="--scrim:0.5"
+  aria-label="3D text"
+  data-draw-scope
+>
+  <ActScene scene={scene} photos={photos} bgClass="act-3d__bg" />
+  <div class="act__scrim" aria-hidden="true"></div>
+  <div class="act__grid act__grid--blue" aria-hidden="true"></div>
+
+  <span class="node" style="top:28%; left:16%" aria-hidden="true"></span>
+  <span class="node" style="top:70%; left:84%" aria-hidden="true"></span>
+  <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <line data-draw x1="16" y1="28" x2="44" y2="42" />
+    <line data-draw class="is-warm" x1="84" y1="70" x2="58" y2="56" />
+    <path data-draw class="is-ink" d="M8 86 H22 M8 86 V72" />
+    <path data-draw class="is-ink" d="M92 14 H78 M92 14 V28" />
+  </svg>
+
+  <div class="fui fui--tl mono" aria-hidden="true"><span>05 — RENDER</span><span>RGB · 3D</span></div>
+  <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">CHROMATIC · PERSPECTIVE</div>
+
+  <div class="act__inner act-3d__inner">
+    <h2 class="act__head act-3d__head serif" data-3dtext data-i18n="act.threeDTitle">{t['act.threeDTitle']}</h2>
+    <p class="act__sub serif" data-i18n="act.threeDSub">{t['act.threeDSub']}</p>
+  </div>
+</section>

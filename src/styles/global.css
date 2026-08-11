@@ -529,7 +529,13 @@ html[lang='th'] .act__head[data-i18n-html] {
    read exactly as they were designed to. */
 .act-film__inner { position: relative; text-align: center; }
 .act-film__kicker { color: rgba(246, 243, 236, 0.75); margin-bottom: 1rem; }
-.act-film__sub {
+
+/* The one subtitle treatment, shared by every centred act. Film and Grid used to
+   carry byte-identical private copies of this; three more acts needed the same
+   line, so it is one class now. Act III keeps .act-char__cap instead — its inner
+   is left-aligned at 50ch with artwork beside it, where a centred 40ch would not
+   sit. */
+.act__sub {
   color: rgba(246, 243, 236, 0.82);
   font-size: clamp(1.05rem, 2.4vw, 1.6rem);
   max-width: 40ch;
@@ -547,7 +553,6 @@ html[lang='th'] .act__head[data-i18n-html] {
 .act-film__vtext--r { right: clamp(-1rem, -2vw, -2rem); }
 
 .act-scatter__inner { text-align: center; }
-.act-scatter__sub { color: rgba(246, 243, 236, 0.78); margin-top: 1rem; }
 
 .act-char__inner { max-width: 50ch; }
 .act-char__cap { color: rgba(246, 243, 236, 0.7); margin-top: 1rem; }
@@ -577,11 +582,17 @@ html[lang='th'] .act__head[data-i18n-html] {
 }
 
 .act-select__inner { text-align: center; }
-.act-select__tool { color: rgba(246, 243, 236, 0.75); margin-bottom: 1.4rem; }
-.act-select__inner .act__head { display: inline-block; }
+/* The marquee box hangs below the heading and none of it takes part in layout:
+   the dashed border sits at -0.18em, the bottom handles half-overlap that, and
+   the W×H readout is absolutely placed a further 1.6em down. Reserve the space
+   or the subtitle lands on top of the readout. Scales with the heading, since
+   the overhang is mostly em-based. */
+.act-select__inner .act__head {
+  display: inline-block;
+  margin-bottom: clamp(2rem, 0.5em, 4rem);
+}
 
 .act-3d__inner { text-align: center; }
-.act-3d__kicker { color: rgba(246, 243, 236, 0.78); margin-bottom: 1.4rem; }
 .act-3d__head { font-size: clamp(2.6rem, 9vw, 7rem); }
 .act-3d__bg::after {
   content: '';
@@ -602,12 +613,6 @@ html[lang='th'] .act__head[data-i18n-html] {
 .act-grid__stage { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .act-grid__inner { text-align: center; }
 .act-grid__head { font-size: clamp(2.6rem, 9vw, 7rem); }
-.act-grid__sub {
-  color: rgba(246, 243, 236, 0.82);
-  font-size: clamp(1.05rem, 2.4vw, 1.6rem);
-  max-width: 40ch;
-  margin: 1.2rem auto 0;
-}
 
 /* Collage fragments pinned over an act (selection act, and any slot set to
    PLATE — see .plate below, which is the same recipe placed by the author). */

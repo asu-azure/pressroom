@@ -11,7 +11,8 @@
    */
   import { supabase } from '../../lib/supabase';
   import { LANGS, LANG_LABEL, type Lang } from '../../lib/lang';
-  import { COPY_FIELDS, SECTIONS, type CopyField } from '../../data/copyKeys';
+  import { COPY_FIELDS, SECTIONS, PAGE_GROUPS, type CopyField } from '../../data/copyKeys';
+  import { applyCopy } from '../../lib/siteCopy';
   import RichTextEditor from './RichTextEditor.svelte';
 
   let lang = $state<Lang>('ja');
@@ -68,6 +69,17 @@
     Object.fromEntries(SECTIONS.map((s) => [s.id, COPY_FIELDS.filter((f) => f.section === s.id)])),
   );
 
+  /** Sections belonging to each page, in registry order. The Studio groups by
+   *  page so the author can tell at a glance which box feeds which page — the
+   *  six acts edit /lookbook, not the portfolio. */
+  const sectionsByPage = $derived(
+    Object.fromEntries(PAGE_GROUPS.map((g) => [g.id, SECTIONS.filter((s) => s.page === g.id)])),
+  );
+
+  function pageEdited(pageId: string, l: Lang): number {
+    return (sectionsByPage[pageId] ?? []).reduce((n, s) => n + sectionEdited(s.id, l), 0);
+  }
+
   /** Fields the author has changed away from the shipped wording, per language. */
   function editedCount(l: Lang): number {
     return COPY_FIELDS.filter((f) => draft[f.key]?.[l].trim() !== f.defaults[l].trim()).length;
@@ -83,6 +95,138 @@
 
   function sectionEdited(sectionId: string, l: Lang): number {
     return (fieldsBySection[sectionId] ?? []).filter((f) => !isDefault(f, l)).length;
+  }
+
+  /* ===================== live preview =====================================
+     The Studio and the previewed page are same-origin, so we drive the iframe
+     directly: applyCopy() already takes a `root`, so the draft can be painted
+     into the preview document with no receiver script.
+
+     ⚠ Everything preview-only — the click handler, the hover affordance, the
+     link guard — is injected INTO the iframe from here. None of it ships to
+     /asu, / or /lookbook, so a visitor can never receive editing chrome. Keep
+     it that way: do not move any of this into the pages themselves. */
+
+  let previewOn = $state(true);
+  let previewEl = $state<HTMLIFrameElement | null>(null);
+  /** The page currently loaded in the iframe, so we only reload on a real change. */
+  let previewPage = $state<string>('/asu');
+  let activeKey = $state<string | null>(null);
+  /** Set when the focused key has no node on the page — see hiddenKeys note. */
+  let notVisible = $state(false);
+
+  const hrefFor = (pageId: string) => PAGE_GROUPS.find((g) => g.id === pageId)?.href ?? '/asu';
+  const pageOfSection = (sectionId: string) =>
+    SECTIONS.find((s) => s.id === sectionId)?.page ?? 'asu';
+
+  /** draft is keyed key→lang; applyCopy wants lang→key. */
+  const bundle = $derived.by(() => {
+    const out = { ja: {}, en: {}, th: {} } as Record<Lang, Record<string, string>>;
+    for (const f of COPY_FIELDS) for (const l of LANGS) out[l][f.key] = draft[f.key]?.[l] ?? '';
+    return out;
+  });
+
+  const previewDoc = () => previewEl?.contentDocument ?? null;
+
+  function paint() {
+    const doc = previewDoc();
+    if (!doc?.body) return;
+    applyCopy(bundle, lang, doc);
+  }
+
+  let paintTimer: ReturnType<typeof setTimeout> | undefined;
+  function paintSoon() {
+    clearTimeout(paintTimer);
+    paintTimer = setTimeout(paint, 120);
+  }
+
+  // Repaint whenever the draft or the language changes.
+  $effect(() => {
+    void bundle;
+    void lang;
+    if (previewOn) paintSoon();
+  });
+
+  function findNode(doc: Document, key: string): HTMLElement | null {
+    return doc.querySelector<HTMLElement>(
+      `[data-i18n="${CSS.escape(key)}"], [data-i18n-html="${CSS.escape(key)}"]`,
+    );
+  }
+
+  /** Focusing a field scrolls the preview to the line it controls. */
+  function revealInPreview(f: CopyField) {
+    activeKey = f.key;
+    const doc = previewDoc();
+    if (!doc) return;
+
+    // Follow the field to its page — but only reload when it actually differs.
+    const href = hrefFor(pageOfSection(f.section));
+    if (href !== previewPage) {
+      previewPage = href;
+      notVisible = false;
+      return; // the load handler paints and re-runs this
+    }
+
+    const el = findNode(doc, f.key);
+    notVisible = !el;
+    if (!el) return;
+
+    // Lenis owns scrolling on these pages; scrollIntoView fights it.
+    const lenis = (previewEl?.contentWindow as unknown as { __lenis?: { scrollTo: Function } })?.__lenis;
+    if (lenis?.scrollTo) lenis.scrollTo(el, { offset: -140 });
+    else el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+
+    el.classList.add('is-copytarget');
+    setTimeout(() => el.classList.remove('is-copytarget'), 1400);
+  }
+
+  /** Clicking a line in the preview opens its section and focuses its input. */
+  function focusField(key: string) {
+    const f = COPY_FIELDS.find((x) => x.key === key);
+    if (!f) return;
+    const host = document.querySelector<HTMLElement>(`[data-fieldkey="${CSS.escape(key)}"]`);
+    host?.closest('details')?.setAttribute('open', '');
+    host?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    host?.querySelector<HTMLElement>('textarea, [contenteditable="true"]')?.focus();
+    activeKey = key;
+  }
+
+  /** Runs on every iframe load: paint the draft, then wire the preview side. */
+  function onPreviewLoad() {
+    const doc = previewDoc();
+    if (!doc) return;
+    paint();
+    // The page applies its own stored language on boot; make sure the draft wins.
+    setTimeout(paint, 250);
+
+    const style = doc.createElement('style');
+    style.textContent = `
+      [data-i18n]:hover, [data-i18n-html]:hover {
+        outline: 1px dashed rgba(39,66,240,.55); outline-offset: 3px; cursor: pointer;
+      }
+      .is-copytarget { outline: 2px solid #2742f0 !important; outline-offset: 3px; }
+    `;
+    doc.head.appendChild(style);
+
+    doc.addEventListener(
+      'click',
+      (e) => {
+        const target = e.target as Element | null;
+        // Never let the preview navigate away from the page being edited — on
+        // /asu a [data-flock] link would also start the bird-flock transition.
+        if (target?.closest('a[href]')) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        const node = target?.closest<HTMLElement>('[data-i18n], [data-i18n-html]');
+        const key = node?.dataset.i18n ?? node?.dataset.i18nHtml;
+        if (key) {
+          e.preventDefault();
+          focusField(key);
+        }
+      },
+      true,
+    );
   }
 
   async function saveAll() {
@@ -155,7 +299,8 @@
   );
 </script>
 
-<div class="sc">
+<div class="sc" class:sc--split={previewOn}>
+  <div class="sc__form">
   <div class="sc__head">
     <nav class="sc__langs mono" aria-label="Language">
       {#each LANGS as l (l)}
@@ -165,6 +310,9 @@
         </button>
       {/each}
     </nav>
+    <button class="mono sc__preview-toggle" onclick={() => (previewOn = !previewOn)}>
+      {previewOn ? 'HIDE PREVIEW' : 'SHOW PREVIEW'}
+    </button>
     <button class="mono sc__save" onclick={saveAll} disabled={saving || !dirty}>
       {saving ? 'SAVING…' : dirty ? 'SAVE COPY' : 'SAVED'}
     </button>
@@ -182,10 +330,27 @@
   {#if !ready}
     <p class="mono">LOADING…</p>
   {:else}
-    {#each SECTIONS as section, i (section.id)}
+    {#each PAGE_GROUPS as group (group.id)}
+      {@const groupSections = (sectionsByPage[group.id] ?? []).filter((s) => (fieldsBySection[s.id] ?? []).length)}
+      {#if groupSections.length}
+        <div class="sc__group">
+          <header class="sc__groupHead">
+            <span class="mono sc__groupLabel">{group.label}</span>
+            <a class="mono sc__groupLink" href={group.href} target="_blank" rel="noopener">
+              {group.href} ↗
+            </a>
+            {#if pageEdited(group.id, lang)}
+              <span class="mono sc__groupEdited">{pageEdited(group.id, lang)} EDITED</span>
+            {/if}
+          </header>
+          <p class="mono sc__groupNote">{group.note}</p>
+
+    {#each groupSections as section, i (section.id)}
       {@const fields = fieldsBySection[section.id] ?? []}
       {#if fields.length}
-        <details class="sc__sec" open={i < 2}>
+        <!-- Only the portfolio group opens on arrival; the lookbook acts stay
+             folded so they cannot be mistaken for portfolio boxes. -->
+        <details class="sc__sec" open={group.id === 'asu' && i < 2}>
           <summary>
             <span class="serif sc__secTitle">{section.label}</span>
             <span class="mono sc__secMeta">
@@ -198,9 +363,20 @@
           <p class="mono sc__secNote">{section.note}</p>
 
           {#each fields as f (f.key)}
-            <div class="sc__field">
+            <!-- data-fieldkey is how a click in the preview finds its way back here. -->
+            <div
+              class="sc__field"
+              class:is-active={activeKey === f.key}
+              data-fieldkey={f.key}
+              onfocusin={() => revealInPreview(f)}
+            >
               <div class="sc__label">
                 <span class="mono">{f.label}</span>
+                {#if activeKey === f.key && notVisible}
+                  <span class="mono sc__chip sc__chip--hidden" title="This line is not rendered on the page right now, so there is nothing to preview.">
+                    NOT VISIBLE
+                  </span>
+                {/if}
                 {#if isDefault(f, lang)}
                   <span class="mono sc__chip">DEFAULT</span>
                 {:else}
@@ -234,6 +410,33 @@
         </details>
       {/if}
     {/each}
+        </div>
+      {/if}
+    {/each}
+  {/if}
+  </div>
+
+  {#if previewOn}
+    <aside class="sc__preview" aria-label="Live preview">
+      <header class="sc__previewHead mono">
+        <span class="sc__previewPath">{previewPage}</span>
+        <span class="sc__previewState" class:is-dirty={dirty}>
+          {dirty ? '● UNSAVED — PREVIEW ONLY' : '● LIVE'}
+        </span>
+      </header>
+      <!-- Same-origin, so the Studio paints the draft straight into this
+           document. Everything preview-only is injected in onPreviewLoad. -->
+      <iframe
+        bind:this={previewEl}
+        class="sc__previewFrame"
+        src={previewPage}
+        title="Live preview"
+        onload={onPreviewLoad}
+      ></iframe>
+      <p class="mono sc__previewHint">
+        Click any outlined line in the page to jump to its field.
+      </p>
+    </aside>
   {/if}
 </div>
 
@@ -242,6 +445,116 @@
     display: flex;
     flex-direction: column;
     gap: 0.9rem;
+  }
+  .sc__form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    min-width: 0;
+  }
+
+  /* --- live preview ---------------------------------------------------------
+     Form scrolls, page stays put. Only split when there is room for both: below
+     this the preview would squeeze the form into a gutter, so it collapses to
+     the toggle in the header instead. */
+  @media (min-width: 1100px) {
+    .sc--split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(28rem, 44%);
+      gap: clamp(1rem, 2.5vw, 2rem);
+      align-items: start;
+    }
+    .sc__preview {
+      position: sticky;
+      top: 1rem;
+      display: grid;
+      gap: 0.5rem;
+      max-height: calc(100svh - 2rem);
+    }
+    .sc__previewFrame {
+      width: 100%;
+      height: calc(100svh - 7rem);
+      border: 1px solid var(--line-strong);
+      background: var(--ink-bg);
+    }
+  }
+  /* Toggled on from the header on narrow screens — stacks under the form. */
+  .sc__preview {
+    display: grid;
+    gap: 0.5rem;
+  }
+  .sc__previewFrame {
+    width: 100%;
+    height: 60svh;
+    border: 1px solid var(--line-strong);
+    background: var(--ink-bg);
+  }
+  .sc__previewHead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+  .sc__previewPath { color: var(--accent); }
+  .sc__previewState { color: var(--fg-faint); }
+  .sc__previewState.is-dirty { color: #e8a31a; }
+  .sc__previewHint {
+    color: var(--fg-faint);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .sc__preview-toggle {
+    border: 1px solid var(--line-strong);
+    background: none;
+    color: var(--fg-dim);
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+  }
+  .sc__preview-toggle:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* The field the preview is currently pointed at. */
+  .sc__field.is-active {
+    box-shadow: -3px 0 0 0 var(--accent);
+    padding-left: 0.7rem;
+  }
+  .sc__chip--hidden {
+    color: #e8a31a;
+    border-color: currentColor;
+  }
+
+  /* --- page groups ---------------------------------------------------------
+     The six acts edit /lookbook, not the portfolio. Grouping by page is what
+     tells the author which box feeds which page; the accent rule down the left
+     is there so the boundary survives a long scroll. */
+  .sc__group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 1.4rem;
+    padding-left: 0.85rem;
+    border-left: 2px solid var(--line-strong);
+  }
+  .sc__group:first-of-type { margin-top: 0; }
+  .sc__groupHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.7rem;
+  }
+  .sc__groupLabel {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    color: var(--fg);
+  }
+  .sc__groupLink { color: var(--accent); }
+  .sc__groupLink:hover { text-decoration: underline; }
+  .sc__groupEdited { color: var(--accent); }
+  .sc__groupNote {
+    margin: -0.15rem 0 0.35rem;
+    color: var(--fg-faint);
+    text-transform: none;
+    letter-spacing: 0;
+    line-height: 1.6;
   }
   .sc__head {
     display: flex;

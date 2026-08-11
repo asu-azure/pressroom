@@ -89,5 +89,11 @@ export function applyCopy(bundle: CopyBundle, lang: Lang, root: ParentNode = doc
     else el.textContent = value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  document.documentElement.lang = lang;
+  // Set `lang` on the document that actually owns `root`, not on whichever
+  // document called us. Identical for a page switching its own language, but the
+  // Studio's live preview passes an iframe: without this the preview keeps
+  // Latin leading for Thai (global.css scopes that fix on html[lang='th']) and
+  // the Studio's own <html lang> gets stomped to the previewed language.
+  const doc = (root as Node).ownerDocument ?? (root as Document);
+  doc.documentElement.lang = lang;
 }

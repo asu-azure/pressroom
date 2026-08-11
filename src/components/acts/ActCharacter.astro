@@ -1,0 +1,42 @@
+---
+/** ACT III · CHARACTER — the double exposure. `variant="char"` is what makes the
+ *  scene slot render its big blended subject rather than a generic pinned plate.
+ *  See ActFilm.astro for why these live as components. */
+import ActScene from '../ActScene.astro';
+import type { ResolvedScene } from '../../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  photos: string[];
+  t: Record<string, string>;
+}
+
+const { scene, photos, t } = Astro.props;
+---
+
+<section
+  id="act-character"
+  class="act spread spread--ink"
+  style="--scrim:0.4"
+  aria-label="Character"
+  data-draw-scope
+>
+  <ActScene scene={scene} photos={photos} variant="char" />
+  <div class="act__scrim" aria-hidden="true"></div>
+  <div class="act__grid" aria-hidden="true"></div>
+
+  <div class="fui fui--tl mono" aria-hidden="true"><span>03 — SUBJECT</span><span>会いたかった人</span></div>
+  <div class="fui fui--tr mono sweep-in" data-sweep aria-hidden="true">DOUBLE EXPOSURE · 多重露光</div>
+
+  <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <circle data-draw class="is-warm" cx="72" cy="46" r="9" />
+    <line data-draw class="is-warm" x1="72" y1="30" x2="72" y2="37" />
+    <line data-draw class="is-warm" x1="72" y1="55" x2="72" y2="62" />
+    <line data-draw class="is-ink" x1="30" y1="50" x2="60" y2="48" />
+  </svg>
+
+  <div class="act__inner act-char__inner">
+    <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.charTitle">{t['act.charTitle']}</h2>
+    <p class="act-char__cap mono sweep-in" data-sweep data-i18n="act.charCap">{t['act.charCap']}</p>
+  </div>
+</section>

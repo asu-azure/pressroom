@@ -1,0 +1,35 @@
+---
+/**
+ * The document-wide sweeps the acts share.
+ *
+ * Three of the act effects are driven by attribute sweeps rather than by a
+ * section id — `[data-select]`, `[data-3dtext]`, `[data-assemble]` — plus
+ * `initDraw`, which walks every `[data-draw-scope]` on the page. Running those
+ * from inside each act component would re-register them once per act, so they
+ * live here and a page that renders acts includes this ONCE.
+ *
+ * Acts with a section-scoped effect (film, scatter, grid) carry their own script
+ * instead, so they stay self-contained.
+ */
+---
+
+<script>
+  import { init3DText } from '../../scripts/perspective';
+  import { initSelectSweep } from '../../scripts/select';
+  import { initAmbient } from '../../scripts/ambient';
+  import { initDraw } from '../../scripts/draw';
+  import { assemble as kineticAssemble } from '../../scripts/kinetic';
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  document.querySelectorAll<HTMLElement>('[data-select]').forEach((el) => initSelectSweep(el, { reduced }));
+  document.querySelectorAll<HTMLElement>('[data-constellation]').forEach((el) => initAmbient(el, { reduced }));
+  document.querySelectorAll<HTMLElement>('[data-3dtext]').forEach((el) => init3DText(el, { reduced }));
+  initDraw(document, { reduced });
+
+  // `assemble` here is kinetic.ts's per-character version — NOT the one text.ts
+  // exports for the hero name, which is why it is imported under an alias.
+  if (!reduced) {
+    document.querySelectorAll<HTMLElement>('[data-assemble]').forEach((el) => kineticAssemble(el, { reduced }));
+  }
+</script>

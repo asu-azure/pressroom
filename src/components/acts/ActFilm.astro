@@ -1,0 +1,90 @@
+---
+/**
+ * ACT I · FILM — the letterboxed opening.
+ *
+ * One of six cinematic interstitials extracted from /asu when that page became a
+ * plain portfolio. They are kept as components, not deleted: the compositions
+ * (backdrop + FUI corners + drawn geometry + heading) are the part of the design
+ * system that does NOT live in global.css, and they are the expensive part to
+ * rebuild. /lookbook renders all six; drop one into any page with one import.
+ *
+ * Interstitials carry no author content beyond their title/subtitle — they are
+ * connective tissue between spreads. Every class here already ships in
+ * global.css.
+ */
+import ActScene from '../ActScene.astro';
+import type { ResolvedScene } from '../../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  /** Four scenery photos — this act cycles them (see channel.ts). */
+  photos: string[];
+  /** Resolved copy for the active language. */
+  t: Record<string, string>;
+}
+
+const { scene, photos, t } = Astro.props;
+---
+
+<section
+  id="act-film"
+  class="act spread spread--ink pillarbox"
+  style="--scrim:0.5; --pb-w:13vw"
+  aria-label="Cinematic intro"
+  data-draw-scope
+>
+  <ActScene scene={scene} photos={photos} />
+  <div class="act__scrim" aria-hidden="true"></div>
+  <div class="channel-scan" aria-hidden="true"></div>
+  <div class="act__grid" aria-hidden="true"></div>
+
+  <span class="pillarbox__bar pillarbox__bar--left" aria-hidden="true"></span>
+  <span class="pillarbox__bar pillarbox__bar--right" aria-hidden="true"></span>
+
+  <div class="sidecol sidecol--left mono" aria-hidden="true">
+    <span class="sidecol__item">Sou</span>
+    <span class="sidecol__item sidecol__item--v serif">目を閉じた</span>
+    <span class="sidecol__item">01 / PANORAMA</span>
+  </div>
+  <div class="sidecol sidecol--right mono" aria-hidden="true">
+    <span class="sidecol__item">第一幕</span>
+    <span class="sidecol__item sidecol__item--v serif">目を開いた</span>
+    <span class="sidecol__item">ASU AZURE</span>
+  </div>
+
+  <div class="fui fui--top mono sweep-in" data-sweep aria-hidden="true">
+    <span class="fui__rec">REC</span><span>PANORAMA</span><span>ブルースクリーン</span><span>モノクロ</span><span data-timecode>00:00:00</span><span>f/1.8 · ISO 200</span>
+  </div>
+  <div class="fui fui--bl mono" aria-hidden="true">
+    <span>SCENE 01 — 向日葵畑</span>
+    <span>STORY &amp; ART — ASU AZURE</span>
+  </div>
+
+  <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <path data-draw class="is-ink" d="M16 18 H30 M16 18 V30" />
+    <path data-draw class="is-ink" d="M84 82 H70 M84 82 V70" />
+    <line data-draw class="is-warm" x1="30" y1="62" x2="50" y2="56" />
+  </svg>
+
+  <div class="act__inner act-film__inner">
+    <p class="mono act-film__kicker sweep-in" data-sweep>OPENING · 第一幕</p>
+    <h2 class="act__head serif" data-select data-i18n="act.filmTitle">{t['act.filmTitle']}</h2>
+    <p class="act__sub serif" data-i18n="act.filmSub">{t['act.filmSub']}</p>
+  </div>
+</section>
+
+<script>
+  // This act owns its own behaviour, so dropping the component onto a page is
+  // all that is needed — Astro only ships a component's script when it renders.
+  // Both modules carry their own reduced-motion fallback, so they are called
+  // unconditionally and opt themselves down.
+  import { initCinema } from '../../scripts/cinema';
+  import { initChannel } from '../../scripts/channel';
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const el = document.getElementById('act-film');
+  if (el) {
+    initCinema(el, { reduced });
+    initChannel(el, { reduced });
+  }
+</script>

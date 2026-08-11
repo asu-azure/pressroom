@@ -22,8 +22,54 @@
  */
 import type { Lang } from '../lib/lang';
 
+/**
+ * Which page a section or scene slot actually appears on.
+ *
+ * This exists because the six acts moved to /lookbook while their copy stayed
+ * in this registry — so the Studio was showing the author six sections with no
+ * way to tell they were no longer part of the portfolio page. Every section and
+ * every scene slot declares its page, and both Studio tabs group by it.
+ *
+ * ⚠ A new section or slot with no `page` will not appear in the Studio at all.
+ */
+export type PageId = 'asu' | 'home' | 'lookbook';
+
+export interface PageGroup {
+  id: PageId;
+  /** Group heading in the Studio. */
+  label: string;
+  /** Where the author can go and look at the result. */
+  href: string;
+  /** One line on what this page is. */
+  note: string;
+}
+
+/** Studio group order — the page the author edits most often comes first. */
+export const PAGE_GROUPS: PageGroup[] = [
+  {
+    id: 'asu',
+    label: 'YOUR PORTFOLIO',
+    href: '/asu',
+    note: 'The page people come to see your work. Short hero, gallery, about, contact.',
+  },
+  {
+    id: 'home',
+    label: 'THE SHELF',
+    href: '/',
+    note: 'The bookshelf everyone lands on, and the banner under it that leads here.',
+  },
+  {
+    id: 'lookbook',
+    label: 'LOOKBOOK',
+    href: '/lookbook',
+    note: 'The six cinematic acts, kept as a design reference. Not on your portfolio page.',
+  },
+];
+
 export interface CopySection {
   id: string;
+  /** Which page this lands on — see PAGE_GROUPS. */
+  page: PageId;
   /** Heading in the Studio editor. */
   label: string;
   /** One line telling the author where on the page this lands. */
@@ -40,22 +86,31 @@ export interface CopyField {
   defaults: Record<Lang, string>;
 }
 
-/** Studio accordion order == the order a visitor scrolls through the page. */
+/**
+ * Grouped by page, and within each group in the order a visitor scrolls through
+ * that page — so the Studio accordion reads like the visit. Keep it that way:
+ * when a page's layout changes, this order has to move with it.
+ */
 export const SECTIONS: CopySection[] = [
-  { id: 'meta',    label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
-  { id: 'teaser',  label: 'Homepage banner', note: 'The cream "Who is Asu Azure?" spread on the shelf, above the book grid.' },
-  { id: 'hero',    label: 'Hero', note: 'The first ink spread on /asu. Your name comes from PROFILE, not from here.' },
-  { id: 'actFilm', label: 'Act I — Film', note: 'Letterboxed interstitial after the hero.' },
-  { id: 'works',   label: 'Selected work', note: 'Headings above the gallery. The artwork titles live in GALLERY.' },
-  { id: 'actScatter', label: 'Act II — Scatter', note: 'Words that scatter apart, after the gallery.' },
-  { id: 'story',   label: 'Story', note: 'The cream biography spread. Your portrait comes from PROFILE.' },
-  { id: 'actChar', label: 'Act III — Character', note: 'Character study interstitial.' },
-  { id: 'craft',   label: 'Craft', note: 'How you work. The bullet list under the lead.' },
-  { id: 'actSelect', label: 'Act IV — Selection', note: 'Sweeping selection-box interstitial.' },
-  { id: 'act3d',   label: 'Act V — 3D text', note: 'Perspective text interstitial.' },
-  { id: 'comm',    label: 'Commissions', note: 'Open/closed is a switch in PROFILE; these are the words around it.' },
-  { id: 'actGrid', label: 'Act VI — Grid finale', note: 'The last interstitial before the contact footer.' },
-  { id: 'contact', label: 'Contact', note: 'The closing cream spread. Email and X come from PROFILE.' },
+  // --- /asu — short hero → gallery → about (story + craft + commissions) → contact
+  { id: 'hero',    page: 'asu', label: 'Hero', note: 'The compact band at the top, above your artwork. Your name comes from PROFILE, not from here.' },
+  { id: 'works',   page: 'asu', label: 'Selected work', note: 'Headings above the gallery. The artwork titles live in GALLERY.' },
+  { id: 'story',   page: 'asu', label: 'Story', note: 'The top half of the About section. Your portrait comes from PROFILE.' },
+  { id: 'craft',   page: 'asu', label: 'Craft', note: 'The lower half of the same About section — how you work, and the list under the lead.' },
+  { id: 'comm',    page: 'asu', label: 'Commissions', note: 'Beside the craft list. Open/closed is a switch in PROFILE; these are the words around it.' },
+  { id: 'contact', page: 'asu', label: 'Contact', note: 'The closing ink spread. Email and X come from PROFILE.' },
+
+  // --- / — the shelf
+  { id: 'teaser',  page: 'home', label: 'Homepage banner', note: 'The dark "Who is Asu Azure?" band on the shelf, below the book grid.' },
+  { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
+
+  // --- /lookbook — the six acts, in their own scroll order
+  { id: 'actFilm',    page: 'lookbook', label: 'Act I — Film', note: 'Letterboxed opening, four cycling photographs.' },
+  { id: 'actScatter', page: 'lookbook', label: 'Act II — Scatter', note: 'Words that blow apart as you scroll.' },
+  { id: 'actChar',    page: 'lookbook', label: 'Act III — Character', note: 'The double-exposure character study.' },
+  { id: 'actSelect',  page: 'lookbook', label: 'Act IV — Selection', note: 'The sweeping selection-box interstitial.' },
+  { id: 'act3d',      page: 'lookbook', label: 'Act V — 3D text', note: 'Perspective title over the dusk backdrop.' },
+  { id: 'actGrid',    page: 'lookbook', label: 'Act VI — Grid finale', note: 'The wireframe stage that closes the lookbook.' },
 ];
 
 export const COPY_FIELDS: CopyField[] = [
@@ -171,6 +226,16 @@ export const COPY_FIELDS: CopyField[] = [
     key: 'act.scatterTitle', section: 'actScatter', label: 'Title', type: 'line',
     defaults: { en: 'Unsteady, still I go', th: 'หวั่นไหว แต่ยังก้าวต่อ', ja: '不安定な僕を' },
   },
+  {
+    // Replaced a hardcoded "SCROLL TO SCATTER" — a how-to that described the
+    // interaction rather than the work, and ignored the language switcher.
+    key: 'act.scatterSub', section: 'actScatter', label: 'Subtitle', type: 'line',
+    defaults: {
+      en: 'Every line starts as a scattered draft — I keep going until it holds.',
+      th: 'ทุกเส้นเริ่มจากภาพร่างที่กระจัดกระจาย — วาดต่อไปจนกว่ามันจะอยู่ตัว',
+      ja: 'どの線も、散らかった下描きから始まる。形になるまで描きつづける。',
+    },
+  },
 
   // ---------------- Story ----------------
   {
@@ -250,11 +315,30 @@ export const COPY_FIELDS: CopyField[] = [
     key: 'act.selectTitle', section: 'actSelect', label: 'Title', type: 'line',
     defaults: { en: 'Selected, reframed', th: 'เลือก แล้วจัดใหม่', ja: '選び、組み直す' },
   },
+  {
+    // Replaced a hardcoded "MARQUEE TOOL" label, which was English-only.
+    key: 'act.selectSub', section: 'actSelect', label: 'Subtitle', type: 'line',
+    defaults: {
+      en: 'Nothing arrives finished — it is chosen, cut loose, and set down again.',
+      th: 'ไม่มีอะไรเสร็จสมบูรณ์มาตั้งแต่แรก — เลือก ตัดออก แล้ววางลงใหม่',
+      ja: 'はじめから完成しているものはない。選び、切り離し、もう一度置き直す。',
+    },
+  },
 
   // ---------------- Act V — 3D text ----------------
   {
     key: 'act.threeDTitle', section: 'act3d', label: 'Title', type: 'line',
     defaults: { en: 'Now, look at me', th: 'มองฉันสิ ตอนนี้', ja: '今の僕を見て' },
+  },
+  {
+    // Replaced a hardcoded 君は今の僕を見て — Japanese-only, so EN and TH visitors
+    // read raw Japanese, and near-duplicate of this act's own title anyway.
+    key: 'act.threeDSub', section: 'act3d', label: 'Subtitle', type: 'line',
+    defaults: {
+      en: 'Not the drawing I made back then — the one I can make now.',
+      th: 'ไม่ใช่ภาพที่วาดไว้ตอนนั้น — แต่เป็นภาพที่วาดได้ในตอนนี้',
+      ja: 'あのころ描いた絵ではなく、いま描ける絵を。',
+    },
   },
 
   // ---------------- Commissions ----------------

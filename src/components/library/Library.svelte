@@ -5,7 +5,6 @@
   import { publicUrl } from '../../lib/storagePaths';
   import { i18n } from '../../lib/i18n.svelte';
   import { assemble } from '../../scripts/text';
-  import { stamp, stampStatic } from '../../data/showcase';
   import WorkCard from './WorkCard.svelte';
   import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
@@ -120,22 +119,10 @@
         </div>
       {/each}
 
-      <!-- The odd one out: cream paper among the dark covers, a seal instead of
-           art. A book about the person who made the books. data-flock hands the
-           navigation to the bird-flock sweep (delegated in flock.ts, so it works
-           even though this markup arrives with the island). -->
-      <div use:rise={cards.length}>
-        <a class="authorcard" href="/asu" data-flock data-cursor="MEET" data-hover>
-          <span class="mono authorcard__k">{i18n.t('artist.cardK')}</span>
-          <!-- Same chibi signature the artist page and the book synopses use. -->
-          <picture class="authorcard__seal" aria-hidden="true">
-            <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
-            <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
-          </picture>
-          <span class="serif authorcard__title">{i18n.t('artist.cardTitle')}</span>
-          <span class="mono authorcard__cta">{i18n.t('artist.cardCta')} →</span>
-        </a>
-      </div>
+      <!-- The author card that used to close this grid is gone: the artist
+           teaser now sits directly below the shelf and says the same thing with
+           more room, so the two were adjacent duplicates. The grid ends on a
+           book, which is what it is for. -->
     </div>
   {/if}
 </section>
@@ -153,57 +140,4 @@
     gap: clamp(1rem, 2.5vw, 2rem);
   }
 
-  /* --- Author card ---------------------------------------------------------
-     Matches WorkCard's 4/5.4 footprint so the grid stays even, but inverts the
-     tone: paper stock, dashed edge, no cover image. It should read as a card
-     that wandered in from a different section. */
-  .authorcard {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    aspect-ratio: 4 / 5.4;
-    padding: clamp(1rem, 2vw, 1.4rem);
-    text-decoration: none;
-    border: 1px dashed var(--paper-line-strong);
-    border-radius: 4px;
-    background: var(--paper-bg);
-    color: var(--paper-fg);
-    transition: border-color 0.4s var(--ease), transform 0.5s var(--ease);
-  }
-  .authorcard:hover,
-  .authorcard:focus-visible {
-    border-color: var(--accent);
-    border-style: solid;
-  }
-  @media (hover: hover) {
-    .authorcard:hover {
-      transform: translateY(-4px);
-    }
-  }
-  .authorcard__k {
-    color: var(--paper-fg-faint);
-    font-size: 0.55rem;
-  }
-  .authorcard__seal {
-    margin: auto 0 0.6rem;
-    align-self: flex-start;
-    display: block;
-    width: clamp(4.2rem, 10vw, 6.5rem);
-    rotate: -7deg;
-    filter: drop-shadow(0 3px 12px rgba(211, 56, 28, 0.28));
-  }
-  .authorcard__seal img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-  .authorcard__title {
-    font-size: clamp(1.05rem, 2.2vw, 1.35rem);
-    line-height: 1.25;
-  }
-  .authorcard__cta {
-    margin-top: 0.7rem;
-    font-size: 0.55rem;
-    color: var(--accent);
-  }
 </style>

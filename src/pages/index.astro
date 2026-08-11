@@ -58,13 +58,17 @@ const t = copy[DEFAULT_LANG];
 
     <Showcase />
 
+    <Library client:only="svelte" />
+
     {/* ============ ARTIST TEASER ============
-        The shelf's only tone flip, and deliberately so: the page has been ink
-        from the top, so one cream spread reads as a different kind of thing and
-        is impossible to scroll past. It is also where the proof-sheet decor
-        (crop marks, registration mark, ruler, hollow watermark) finally earns
-        its keep — all of it shipped in global.css unused. */}
-    <section class="spread spread--paper teaser" id="artist">
+        Sits AFTER the books, because the journey is shelf first, artist second —
+        a visitor who has just looked through the work is the one ready to ask
+        who made it. It used to sit above the grid and flip the page to cream;
+        below the grid that tone flip would land as a bright slab between two
+        dark blocks, so it is ink now and reads as the closing invitation. The
+        proof-sheet decor (crop marks, registration mark, ruler, hollow
+        watermark) is retoned to match — see the .teaser rules below. */}
+    <section class="spread spread--ink teaser" id="artist">
       <div class="paper-grid" aria-hidden="true"></div>
       <span class="wm-line wm-line--latin teaser__wm" aria-hidden="true">Artist</span>
       <span class="crop crop--tl" aria-hidden="true"></span>
@@ -96,12 +100,10 @@ const t = copy[DEFAULT_LANG];
         <span style="background:#6aa0ff"></span>
         <span style="background:#e8a31a"></span>
         <span style="background:#d3381c"></span>
-        <span style="background:#121822"></span>
+        <span style="background:#f4f1ea"></span>
         <span class="chips__label mono">PROOF</span>
       </div>
     </section>
-
-    <Library client:only="svelte" />
 
     <footer class="lib-foot">
       <span class="mono">© ASU AZURE</span>
@@ -218,6 +220,27 @@ const t = copy[DEFAULT_LANG];
       };
       if (document.readyState === 'complete') settle();
       else window.addEventListener('load', settle, { once: true });
+    }
+
+    // The teaser now sits BELOW the book grid, and that grid is a `client:only`
+    // island — so at the moment its ScrollTrigger start is first computed, the
+    // island has rendered nothing and the teaser is still near the top of the
+    // document. Once the cards arrive the page grows by thousands of pixels and
+    // every start above becomes wrong: the heading reveal would fire far too
+    // early, or sit parked at translateY(110%) forever. `load` is not enough —
+    // hydration can finish after it. Watch the shelf and recompute whenever its
+    // height actually changes.
+    const shelf = document.querySelector('.lib-shell');
+    if (shelf && 'ResizeObserver' in window) {
+      let last = 0;
+      const ro = new ResizeObserver(() => {
+        const h = shelf.getBoundingClientRect().height;
+        if (Math.abs(h - last) < 1) return;
+        last = h;
+        ScrollTrigger.refresh();
+        ScrollTrigger.update();
+      });
+      ro.observe(shelf);
     }
   }
 </script>
@@ -357,7 +380,32 @@ const t = copy[DEFAULT_LANG];
     padding: clamp(1.75rem, 4.5vh, 2.75rem) var(--pad);
     overflow: hidden;
   }
-  .teaser__wm { bottom: 2%; right: calc(var(--pad) * 0.6); font-size: clamp(3rem, 9vw, 6rem); }
+  /* --- ink retone of the proof-sheet decor -------------------------------
+     All of this decor is authored in global.css against cream paper: blue-black
+     marks, and notebook ruling in a blue that only reads on a light ground. On
+     ink every one of them would vanish, so each is inverted here. Scoped to
+     .teaser, so the paper spreads on /asu are untouched. */
+  .teaser .paper-grid {
+    /* Keep the notebook ruling — it is the artist identity, and it survives the
+       tone flip as light-on-dark. The red margin rule stays red. */
+    background-image:
+      repeating-linear-gradient(180deg, rgba(160, 190, 240, 0.14) 0 1px, transparent 1px var(--rule-step));
+  }
+  .teaser .paper-grid::before { background: rgba(216, 92, 99, 0.34); }
+  .teaser .crop::before,
+  .teaser .crop::after { background: rgba(244, 241, 234, 0.42); }
+  .teaser .regmark { border-color: rgba(216, 92, 99, 0.55); }
+  .teaser .regmark::before,
+  .teaser .regmark::after { background: rgba(216, 92, 99, 0.55); }
+  .teaser .ruler { color: rgba(244, 241, 234, 0.30); }
+  .teaser__wm {
+    bottom: 2%;
+    right: calc(var(--pad) * 0.6);
+    font-size: clamp(3rem, 9vw, 6rem);
+    /* Default --wm-stroke is blue-black for paper; this is the ink value the
+       book hero already uses. */
+    --wm-stroke: rgba(244, 241, 234, 0.09);
+  }
   .teaser__reg { top: 14%; right: 30%; }
   .teaser__chips { bottom: clamp(0.5rem, 1.5vh, 1rem); left: var(--pad); }
   .teaser__inner {

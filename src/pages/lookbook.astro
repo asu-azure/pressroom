@@ -1,0 +1,197 @@
+---
+/**
+ * /lookbook — the six cinematic acts, kept alive and browsable.
+ *
+ * When /asu became a plain portfolio the acts came off it. They were extracted
+ * rather than deleted: the compositions are the part of the design system that
+ * does NOT live in global.css, and this page is what stops them rotting quietly
+ * in a folder — if an act breaks, this page shows it.
+ *
+ * ⚠ This page reads the author's real copy and scenes, and it must keep doing
+ * so. It was first written with no database call at all — a robustness idea that
+ * quietly broke the Studio: the six act sections in COPY and SCENES still edit
+ * these acts, so with defaults hardcoded here, every one of those boxes changed
+ * nothing anywhere. The author had already written all twelve act lines in three
+ * languages and picked artwork for three act slots. If you are tempted to make
+ * this page data-free again, delete those Studio sections in the same commit.
+ *
+ * Failure still degrades rather than 500s: the query is wrapped, and loadCopy()
+ * falls back to the shipped defaults on its own.
+ *
+ * Unlisted — nothing links here except the Studio's VIEW /lookbook ↗.
+ */
+import { getImage } from 'astro:assets';
+import Base from '../layouts/Base.astro';
+import ActFilm from '../components/acts/ActFilm.astro';
+import ActScatter from '../components/acts/ActScatter.astro';
+import ActCharacter from '../components/acts/ActCharacter.astro';
+import ActSelect from '../components/acts/ActSelect.astro';
+import Act3D from '../components/acts/Act3D.astro';
+import ActGrid from '../components/acts/ActGrid.astro';
+import ActRuntime from '../components/acts/ActRuntime.astro';
+import { supabaseServer } from '../lib/supabaseServer';
+import { toArtworkRec } from '../lib/storagePaths';
+import { resolveScenes } from '../lib/scenes';
+import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
+import { LANGS, LANG_LABEL, DEFAULT_LANG } from '../lib/lang';
+import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
+
+// Author-edited copy must not be frozen into a static build — same reason /asu
+// and the homepage are server-rendered.
+export const prerender = false;
+
+let profile: ArtistProfile | null = null;
+let works: ArtworkRec[] = [];
+
+try {
+  const [p, a] = await Promise.all([
+    supabaseServer.from('artist_profile').select('*').eq('id', 1).single(),
+    supabaseServer
+      .from('artworks')
+      .select('*')
+      .eq('published', true)
+      .order('sort_key', { ascending: true }),
+  ]);
+  if (p.data) profile = p.data as ArtistProfile;
+  if (a.data) works = (a.data as ArtworkRow[]).map(toArtworkRec);
+} catch {
+  // Render the acts on their scenery photographs regardless.
+}
+
+// Never throws and never returns empty — falls back to the shipped defaults.
+const copy = await loadCopy();
+const t = copy[DEFAULT_LANG];
+
+// Answers for every registered slot; an act slot the author never touched
+// falls through to its scenery photograph.
+const scenes = resolveScenes(profile?.scenes, works);
+
+import scnField from '../assets/scenery/IMG_0402.jpg';
+import scnPath from '../assets/scenery/IMG_0364.jpg';
+import scnSea from '../assets/scenery/IMG_1243-w.jpg';
+import scnSky from '../assets/scenery/IMG_3293.jpg';
+import scnHill from '../assets/scenery/IMG_3169-w.jpg';
+import scnStreet from '../assets/scenery/IMG_0705.jpg';
+import scnDusk from '../assets/scenery/IMG_3005.jpg';
+
+// quality 60, one width — these sit far behind a scrim.
+const bg = async (img: ImageMetadata, width = 1600) =>
+  (await getImage({ src: img, format: 'webp', width, quality: 60 })).src;
+
+const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.all([
+  bg(scnField), bg(scnPath), bg(scnSea), bg(scnSky), bg(scnHill), bg(scnStreet), bg(scnDusk),
+]);
+---
+
+<Base title="Lookbook — Asu Azure" description="The cinematic act compositions, kept as a design reference.">
+  {/* The act copy exists in all three languages, so the lookbook needs the same
+      switcher /asu has — otherwise two thirds of what the author wrote is
+      unreachable. */}
+  <nav class="asu__langs mono" aria-label="Language">
+    {LANGS.map((l) => (
+      <button type="button" data-lang={l} aria-pressed={l === DEFAULT_LANG ? 'true' : 'false'}>
+        {LANG_LABEL[l]}
+      </button>
+    ))}
+  </nav>
+
+  <main class="lookbook">
+    <header class="spread spread--ink lookbook__head">
+      <p class="mono lookbook__k">DESIGN REFERENCE · 設計資料</p>
+      <h1 class="serif lookbook__title">The six acts</h1>
+      <p class="lookbook__lede">
+        Kept from the long-form artist page. Each one is a component in
+        <code>src/components/acts/</code> — drop it into any page with one import.
+        The words and the artwork are yours, edited in Studio → ARTIST.
+      </p>
+      <a class="mono lookbook__back" href="/asu" data-magnetic>
+        <span aria-hidden="true">←</span> ASU AZURE
+      </a>
+    </header>
+
+    <ActFilm scene={scenes['act.film']} photos={[bgPath, bgField, bgSea, bgSky]} t={t} />
+    <ActScatter scene={scenes['act.scatter']} photos={[bgHill]} t={t} />
+    <ActCharacter scene={scenes['act.character']} photos={[bgStreet]} t={t} />
+    <ActSelect scene={scenes['act.select']} photos={[bgSky]} t={t} />
+    <Act3D scene={scenes['act.3d']} photos={[bgDusk]} t={t} />
+    <ActGrid scene={scenes['act.grid']} photos={[bgPath]} t={t} />
+  </main>
+
+  <ActRuntime />
+
+  {/* All three languages inline, so switching never waits on a request. */}
+  <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
+</Base>
+
+<script>
+  import { applyCopy, readCopyPayload } from '../lib/siteCopy';
+  import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
+
+  // Same storage key as /asu and the shelf, so a visitor picks a language once
+  // for the whole site.
+  const copyBundle = readCopyPayload();
+
+  function currentLang(): Lang {
+    try {
+      const saved = localStorage.getItem(LANG_STORAGE_KEY);
+      if (isLang(saved)) return saved;
+    } catch {
+      /* private mode */
+    }
+    return DEFAULT_LANG;
+  }
+
+  function setLang(next: Lang) {
+    if (!copyBundle) return;
+    applyCopy(copyBundle, next);
+    try {
+      localStorage.setItem(LANG_STORAGE_KEY, next);
+    } catch {
+      /* private mode */
+    }
+    for (const btn of document.querySelectorAll<HTMLButtonElement>('.asu__langs [data-lang]')) {
+      btn.setAttribute('aria-pressed', String(btn.dataset.lang === next));
+    }
+    document.dispatchEvent(new CustomEvent<Lang>(LANG_EVENT, { detail: next }));
+  }
+
+  if (copyBundle) {
+    const saved = currentLang();
+    if (saved !== DEFAULT_LANG) setLang(saved);
+
+    document.querySelector('.asu__langs')?.addEventListener('click', (e) => {
+      const btn = (e.target as Element | null)?.closest<HTMLElement>('[data-lang]');
+      const next = btn?.dataset.lang;
+      if (isLang(next)) setLang(next);
+    });
+  }
+</script>
+
+<style>
+  .lookbook__head {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 0.9rem;
+    justify-items: start;
+    padding: clamp(5rem, 14vh, 9rem) var(--pad) clamp(3rem, 8vh, 5rem);
+  }
+  .lookbook__k { color: var(--accent); }
+  .lookbook__title {
+    font-size: clamp(2.4rem, 7vw, 5rem);
+    line-height: 1.02;
+    letter-spacing: -0.02em;
+  }
+  .lookbook__lede {
+    max-width: 52ch;
+    color: var(--fg-dim);
+    line-height: 1.7;
+  }
+  .lookbook__lede code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--fg);
+  }
+  .lookbook__back { color: var(--fg-dim); margin-top: 0.6rem; }
+  .lookbook__back:hover { color: var(--accent); }
+</style>

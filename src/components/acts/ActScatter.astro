@@ -1,0 +1,50 @@
+---
+/** ACT II · SCATTER — the words blow apart on scroll. See ActFilm.astro for why
+ *  these live as components. */
+import ActScene from '../ActScene.astro';
+import type { ResolvedScene } from '../../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  photos: string[];
+  t: Record<string, string>;
+}
+
+const { scene, photos, t } = Astro.props;
+---
+
+<section
+  id="act-scatter"
+  class="act spread spread--ink"
+  style="--scrim:0.3"
+  aria-label="Words scatter"
+  data-draw-scope
+>
+  <ActScene scene={scene} photos={photos} />
+  <div class="act__scrim" aria-hidden="true"></div>
+  <div class="act__grid act__grid--blue" aria-hidden="true"></div>
+
+  <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <line data-draw class="is-ink" x1="6" y1="30" x2="40" y2="30" />
+    <line data-draw x1="60" y1="70" x2="94" y2="70" />
+    <circle data-draw class="is-warm" cx="78" cy="34" r="6" />
+    <line data-draw class="is-warm" x1="22" y1="74" x2="40" y2="64" />
+  </svg>
+
+  <div class="fui fui--tl mono" aria-hidden="true"><span>02 — SCATTER</span><span>言葉が舞う</span></div>
+  <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">DRIFT · TILT · BURST</div>
+
+  <div class="act__inner act-scatter__inner">
+    <h2 class="act__head chroma serif" data-vel data-assemble data-i18n="act.scatterTitle">{t['act.scatterTitle']}</h2>
+    <p class="act__sub serif" data-i18n="act.scatterSub">{t['act.scatterSub']}</p>
+  </div>
+</section>
+
+<script>
+  import { initScatter } from '../../scripts/scatter';
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  const el = document.getElementById('act-scatter');
+  if (el) initScatter(el, { reduced, coarse });
+</script>

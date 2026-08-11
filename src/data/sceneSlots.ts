@@ -7,9 +7,13 @@
  * page can never render blank; and clearing a slot deletes its entry, which is
  * how RESET works.
  *
- * Adding a slot = one entry here + one `scene(...)` read in asu.astro. No
+ * Adding a slot = one entry here + one `scene(...)` read in the page. No
  * migration — `artist_profile.scenes` is a single jsonb column.
+ *
+ * Every slot declares its `page`, because six of them moved to /lookbook with
+ * the acts and the Studio groups by page. A slot with no `page` will not show.
  */
+import type { PageId } from './copyKeys';
 
 /**
  * How a slot renders.
@@ -22,6 +26,8 @@ export type SceneMode = 'photo' | 'plate' | 'backdrop' | 'off';
 
 export interface SceneSlot {
   key: string;
+  /** Which page this slot appears on — see PAGE_GROUPS in copyKeys.ts. */
+  page: PageId;
   /** Heading the Studio groups this under — the section a visitor is looking at. */
   section: string;
   label: string;
@@ -38,6 +44,7 @@ export interface SceneSlot {
 export const SCENE_SLOTS: SceneSlot[] = [
   {
     key: 'act.film',
+    page: 'lookbook',
     section: 'ACT I — FILM',
     label: 'Letterboxed opening',
     hint: 'The four cycling scenery photos right after your name.',
@@ -47,15 +54,17 @@ export const SCENE_SLOTS: SceneSlot[] = [
   },
   {
     key: 'bio.plate',
-    section: '02 — STORY',
+    page: 'asu',
+    section: 'ABOUT — STORY',
     label: 'Beside your story',
-    hint: 'The cream spread with your bio. Shows one piece next to the words; set NONE for text only.',
+    hint: 'The top half of the About section. Shows one piece next to the words; set NONE for text only.',
     modes: ['off', 'plate'],
     count: 1,
     fallback: 'plate',
   },
   {
     key: 'act.scatter',
+    page: 'lookbook',
     section: 'ACT II — SCATTER',
     label: 'Scatter backdrop',
     hint: 'The hillside photo behind the scattering title.',
@@ -65,6 +74,7 @@ export const SCENE_SLOTS: SceneSlot[] = [
   },
   {
     key: 'act.character',
+    page: 'lookbook',
     section: 'ACT III — CHARACTER',
     label: 'Double-exposure subject',
     hint: 'The large figure blended over the street photo. Uses your featured piece unless you pick another.',
@@ -74,15 +84,17 @@ export const SCENE_SLOTS: SceneSlot[] = [
   },
   {
     key: 'craft.plate',
-    section: '04 — CRAFT',
+    page: 'asu',
+    section: 'ABOUT — CRAFT',
     label: 'Beside the craft list',
-    hint: 'The other cream spread, opposite what you offer. Set NONE for text only.',
+    hint: 'The lower half of the same About section, opposite what you offer. Set NONE for text only.',
     modes: ['off', 'plate'],
     count: 1,
     fallback: 'plate',
   },
   {
     key: 'act.select',
+    page: 'lookbook',
     section: 'ACT IV — SELECTION',
     label: 'Collage fragments',
     hint: 'Two small framed pieces pinned over the sky photo. Uses your first two pieces unless you pick.',
@@ -92,6 +104,7 @@ export const SCENE_SLOTS: SceneSlot[] = [
   },
   {
     key: 'act.3d',
+    page: 'lookbook',
     section: 'ACT V — 3D TEXT',
     label: 'Dusk backdrop',
     hint: 'Behind the perspective title.',
@@ -101,6 +114,7 @@ export const SCENE_SLOTS: SceneSlot[] = [
   },
   {
     key: 'act.grid',
+    page: 'lookbook',
     section: 'ACT VI — GRID',
     label: 'Finale backdrop',
     hint: 'The last act before your contact details.',

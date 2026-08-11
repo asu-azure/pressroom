@@ -1,0 +1,59 @@
+---
+/** ACT VI · GRID FINALE — the wireframe stage. See ActFilm.astro for why these
+ *  live as components. */
+import ActScene from '../ActScene.astro';
+import type { ResolvedScene } from '../../lib/scenes';
+
+interface Props {
+  scene: ResolvedScene;
+  photos: string[];
+  t: Record<string, string>;
+}
+
+const { scene, photos, t } = Astro.props;
+---
+
+<section
+  id="act-grid"
+  class="act spread spread--ink"
+  style="--scrim:0.5"
+  aria-label="Grid finale"
+  data-draw-scope
+>
+  <ActScene scene={scene} photos={photos} />
+  <div class="act__scrim" aria-hidden="true"></div>
+
+  <div class="stage3d act-grid__stage" aria-hidden="true">
+    <div class="layer3d">
+      <span class="wiregrid"></span>
+      <span class="node" style="top:30%; left:18%"></span>
+      <span class="node" style="top:44%; left:72%"></span>
+      <span class="node" style="top:62%; left:40%"></span>
+      <span class="node" style="top:38%; left:54%"></span>
+    </div>
+  </div>
+
+  <svg class="draw-svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <line data-draw x1="18" y1="30" x2="72" y2="44" />
+    <line data-draw x1="40" y1="62" x2="54" y2="38" />
+    <line data-draw class="is-warm" x1="72" y1="44" x2="54" y2="38" />
+    <line data-draw class="is-ink" x1="18" y1="30" x2="40" y2="62" />
+  </svg>
+
+  <div class="fui fui--tl mono" aria-hidden="true"><span>06 — SPACE</span><span>構造 / STRUCTURE</span></div>
+  <div class="fui fui--br mono sweep-in" data-sweep aria-hidden="true">GRID · NODES · WIRES</div>
+
+  <div class="act__inner act-grid__inner">
+    <h2 class="act__head act-grid__head serif" data-3dtext data-i18n="act.gridTitle">{t['act.gridTitle']}</h2>
+    <p class="act__sub serif" data-i18n="act.gridSub">{t['act.gridSub']}</p>
+  </div>
+</section>
+
+<script>
+  import { initGrid } from '../../scripts/grid3d';
+
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse = window.matchMedia('(pointer: coarse)').matches;
+  const el = document.getElementById('act-grid');
+  if (el) initGrid(el, { reduced, coarse });
+</script>

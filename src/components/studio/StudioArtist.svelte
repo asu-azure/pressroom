@@ -21,6 +21,7 @@
     type SceneMode,
     type ScenesRecord,
   } from '../../data/sceneSlots';
+  import { PAGE_GROUPS } from '../../data/copyKeys';
   import type { ArtistProfile, ArtworkRow } from '../../lib/types';
 
   const FLIP_MS = 180;
@@ -303,14 +304,17 @@
   const mediums = $derived([...new Set(items.map((a) => a.medium).filter(Boolean))].sort());
 </script>
 
-<div class="sa">
+<div class="sa" class:sa--wide={tab === 'copy'}>
   <header class="sa__head">
     <div>
       <a class="mono sa__back" href="/studio">← STUDIO</a>
       <p class="mono">ASU AZURE · ARTIST PAGE</p>
       <h1 class="serif sa__title">Who is Asu Azure</h1>
     </div>
-    <a class="mono sa__view" href="/asu" target="_blank" rel="noopener">VIEW /asu ↗</a>
+    <span class="sa__views">
+      <a class="mono sa__view" href="/asu" target="_blank" rel="noopener">VIEW /asu ↗</a>
+      <a class="mono sa__view" href="/lookbook" target="_blank" rel="noopener">VIEW /lookbook ↗</a>
+    </span>
   </header>
 
   <nav class="sa__tabs mono" aria-label="Sections">
@@ -409,7 +413,20 @@
           UPLOAD ARTWORK IN THE GALLERY TAB FIRST — THERE IS NOTHING TO PLACE YET.
         </p>
       {:else}
-        {#each SCENE_SLOTS as slot (slot.key)}
+        {#each PAGE_GROUPS as group (group.id)}
+          {@const groupSlots = SCENE_SLOTS.filter((s) => s.page === group.id)}
+          {#if groupSlots.length}
+          <div class="sa__group">
+            <header class="sa__groupHead">
+              <span class="mono sa__groupLabel">{group.label}</span>
+              <a class="mono sa__groupLink" href={group.href} target="_blank" rel="noopener">
+                {group.href} ↗
+              </a>
+            </header>
+            <p class="mono sa__groupNote">{group.note}</p>
+          </div>
+
+        {#each groupSlots as slot (slot.key)}
           {@const mode = modeOf(slot.key)}
           {@const chosen = scenes[slot.key]?.art ?? []}
           <section class="sa__slot">
@@ -459,6 +476,8 @@
               </div>
             {/if}
           </section>
+        {/each}
+          {/if}
         {/each}
 
         <div class="sa__save">
@@ -561,6 +580,11 @@
     gap: clamp(1.4rem, 3.5vh, 2.2rem);
     max-width: 1000px;
   }
+  /* COPY runs a live preview beside the form, which needs more room than the
+     reading width the other tabs want. */
+  .sa--wide {
+    max-width: 1700px;
+  }
   .sa__head {
     display: flex;
     justify-content: space-between;
@@ -575,6 +599,13 @@
   .sa__back:hover,
   .sa__view:hover {
     color: var(--accent);
+  }
+  /* Two destinations now: the portfolio, and the lookbook the acts live on. */
+  .sa__views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    justify-content: flex-end;
   }
   .sa__title {
     font-size: clamp(1.8rem, 4.5vw, 2.7rem);
@@ -687,6 +718,36 @@
     display: grid;
     gap: clamp(1rem, 2.5vh, 1.6rem);
   }
+  /* Page grouping — same idea as the COPY tab: six of these slots place artwork
+     on /lookbook, not on the portfolio page, and the author has to be able to
+     tell which is which without opening both pages. */
+  .sa__group {
+    margin: 1.6rem 0 0.2rem;
+  }
+  .sa__group:first-of-type { margin-top: 0; }
+  .sa__groupHead {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.7rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .sa__groupLabel {
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    color: var(--fg);
+  }
+  .sa__groupLink { color: var(--accent); }
+  .sa__groupLink:hover { text-decoration: underline; }
+  .sa__groupNote {
+    margin-top: 0.4rem;
+    color: var(--fg-faint);
+    text-transform: none;
+    letter-spacing: 0;
+    line-height: 1.6;
+  }
+
   .sa__slot {
     display: grid;
     gap: 0.6rem;
