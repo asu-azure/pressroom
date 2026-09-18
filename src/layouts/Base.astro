@@ -198,6 +198,21 @@ const jsonLd = JSON.stringify({
       const finePointer = window.matchMedia('(pointer: fine)').matches;
       const chromeless = document.body.dataset.chromeless === 'true';
 
+      // --- Storybook entrances (tale.css): [data-t-in] gets .is-in while on screen.
+      // Reversible, per the house rule. Reduced motion / no observer: shown at once.
+      const tIn = document.querySelectorAll<HTMLElement>('[data-t-in]');
+      if (tIn.length) {
+        if (prefersReduced || !('IntersectionObserver' in window)) {
+          tIn.forEach((el) => el.classList.add('is-in'));
+        } else {
+          const io = new IntersectionObserver(
+            (entries) => entries.forEach((e) => e.target.classList.toggle('is-in', e.isIntersecting)),
+            { rootMargin: '0px 0px -10% 0px' },
+          );
+          tIn.forEach((el) => io.observe(el));
+        }
+      }
+
       // --- Smooth inertia scroll (the "premium feel") ---
       // The reader route owns its own scrolling (flip mode has none; scroll mode
       // mounts Lenis on its own container), so skip the global instance there.

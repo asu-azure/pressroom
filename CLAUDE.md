@@ -376,3 +376,28 @@ spans the navigation, covering the old page and uncovering the new one.
   ScrollSurface reads its start index only at mount, so a bare `setCur` did nothing there.
 - Chrome icons are inline SVG: the subset mono webfont has no ♥/▦ glyphs.
 - The chrome hides after 3 s idle; never while a panel is open or focus is inside it.
+
+## The storybook theme (public pages)
+
+`/`, `/asu` and `/w/[slug]` pass `theme="tale"` to `Base.astro`, which puts `theme-tale` on
+`<body>` and `data-theme="tale"` on `<html>`. **The reader, `/lookbook` and the Studio stay Editorial FUI** —
+entering the reader is a deliberate change of scene.
+
+- **`src/styles/tale.css`** — tokens (muted: night `#2f3558`, sky, sunflower, leaf, cream paper), the
+  Zen Maru Gothic faces, primitives (`.t-frame` banded dashed card, `.t-sticker` white-bordered picture,
+  `.t-tape` masking tape, `.t-notebook`, `.t-label` boxed title, `.t-rule`, `.t-pill`, `.t-ring`), and
+  motion (`.t-spin`, `.t-popup`, `[data-t-in]` entrances toggled by the observer in `Base.astro`).
+  Everything is scoped under `body.theme-tale`, which also hides the FUI furniture (brackets, rgb line,
+  proof marks, watermarks, grain, custom cursor).
+- **`src/components/tale/`** — `Burst`, `Sunflower`, `TaleLabel`, `TaleRule`, `TaleIcon` (+ `taleIcons.ts`, shared
+  with Svelte via `{@html}`), `Swatches`.
+- Grammar from yui540's DropOut / Cowardly-Witch and motion from `css-animations` (all MIT), plus Asu's
+  own motifs (sunflower, tape, notebook). **No image, logo, character or name from those projects** —
+  every mark is drawn here. The owner found moons and hanging stars too cute; they were removed.
+- Spreads go transparent at `body.theme-tale .spread--ink` (0,2,1). A section that paints its own panel
+  needs `:global(body.theme-tale) .x` to outrank that (see the /asu hero and contact).
+- **Font:** `public/fonts/ZenMaruGothic-*.woff2` are subsets built by `node scripts/subset-zen.mjs <dir>`
+  (TTFs not committed). Re-run after adding kanji to `src/`. Database text uses `--t-font-authored`,
+  whose first face is a Latin-only alias, so author kanji never mix faces glyph by glyph.
+- The kit's scribble underline breaks into dashes at display size in Chromium (non-scaling stroke +
+  pathLength). The homepage title overrides it with a near-true-aspect viewBox and a plain stroke.

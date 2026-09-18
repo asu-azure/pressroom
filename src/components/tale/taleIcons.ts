@@ -15,6 +15,7 @@ export const taleIcons = {
     '<path d="M16.29 3.3C14.57 3.3 13.05 4.06 12 5.29 10.95 4.06 9.33 3.3 7.62 3.3 4.57 3.3 2 5.86 2 8.9v.57c.38 4.66 5.33 8.55 8.29 10.35.47.29 1.04.48 1.71.48.57 0 1.14-.19 1.71-.48 2.96-1.9 7.91-5.7 8.29-10.35V8.9c0-3.04-2.57-5.6-5.71-5.6Z"/>',
   lock:
     '<rect x="5" y="10.5" width="14" height="10" rx="2.4"/><path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2"/>',
+  flower: '<g opacity=".9"><circle cx="18.40" cy="12.00" r="3.6"/><circle cx="16.53" cy="16.53" r="3.6"/><circle cx="12.00" cy="18.40" r="3.6"/><circle cx="7.47" cy="16.53" r="3.6"/><circle cx="5.60" cy="12.00" r="3.6"/><circle cx="7.47" cy="7.47" r="3.6"/><circle cx="12.00" cy="5.60" r="3.6"/><circle cx="16.53" cy="7.47" r="3.6"/></g><circle cx="12" cy="12" r="3.4" fill="#6b4a2e"/>',
 } as const;
 
 export type TaleIconName = keyof typeof taleIcons;

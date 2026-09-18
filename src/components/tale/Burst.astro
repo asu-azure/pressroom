@@ -1,0 +1,16 @@
+---
+/**
+ * A ring of small triangles pointing outward — flat graphic punctuation in the
+ * DropOut manner, drawn here from scratch. Decoration only.
+ */
+interface Props {
+  class?: string;
+  count?: number;
+}
+const { class: cls = '', count = 12 } = Astro.props;
+const rays = Array.from({ length: count }, (_, i) => (360 / count) * i);
+---
+
+<svg class={`t-burst ${cls}`} viewBox="0 0 100 100" aria-hidden="true">
+  {rays.map((deg) => <polygon points="46,16 54,16 50,2" transform={`rotate(${deg} 50 50)`} />)}
+</svg>

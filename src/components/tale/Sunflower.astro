@@ -1,0 +1,30 @@
+---
+/**
+ * A flat sunflower — the ทานตะวัน of Asu's series — as a graphic mark.
+ * Two petal rings (offset) around a seeded centre. Decoration only.
+ */
+interface Props {
+  class?: string;
+}
+const { class: cls = '' } = Astro.props;
+const outer = Array.from({ length: 14 }, (_, i) => (360 / 14) * i);
+const inner = outer.map((d) => d + 360 / 28);
+const seeds = Array.from({ length: 13 }, (_, i) => {
+  const a = i * 137.5 * (Math.PI / 180);
+  const r = 2.6 * Math.sqrt(i + 0.5);
+  return [50 + r * Math.cos(a), 50 + r * Math.sin(a)];
+});
+---
+
+<svg class={`t-sunflower ${cls}`} viewBox="0 0 100 100" aria-hidden="true">
+  <g class="t-sunflower__petals t-sunflower__petals--back">
+    {inner.map((d) => <ellipse cx="50" cy="22" rx="7" ry="17" transform={`rotate(${d} 50 50)`} />)}
+  </g>
+  <g class="t-sunflower__petals">
+    {outer.map((d) => <ellipse cx="50" cy="20" rx="7.5" ry="18" transform={`rotate(${d} 50 50)`} />)}
+  </g>
+  <circle class="t-sunflower__disc" cx="50" cy="50" r="17" />
+  <g class="t-sunflower__seeds">
+    {seeds.map(([x, y]) => <circle cx={x.toFixed(2)} cy={y.toFixed(2)} r="1.5" />)}
+  </g>
+</svg>

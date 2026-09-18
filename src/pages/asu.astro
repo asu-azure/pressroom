@@ -22,6 +22,11 @@
  * (src/data/sceneSlots.ts, resolved through src/lib/scenes.ts).
  */
 import Base from '../layouts/Base.astro';
+import TaleLabel from '../components/tale/TaleLabel.astro';
+import TaleRule from '../components/tale/TaleRule.astro';
+import Swatches from '../components/tale/Swatches.astro';
+import Burst from '../components/tale/Burst.astro';
+import Sunflower from '../components/tale/Sunflower.astro';
 import { supabaseServer } from '../lib/supabaseServer';
 import { artUrl, toArtworkRec } from '../lib/storagePaths';
 import { stamp, stampStatic } from '../data/showcase';
@@ -104,6 +109,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 ---
 
 <Base
+  theme="tale"
   title={t['meta.title']}
   description={`Illustrator ${name} — the artist behind the Pressroom shelf. Gallery, background, and commission status.`}
   image={featured?.fullUrl}
@@ -120,15 +126,20 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
   <main class="asu">
     <!-- ============ 00 · HERO (ink) ============ -->
-    <section id="hero" class="spread spread--ink asu__hero" data-draw-scope data-constellation>
+    <section id="hero" class="spread spread--ink asu__hero">
+      {/* Storybook cover (styles/tale.css): flat sky stage, a ring cropped by
+          the corner, a burst of triangles, the featured piece taped down. */}
+      <span class="t-ring asu__ring" aria-hidden="true"></span>
+      <Burst class="asu__burst t-spin" />
       {featured && (
-        <div class="asu__heroArt" aria-hidden="true">
+        <div class="asu__heroArt t-sticker t-tape t-popup" aria-hidden="true">
           <img src={featured.medUrl} alt="" decoding="async" fetchpriority="high" />
         </div>
       )}
       <div class="bracket bracket--tl" aria-hidden="true"></div>
       <div class="bracket bracket--tr" aria-hidden="true"></div>
 
+      <div class="asu__heroCopy">
       <p class="mono asu__kicker" id="asu-kicker" data-i18n="hero.sub">{t['hero.sub']}</p>
       <h1 class="mega asu__name" id="asu-name">{name}</h1>
       {commissionsShow && (
@@ -139,6 +150,8 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
           {commissionsOpen ? t['hero.status'] : t['hero.statusClosed']}
         </p>
       )}
+      <Sunflower class="asu__heroFlower t-spin" />
+      </div>
       {/* The artist's own chibi doodle — the same signature that closes every
           book's synopsis. Animated WebP cannot be paused with CSS, so reduced
           motion gets the still frame via <picture>. */}
@@ -151,15 +164,16 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
     <!-- ============ 01 · GALLERY (ink) — the art, first ============ -->
     <section class="spread spread--ink asu__gallery" id="works">
-      <header class="asu__galHead">
+      <header class="asu__galHead" data-t-in>
         <span class="mono asu__num asu__num--ink">
           <span class="asu__numDigits">01</span>
           <span data-i18n="works.sub">{t['works.sub']}</span>
         </span>
-        <h2 class="serif asu__h2">
+        <h2 class="serif asu__h2 t-label">
           <span class="reveal-mask"><span data-line data-i18n="works.title">{t['works.title']}</span></span>
         </h2>
         <span class="mono asu__count">{pad2(works.length)} PCS</span>
+        <TaleRule class="asu__rule" />
       </header>
 
       {works.length === 0 ? (
@@ -186,7 +200,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
             {featured && (
               <button
                 type="button"
-                class="tile tile--natural asu__tile asu__tile--lead"
+                class="tile tile--natural asu__tile asu__tile--lead t-tape"
                 data-medium={featured.medium}
                 data-lb-open={lbIndex.get(featured.id)}
                 data-cursor="VIEW"
@@ -259,13 +273,14 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
         <span class="chips__label mono">PROOF</span>
       </div>
 
-      <div class="asu__bioInner">
+      <div class="asu__bioInner t-frame" data-t-in>
+        <Sunflower class="asu__aboutFlower t-spin" />
         <div class="asu__bioHead">
           <span class="mono asu__num">
             <span class="asu__numDigits">02</span>
             <span data-i18n="story.tag">{t['story.tag']}</span>
           </span>
-          <h2 class="serif asu__h2">
+          <h2 class="serif asu__h2 t-label t-label--leaf">
             <span class="reveal-mask"><span data-line data-i18n="story.title">{t['story.title']}</span></span>
           </h2>
         </div>
@@ -276,7 +291,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
             placed in the 300px portrait track and read as a narrow ribbon. */}
         <div class:list={['asu__bioBody', !portrait && bioPlate.length === 0 && 'asu__bioBody--solo']}>
           {portrait ? (
-            <figure class="asu__portrait">
+            <figure class="asu__portrait t-sticker t-tape">
               <img src={portrait} alt={`${name} — portrait`} loading="lazy" decoding="async" />
               <figcaption class="mono">{name.toUpperCase()}</figcaption>
             </figure>
@@ -342,7 +357,9 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     </section>
 
     <!-- ============ 03 · CONTACT + RETURN (ink) ============ -->
-    <footer class="spread spread--ink asu__contact" data-draw-scope data-constellation>
+    <footer class="spread spread--ink asu__contact">
+      <span class="t-ring asu__contactRing" aria-hidden="true"></span>
+      <Burst class="asu__contactBurst t-spin" />
       <span class="bracket bracket--bl" aria-hidden="true"></span>
       <span class="mono asu__num asu__num--ink">
         <span class="asu__numDigits">03</span>
@@ -361,6 +378,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
           </a>
         )}
       </div>
+      <Swatches class="asu__swatches" />
       <a class="mono asu__back" href="/" data-flock="back" data-magnetic>
         <span aria-hidden="true">←</span> <span data-i18n="contact.back">{t['contact.back']}</span>
       </a>
@@ -1041,5 +1059,377 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     .asu__seal {
       opacity: 0.92;
     }
+  }
+</style>
+
+{/* Storybook theme (styles/tale.css). Kept as a second block after the page's
+    original rules so the layout grammar above stays readable; everything here
+    overrides it for the one theme /asu now wears. */}
+<style>
+  /* ---------- language bar: rounded pills ---------- */
+  .asu__langs {
+    gap: 0.3rem;
+    padding: 0.3rem;
+    border-radius: 999px;
+    background: var(--t-card);
+    border: 2px dashed var(--t-dash-soft);
+  }
+  .asu__langs button {
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    backdrop-filter: none;
+    padding: 0.35em 0.9em;
+    color: var(--t-night);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+  }
+  .asu__langs button[aria-pressed='true'] {
+    background: var(--t-night);
+    color: var(--t-paper);
+  }
+
+  /* ---------- hero: the storybook cover ---------- */
+  .asu__hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    align-items: center;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    margin: clamp(3.8rem, 9vh, 5.5rem) var(--pad) 0;
+    padding: clamp(3rem, 8vh, 5rem) clamp(1.6rem, 6vw, 5rem);
+    min-height: clamp(26rem, 62svh, 38rem);
+    border-radius: 32px;
+  }
+  /* body.theme-tale .spread--ink makes spreads transparent at (0,2,1); these
+     two sections paint their own panels, so they need the extra weight. */
+  :global(body.theme-tale) .asu__hero {
+    background-color: var(--t-sky);
+    background-image: radial-gradient(rgba(255, 253, 248, 0.45) 1.2px, transparent 1.5px);
+    background-size: 18px 18px;
+    isolation: isolate;
+  }
+  .asu__hero::before {
+    content: '';
+    position: absolute;
+    inset: 14px;
+    z-index: 1;
+    border: 2.5px dashed rgba(47, 53, 88, 0.35);
+    border-radius: 22px;
+    pointer-events: none;
+  }
+  .asu__ring {
+    top: clamp(-14rem, -18vw, -6rem);
+    right: clamp(-10rem, -12vw, -4rem);
+    width: clamp(16rem, 32vw, 28rem);
+  }
+  .asu__hero :global(.asu__burst) {
+    position: absolute;
+    left: clamp(-2.5rem, -2vw, -1rem);
+    bottom: clamp(-2.5rem, -2vw, -1rem);
+    z-index: 0;
+    width: clamp(7rem, 13vw, 11rem);
+    --spin: 60s;
+  }
+  .asu__heroCopy {
+    position: relative;
+    z-index: 3;
+    min-width: 0;
+  }
+  .asu__heroArt {
+    position: relative;
+    inset: auto;
+    z-index: 2;
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: center;
+    width: min(26rem, 34vw);
+    rotate: 3deg;
+    pointer-events: none;
+  }
+  .asu__heroArt img {
+    height: auto;
+    opacity: 1;
+    max-height: 26rem;
+    object-fit: cover;
+  }
+  .asu__heroArt::after {
+    display: none;
+  }
+  .asu__kicker {
+    color: var(--t-night-soft);
+    letter-spacing: 0.2em;
+    font-size: 0.72rem;
+  }
+  .asu__name {
+    margin-top: 0.8rem;
+    font-weight: 900;
+    font-size: clamp(2.6rem, 8vw, 6.4rem);
+    line-height: 1;
+    color: var(--t-night);
+  }
+  .asu__tagline {
+    display: inline-block;
+    margin-top: 1.1rem;
+    padding: 0.3em 1em;
+    border-radius: 999px;
+    background: var(--t-sun);
+    color: var(--t-night);
+    font-weight: 700;
+    font-size: 0.85rem;
+    letter-spacing: 0.08em;
+  }
+  .asu__heroCopy :global(.asu__heroFlower) {
+    width: clamp(2.4rem, 3.6vw, 3.2rem);
+    margin-top: 1.2rem;
+    --spin: 30s;
+  }
+  .asu__seal {
+    top: auto;
+    bottom: clamp(1.2rem, 4vh, 2.2rem);
+    right: clamp(1.4rem, 5vw, 4rem);
+    z-index: 4;
+    filter: drop-shadow(0 4px 10px rgba(47, 53, 88, 0.25));
+  }
+  @media (max-width: 760px) {
+    .asu__hero {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .asu__heroArt {
+      grid-column: 1;
+      grid-row: 2;
+      width: min(18rem, 72vw);
+      margin: 0.6rem auto 1rem;
+    }
+  }
+
+  /* ---------- section heads ---------- */
+  .asu__num {
+    display: inline-block;
+    padding: 0.3em 0.9em;
+    border-radius: 999px;
+    background: var(--t-card);
+    border: 2px dashed var(--t-dash-soft);
+    color: var(--t-night);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+  }
+  .asu__h2.t-label {
+    margin-top: 1rem;
+    font-size: clamp(1.5rem, 3.4vw, 2.2rem);
+    font-weight: 900;
+    line-height: 1.3;
+  }
+  .asu__galHead {
+    justify-items: center;
+    text-align: center;
+  }
+  .asu__count {
+    color: var(--t-night-soft);
+  }
+  .asu__galHead :global(.asu__rule) {
+    width: min(34rem, 100%);
+    margin-top: 0.8rem;
+  }
+
+  /* ---------- gallery: every piece a sticker ---------- */
+  .asu__filters {
+    justify-content: center;
+  }
+  .asu__chip {
+    font-family: var(--t-font);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: none;
+    font-size: 0.72rem;
+    border: 2px dashed var(--t-dash-soft);
+    color: var(--t-night);
+    background: var(--t-card);
+  }
+  .asu__chip.is-on {
+    background: var(--t-night);
+    border-color: var(--t-night);
+    border-style: solid;
+    color: var(--t-paper);
+  }
+  .asu__tile {
+    padding: 8px;
+    background: #fff;
+    border: 0;
+    border-radius: 14px;
+    overflow: visible;
+    box-shadow: 0 8px 20px rgba(47, 53, 88, 0.14);
+    transition: rotate 0.35s var(--ease), translate 0.35s var(--ease);
+  }
+  .asu__tile img {
+    border-radius: 8px;
+  }
+  .asu__grid > .asu__tile:nth-child(3n + 1) { rotate: -0.8deg; }
+  .asu__grid > .asu__tile:nth-child(3n + 2) { rotate: 0.6deg; }
+  @media (hover: hover) {
+    .asu__grid > .asu__tile:hover { rotate: 0deg; translate: 0 -4px; }
+  }
+  .asu__tile :global(.tile__num),
+  .asu__tile :global(.tile__tag) {
+    mix-blend-mode: normal;
+    color: var(--t-paper);
+    background: var(--t-night);
+    padding: 0.2em 0.6em;
+    border-radius: 999px;
+    font-size: 0.58rem;
+  }
+  .asu__tile::after {
+    border-radius: 14px;
+  }
+  /* Two columns even on phones: 53 pieces in one column is a long scroll. */
+  @media (max-width: 460px) {
+    .asu__grid { columns: 2; }
+    .asu__tile { padding: 5px; border-radius: 10px; }
+  }
+  .asu__hint {
+    text-align: center;
+    color: var(--t-night-soft);
+  }
+
+  /* ---------- about: one framed page ---------- */
+  .asu__bioInner.t-frame {
+    max-width: 1100px;
+    margin-inline: auto;
+    overflow: hidden;
+    --band-top: var(--t-leaf);
+    --band-bottom: var(--t-sky);
+  }
+  .asu__bioInner :global(.asu__aboutFlower) {
+    position: absolute;
+    top: -3.4rem;
+    right: -3.4rem;
+    width: clamp(7rem, 12vw, 10rem);
+    --spin: 50s;
+  }
+  .asu__portrait img {
+    border: 0;
+  }
+  .asu__portrait figcaption {
+    text-align: center;
+    color: var(--t-night-soft);
+  }
+  .asu__prose {
+    color: var(--t-night-soft);
+  }
+  .asu__aboutCraft {
+    border-top: 2.5px dashed var(--t-dash-soft);
+  }
+  .asu__craftK {
+    display: inline-block;
+    padding: 0.3em 0.9em;
+    border-radius: 999px;
+    background: var(--t-sun);
+    color: var(--t-night);
+    font-size: 0.7rem;
+  }
+  .asu__craftLead {
+    font-weight: 700;
+  }
+  .asu__craftList li {
+    border-bottom: 2px dashed var(--t-dash-soft);
+  }
+  .asu__comm {
+    border: 2px dashed var(--t-dash);
+    border-radius: 14px;
+    background: var(--t-paper);
+  }
+  .asu__comm.is-open {
+    border-color: var(--t-leaf);
+    border-style: solid;
+  }
+  .asu__comm.is-open .asu__commK {
+    color: #5f7a2a;
+  }
+  .asu__commCta {
+    background: var(--t-night);
+    border-color: var(--t-night);
+    color: var(--t-paper);
+    font-weight: 700;
+  }
+  .asu__commCta:hover {
+    background: var(--t-sun);
+    color: var(--t-night);
+  }
+
+  /* ---------- contact: a closing card ---------- */
+  .asu__contact {
+    overflow: hidden;
+    margin: 0 var(--pad) clamp(2rem, 6vh, 3.5rem);
+    border-radius: 32px;
+  }
+  :global(body.theme-tale) .asu__contact {
+    background-color: var(--t-night);
+    background-image: radial-gradient(rgba(255, 253, 248, 0.12) 1.2px, transparent 1.5px);
+    background-size: 18px 18px;
+    color: var(--t-paper);
+    isolation: isolate;
+  }
+  .asu__contactRing {
+    bottom: clamp(-12rem, -16vw, -5rem);
+    right: clamp(-8rem, -10vw, -3rem);
+    width: clamp(14rem, 28vw, 24rem);
+    --ring-out: var(--t-sun);
+    --ring-in: #f1d08b;
+  }
+  .asu__contact :global(.asu__contactBurst) {
+    position: absolute;
+    top: 1.4rem;
+    right: 28%;
+    width: clamp(4rem, 7vw, 6rem);
+    --burst: var(--t-sky);
+    --spin: 50s;
+  }
+  .asu__contact .asu__num {
+    background: transparent;
+    border-color: rgba(255, 253, 248, 0.35);
+    color: var(--t-paper);
+  }
+  .asu__contactLabel {
+    position: relative;
+    font-weight: 900;
+    color: var(--t-paper);
+  }
+  .asu__contactLink {
+    position: relative;
+    color: var(--t-paper);
+    font-weight: 700;
+    border-bottom: 2.5px dashed rgba(255, 253, 248, 0.45);
+  }
+  .asu__contactLink:hover {
+    color: var(--t-sun);
+    border-color: var(--t-sun);
+  }
+  .asu__contact :global(.asu__swatches) {
+    position: relative;
+    display: flex;
+    margin-top: clamp(2rem, 5vh, 3rem);
+  }
+  .asu__back {
+    position: relative;
+    margin-top: 1.2rem;
+    border: 2.5px solid var(--t-paper);
+    color: var(--t-paper);
+    font-weight: 700;
+  }
+  .asu__back:hover {
+    background: var(--t-sun);
+    border-color: var(--t-sun);
+    color: var(--t-night);
+  }
+  .asu__backFixed {
+    border: 2px dashed var(--t-dash);
+    background: var(--t-card);
+    color: var(--t-night);
+    backdrop-filter: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+  .asu__backFixed:hover {
+    background: var(--t-sun);
+    color: var(--t-night);
   }
 </style>

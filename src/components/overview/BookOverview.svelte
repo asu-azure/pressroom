@@ -297,7 +297,7 @@
     <div class="bracket bracket--tr" aria-hidden="true"></div>
     <div class="ov-hero__inner">
       {#if cover}
-        <figure class="ov-hero__cover" use:reveal={{ y: 34 }}>
+        <figure class="ov-hero__cover t-tape" use:reveal={{ y: 34 }}>
           <img
             src={cover.medUrl}
             alt={`${work.title} — cover`}
@@ -561,6 +561,215 @@
   }
   .ov-status__back:hover {
     color: var(--accent);
+  }
+
+  /* ---- storybook theme (styles/tale.css) ----------------------------------
+     The overview is only mounted on /w/[slug], which wears the tale theme; the
+     rules are still gated on body.theme-tale so the component stays whole on
+     any Editorial FUI page. */
+  :global(body.theme-tale) .ov-hero {
+    min-height: calc(100svh - 5rem);
+    margin: clamp(3.4rem, 8vh, 4.6rem) var(--pad) 0;
+    border-radius: 32px;
+    background-color: var(--t-sky);
+    background-image: radial-gradient(rgba(255, 253, 248, 0.45) 1.2px, transparent 1.5px);
+    background-size: 18px 18px;
+  }
+  :global(body.theme-tale) .ov-hero::before {
+    content: '';
+    position: absolute;
+    inset: 14px;
+    z-index: 1;
+    border: 2.5px dashed rgba(47, 53, 88, 0.35);
+    border-radius: 22px;
+    pointer-events: none;
+  }
+  :global(body.theme-tale) .ov-hero::after {
+    /* the ring, cropped by the corner */
+    content: '';
+    position: absolute;
+    top: clamp(-14rem, -18vw, -6rem);
+    right: clamp(-10rem, -12vw, -4rem);
+    z-index: 0;
+    width: clamp(16rem, 32vw, 28rem);
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 62% 38%, #7d7890 0 40%, var(--t-night) 40.5% 100%);
+    pointer-events: none;
+  }
+  :global(body.theme-tale) .ov-hero__wm {
+    display: none;
+  }
+  :global(body.theme-tale) .ov-hero__cover {
+    padding: 12px;
+    border: 0;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 14px 32px rgba(47, 53, 88, 0.2);
+    rotate: -2deg;
+  }
+  :global(body.theme-tale) .ov-hero__cover img {
+    border-radius: 10px;
+  }
+  :global(body.theme-tale) .ov-hero__coverTag {
+    left: 1.3rem;
+    bottom: 1.2rem;
+    padding: 0.2em 0.7em;
+    border-radius: 999px;
+    background: var(--t-night);
+    color: var(--t-paper);
+    mix-blend-mode: normal;
+  }
+  :global(body.theme-tale) .ov-hero__title {
+    font-weight: 900;
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .ov-hero__kicker,
+  :global(body.theme-tale) .ov-hero__meta,
+  :global(body.theme-tale) .ov-hero__desc {
+    color: var(--t-night-soft);
+  }
+  :global(body.theme-tale) .ov-btn {
+    border-radius: 999px;
+    border: 2.5px solid var(--t-night);
+    background: var(--t-night);
+    color: var(--t-paper);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  :global(body.theme-tale) .ov-btn:hover {
+    background: var(--t-sun);
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .ov-btn--ghost {
+    background: var(--t-card);
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .ov-scrollcue__label {
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .ov-scrollcue__line {
+    background: linear-gradient(var(--t-night), transparent);
+  }
+  :global(body.theme-tale) .ov-scrollcue__chev {
+    border-color: var(--t-night);
+  }
+  /* section heads: the big index numerals give way to boxed labels */
+  :global(body.theme-tale) .ov-toc__head .index-num,
+  :global(body.theme-tale) .ov-cast__head .index-num {
+    display: none;
+  }
+  :global(body.theme-tale) .ov-toc__title,
+  :global(body.theme-tale) .ov-cast__title {
+    position: relative;
+    display: inline-block;
+    padding: 0.3em 1.2em;
+    background: var(--t-sky-deep);
+    color: #fff;
+    font-weight: 900;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+  }
+  :global(body.theme-tale) .ov-cast__title {
+    background: var(--t-leaf);
+  }
+  :global(body.theme-tale) .ov-toc__title::after,
+  :global(body.theme-tale) .ov-cast__title::after {
+    content: '';
+    position: absolute;
+    inset: -7px 7px 7px -7px;
+    border: 2.5px solid var(--t-night);
+    pointer-events: none;
+  }
+  :global(body.theme-tale) .ov-toc__rule,
+  :global(body.theme-tale) .ov-cast__rule {
+    border-top: 2.5px dashed var(--t-dash);
+    background: none;
+    height: 0;
+  }
+  :global(body.theme-tale) .ov-chapter__title {
+    font-weight: 900;
+  }
+  :global(body.theme-tale) .ov-thumb {
+    padding: 5px;
+    border: 0;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 6px 16px rgba(47, 53, 88, 0.14);
+  }
+  :global(body.theme-tale) .ov-thumb img {
+    border-radius: 6px;
+  }
+  :global(body.theme-tale) .ov-thumb__num,
+  :global(body.theme-tale) .ov-thumb__tag {
+    mix-blend-mode: normal;
+    color: var(--t-paper);
+    background: var(--t-night);
+    padding: 0.1em 0.5em;
+    border-radius: 999px;
+  }
+  :global(body.theme-tale) .ov-lockNote {
+    border: 2.5px dashed var(--t-dash);
+    border-radius: 16px;
+    background: var(--t-card);
+  }
+  :global(body.theme-tale) .ov-lockNote__btn {
+    border-radius: 999px;
+    background: var(--t-night);
+    border-color: var(--t-night);
+    color: var(--t-paper);
+    font-weight: 700;
+  }
+  :global(body.theme-tale) .ov-castTile__frame {
+    padding: 6px;
+    border: 0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 18px rgba(47, 53, 88, 0.14);
+  }
+  :global(body.theme-tale) .ov-castTile__frame::after {
+    display: none;
+  }
+  :global(body.theme-tale) .ov-fore__inner {
+    padding: clamp(1.8rem, 4vw, 3rem);
+    background: var(--t-card);
+    border-radius: 18px;
+    border-top: 14px solid var(--t-sky);
+    border-bottom: 14px solid var(--t-leaf);
+    box-shadow: 0 10px 30px rgba(47, 53, 88, 0.1);
+    outline: 2.5px dashed var(--t-dash);
+    outline-offset: -12px;
+  }
+  :global(body.theme-tale) .ov-fore__label {
+    display: inline-block;
+    padding: 0.3em 0.9em;
+    border-radius: 999px;
+    background: var(--t-sun);
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .ov-backchip {
+    mix-blend-mode: normal;
+    opacity: 1;
+    padding: 0.45em 1em;
+    border-radius: 999px;
+    border: 2px dashed var(--t-dash-soft);
+    background: var(--t-card);
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .ov-backchip:hover {
+    background: var(--t-sun);
+  }
+  :global(body.theme-tale) .ov-fore__label,
+  :global(body.theme-tale) .ov-fore__spoiler {
+    justify-self: start;
+    width: fit-content;
+  }
+  @media (max-width: 760px) {
+    :global(body.theme-tale) .ov-scrollcue {
+      display: none;
+    }
+  }
+  :global(body.theme-tale) .ov-foot {
+    border-top: 2.5px dashed var(--t-dash-soft);
   }
 
   /* ---- hero ---- */

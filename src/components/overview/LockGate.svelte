@@ -135,6 +135,50 @@
 </div>
 
 <style>
+  /* Storybook theme: a paper card on a night veil (styles/tale.css). */
+  :global(body.theme-tale) .lg__backdrop {
+    background: rgba(38, 42, 70, 0.72);
+  }
+  :global(body.theme-tale) .lg__frame {
+    background: var(--t-card);
+    color: var(--t-night);
+    border: 0;
+    border-radius: 18px;
+    border-top: 14px solid var(--t-sky);
+    border-bottom: 14px solid var(--t-leaf);
+    outline: 2.5px dashed var(--t-dash);
+    outline-offset: -12px;
+    box-shadow: 0 18px 50px rgba(20, 24, 50, 0.35);
+  }
+  :global(body.theme-tale) .lg__frame .bracket {
+    display: none;
+  }
+  :global(body.theme-tale) .lg__title,
+  :global(body.theme-tale) .lg__hint,
+  :global(body.theme-tale) .lg__fieldLabel {
+    color: var(--t-night-soft);
+  }
+  :global(body.theme-tale) .lg__work {
+    color: var(--t-night);
+    font-weight: 900;
+  }
+  :global(body.theme-tale) .lg__field input {
+    background: var(--t-paper);
+    color: var(--t-night);
+    border: 2px dashed var(--t-dash);
+    border-radius: 10px;
+  }
+  :global(body.theme-tale) .lg__unlock {
+    border-radius: 999px;
+    background: var(--t-night);
+    border-color: var(--t-night);
+    color: var(--t-paper);
+    font-weight: 700;
+  }
+  :global(body.theme-tale) .lg__unlock:hover:not(:disabled) {
+    background: var(--t-sun);
+    color: var(--t-night);
+  }
   .lg {
     position: fixed;
     inset: 0;

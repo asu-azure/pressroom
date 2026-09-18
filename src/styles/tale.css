@@ -1,11 +1,18 @@
 /* ==========================================================================
-   tale.css — the "fairy-tale" theme for the public pages (/, /asu, /w/[slug]).
+   tale.css — the storybook theme for the public pages (/, /asu, /w/[slug]).
 
-   Grammar inspired by yui540's "臆病な魔女" (Cowardly-Witch, MIT): dashed
-   rounded frames with colour bands, stars on strings, a crescent moon, boxed
-   titles, dashed rules with sparkle ends, dotted paper, a rounded face.
-   Nothing is copied from that project's images, logo, character or name —
-   every motif here is drawn for Pressroom, in Asu's own palette.
+   Two sources of grammar, both redrawn for Pressroom rather than copied:
+   - yui540's DropOut / Cowardly-Witch (MIT): flat geometry — a concentric
+     ring cropped at a corner, a burst of small triangles — pictures set as
+     white-bordered stickers, dashed frames, boxed titles, dotted paper.
+   - Asu's own world: the sunflower (ทานตะวัน) of the series, masking tape
+     holding pictures down, the Thai school-notebook paper Pressroom already
+     wears.
+   No image, logo, character or name is taken from any source project.
+
+   Motion adapted from yui540/css-animations (MIT, Copyright (c) 2026 yui540 —
+   the full notice travels with src/styles/motion-kit.css): 飛び出す (pop-up
+   entrance), 塗り (paint-wipe title reveal) and a slow spin for the marks.
 
    Scope: everything lives under `body.theme-tale`, which Base.astro sets only
    when a page passes theme="tale". The reader, /lookbook and the Studio keep
@@ -50,27 +57,31 @@
 }
 
 body.theme-tale {
-  --t-night: #2b3263;
-  --t-night-soft: #4a5288;
-  --t-azure: #3d8fd6;
-  --t-sky: #9fcdef;
-  --t-lilac: #b6c3ea;
-  --t-sun: #f2b53a;
-  --t-leaf: #a8c85a;
-  --t-paper: #fbf7ea;
-  --t-card: #fffdf7;
-  --t-dash: rgba(43, 50, 99, 0.55);
-  --t-dash-soft: rgba(43, 50, 99, 0.28);
+  /* Muted on purpose: the art is the colour, the page is the paper. */
+  --t-night: #2f3558;
+  --t-night-soft: #545a7c;
+  --t-plum: #5c5470;
+  --t-azure: #4a7fb5;
+  --t-sky: #b3cfd8;
+  --t-sky-deep: #8fb3c2;
+  --t-sun: #e6b04a;
+  --t-leaf: #a6bb6c;
+  --t-paper: #f6f2e7;
+  --t-card: #fffdf8;
+  --t-dash: rgba(47, 53, 88, 0.5);
+  --t-dash-soft: rgba(47, 53, 88, 0.25);
+  --t-rule-blue: rgba(74, 127, 181, 0.2);
+  --t-rule-red: rgba(200, 90, 90, 0.35);
   --t-font: 'Zen Maru Gothic', 'Prompt', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
   --t-font-authored: 'Zen Maru Latin', 'Prompt', 'Hiragino Maru Gothic ProN', 'Yu Gothic', 'Hiragino Kaku Gothic ProN',
     'Noto Sans CJK JP', 'Meiryo', system-ui, sans-serif;
   --t-radius: 18px;
-  --t-swing: 3.6s;
 
   /* Re-point the house tokens, so every component that reads them follows. */
   --accent: var(--t-azure);
   --ink: var(--t-azure);
   --mk-accent: var(--t-sun);
+  --mk-love: var(--t-sun);
   --font-display: var(--t-font);
   --font-serif: var(--t-font);
   --font-mono: var(--t-font);
@@ -82,33 +93,41 @@ body.theme-tale {
   --bg-soft: var(--t-card);
   --fg: var(--t-night);
   --fg-dim: var(--t-night-soft);
-  --fg-faint: rgba(43, 50, 99, 0.45);
+  --fg-faint: rgba(47, 53, 88, 0.45);
   --line: var(--t-dash-soft);
   --line-strong: var(--t-dash);
 
   background-color: var(--t-paper);
-  background-image: radial-gradient(rgba(43, 50, 99, 0.13) 1.1px, transparent 1.4px);
+  background-image: radial-gradient(rgba(47, 53, 88, 0.12) 1.1px, transparent 1.4px);
   background-size: 16px 16px;
   color: var(--t-night);
   font-family: var(--t-font);
   font-weight: 500;
 }
-/* Both spreads become the same dotted paper — the tale has one tone. */
+/* Both spreads become the same dotted paper — the storybook has one tone. */
 body.theme-tale .spread--ink,
 body.theme-tale .spread--paper {
   --bg: transparent;
   --fg: var(--t-night);
   --fg-dim: var(--t-night-soft);
-  --fg-faint: rgba(43, 50, 99, 0.45);
+  --fg-faint: rgba(47, 53, 88, 0.45);
   --line: var(--t-dash-soft);
   --line-strong: var(--t-dash);
   background: transparent;
   color: var(--t-night);
 }
-/* FUI furniture that has no place on paper. */
+/* Editorial-FUI furniture that has no place on paper. */
 body.theme-tale .grid-bg,
 body.theme-tale .grain,
-body.theme-tale .cursor { display: none; }
+body.theme-tale .cursor,
+body.theme-tale .bracket,
+body.theme-tale .rgb-line,
+body.theme-tale .crop,
+body.theme-tale .regmark,
+body.theme-tale .ruler,
+body.theme-tale .chips,
+body.theme-tale .wm-line,
+body.theme-tale .paper-grid { display: none; }
 body.theme-tale .progress-line { background: var(--t-sun); height: 4px; }
 body.theme-tale .progress-line::before,
 body.theme-tale .progress-line::after { display: none; }
@@ -126,7 +145,7 @@ body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
   border-radius: var(--t-radius);
   border-top: 14px solid var(--band-top);
   border-bottom: 14px solid var(--band-bottom);
-  box-shadow: 0 10px 30px rgba(43, 50, 99, 0.12);
+  box-shadow: 0 10px 30px rgba(47, 53, 88, 0.1);
   padding: clamp(1.6rem, 4vw, 3rem);
 }
 .t-frame::before {
@@ -139,10 +158,55 @@ body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
 }
 .t-frame > * { position: relative; }
 
+/* ---- Sticker: a picture with a thick white border (DropOut's panel) ------ */
+.t-sticker {
+  position: relative;
+  display: block;
+  padding: clamp(8px, 1.1vw, 14px);
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(47, 53, 88, 0.18);
+}
+.t-sticker img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+
+/* ---- Masking tape: a translucent strip across a top edge ----------------- */
+.t-tape { position: relative; }
+.t-tape::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  z-index: 4;
+  width: clamp(64px, 30%, 110px);
+  height: 26px;
+  translate: -50% 0;
+  rotate: var(--tape-rot, -4deg);
+  background: var(--tape, rgba(230, 176, 74, 0.62));
+  /* torn ends */
+  clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 2% 96%, 0 45%);
+  pointer-events: none;
+}
+.t-tape--sky { --tape: rgba(143, 179, 194, 0.7); }
+.t-tape--leaf { --tape: rgba(166, 187, 108, 0.65); }
+.t-tape--left::before { left: 18%; --tape-rot: -9deg; }
+
+/* ---- Notebook paper: blue rules, red margin (Pressroom's own stock) ------ */
+.t-notebook {
+  background-color: var(--t-card);
+  background-image:
+    linear-gradient(90deg, transparent calc(2.2rem - 1px), var(--t-rule-red) calc(2.2rem - 1px) 2.2rem, transparent 2.2rem),
+    repeating-linear-gradient(180deg, transparent 0 calc(1.9rem - 1px), var(--t-rule-blue) calc(1.9rem - 1px) 1.9rem);
+}
+
 /* ---- Label: boxed title, offset outline, tiny caption --------------------- */
 .t-label-wrap { display: inline-grid; justify-items: center; gap: 0.45rem; }
 .t-label {
-  --label-bg: var(--t-lilac);
+  --label-bg: var(--t-sky-deep);
   position: relative;
   display: inline-block;
   margin: 0;
@@ -164,7 +228,7 @@ body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
 }
 .t-label--sun { --label-bg: var(--t-sun); }
 .t-label--leaf { --label-bg: var(--t-leaf); }
-.t-label--sky { --label-bg: var(--t-sky); }
+.t-label--sky { --label-bg: var(--t-sky-deep); }
 .t-label--night { --label-bg: var(--t-night); }
 .t-label__cap {
   padding-top: 0.35rem;
@@ -175,7 +239,7 @@ body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
   color: var(--t-night);
 }
 
-/* ---- Rule: sparkle — dashes — text — dashes — sparkle -------------------- */
+/* ---- Rule: mark — dashes — text — dashes — mark ----------------------- */
 .t-rule {
   display: flex;
   align-items: center;
@@ -187,59 +251,6 @@ body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
 .t-rule__line { flex: 1; border-top: 2.5px dashed var(--t-dash); min-width: 1.5rem; }
 .t-rule__end { width: 0.85rem; height: 0.85rem; color: var(--t-night-soft); }
 .t-rule__text { white-space: nowrap; font-size: clamp(0.95rem, 1.6vw, 1.15rem); }
-
-/* ---- Card: dashed paper card with a corner star ------------------------- */
-.t-card {
-  position: relative;
-  background: var(--t-card);
-  border: 2px dashed var(--t-dash-soft);
-  border-radius: 8px;
-}
-.t-card__star {
-  position: absolute;
-  top: -0.7rem;
-  left: -0.7rem;
-  z-index: 3;
-  width: 1.5rem;
-  height: 1.5rem;
-  color: var(--t-night);
-}
-.t-card__moon {
-  position: absolute;
-  right: 0.55rem;
-  bottom: 0.5rem;
-  z-index: 3;
-  width: 1.2rem;
-  height: 1.2rem;
-  color: var(--t-night);
-}
-
-/* ---- Round close button ------------------------------------------------- */
-.t-close {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 3.4rem;
-  height: 3.4rem;
-  border-radius: 50%;
-  border: 0;
-  background: #fff;
-  color: var(--t-night);
-  box-shadow: 0 6px 18px rgba(43, 50, 99, 0.18);
-  cursor: pointer;
-}
-.t-close::before {
-  content: '';
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  border: 2px dashed var(--t-dash);
-}
-.t-close::after {
-  content: '✕';
-  font-size: 1.3rem;
-  font-weight: 400;
-}
 
 /* ---- Pill button ----------------------------------------------------------- */
 .t-pill {
@@ -268,41 +279,60 @@ body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
 .t-swatches { display: inline-flex; gap: 0.5rem; }
 .t-swatches > span { width: 0.85rem; height: 0.85rem; border-radius: 2px; }
 
-/* ---- Hanging stars ------------------------------------------------------- */
-.t-hang {
+/* ---- Flat marks ----------------------------------------------------------
+   Ring: a dark disc with a lighter disc set inside, meant to be cropped by
+   its section's corner. Burst: small triangles in a circle. Sunflower. */
+.t-ring {
   position: absolute;
-  top: 0;
-  left: var(--x);
-  z-index: 2;
-  display: grid;
-  justify-items: center;
-  transform-origin: top center;
-  animation: t-swing var(--t-swing) ease-in-out var(--d) infinite alternate;
+  z-index: 0;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 62% 38%, var(--ring-in, #7d7890) 0 40%, var(--ring-out, var(--t-night)) 40.5% 100%);
   pointer-events: none;
 }
-.t-hang__string { width: 1.5px; height: var(--len); background: currentColor; opacity: 0.55; }
-.t-hang__icon { width: var(--size); height: var(--size); margin-top: -2px; }
-.t-hang--sun { color: var(--t-sun); }
-.t-hang--night { color: var(--t-night); }
-.t-hang--paper { color: var(--t-paper); }
-.t-hang--azure { color: var(--t-azure); }
-@keyframes t-swing {
-  from { rotate: -5deg; }
-  to { rotate: 5deg; }
+.t-burst { display: block; fill: var(--burst, var(--t-night)); }
+.t-sunflower { display: block; }
+.t-sunflower__petals { fill: var(--t-sun); }
+.t-sunflower__petals--back { fill: #d49a34; }
+.t-sunflower__disc { fill: #6b4a2e; }
+.t-sunflower__seeds { fill: #3f2a1a; }
+
+/* ---- Motion (adapted from yui540/css-animations, MIT) ---------------------
+   .t-spin      slow rotation for the burst and the sunflower
+   .t-popup     飛び出す — scale 0 → overshoot → settle, for stickers on load
+   [data-t-in]  entrance on first view, toggled by Base.astro's observer:
+                .t-label paints in (塗り), .t-in-pop pops (飛び出す)
+   Everything lands static under reduced motion; nothing is hidden without JS. */
+.t-spin { animation: t-spin var(--spin, 40s) linear infinite; }
+@keyframes t-spin { to { rotate: 360deg; } }
+
+.t-popup { animation: t-popup 0.7s ease-in-out var(--d, 0s) both; }
+@keyframes t-popup {
+  from { scale: 0 0; }
+  50% { scale: 1.12 1.16; }
+  75% { scale: 0.95 0.97; }
+  to { scale: 1 1; }
 }
-.t-twinkle { animation: t-twinkle 2.8s ease-in-out var(--d, 0s) infinite; }
-@keyframes t-twinkle {
-  0%, 100% { opacity: 1; scale: 1; }
-  50% { opacity: 0.45; scale: 0.8; }
+
+html.mk-js [data-t-in] .t-label { clip-path: inset(0 100% 0 0); }
+html.mk-js [data-t-in].is-in .t-label { animation: t-paint 0.6s cubic-bezier(0.7, 0, 0.3, 1) both; }
+@keyframes t-paint {
+  from { clip-path: inset(-12px 100% -12px -12px); }
+  to { clip-path: inset(-12px -12px -12px -12px); }
 }
+html.mk-js [data-t-in] .t-in-pop { scale: 0; }
+html.mk-js [data-t-in].is-in .t-in-pop { animation: t-popup 0.7s ease-in-out var(--d, 0.1s) both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .t-hang, .t-twinkle { animation: none; }
+  .t-spin, .t-popup { animation: none; }
+  html.mk-js [data-t-in] .t-label,
+  html.mk-js [data-t-in].is-in .t-label { clip-path: none; animation: none; }
+  html.mk-js [data-t-in] .t-in-pop,
+  html.mk-js [data-t-in].is-in .t-in-pop { scale: 1; animation: none; }
 }
 
-/* ---- Lightbox on tale pages: night backdrop, round paper buttons ---------- */
-body.theme-tale .lb__backdrop { background: rgba(33, 38, 78, 0.93); }
-body.theme-tale .lb .bracket { display: none; }
+/* ---- Lightbox on storybook pages: night backdrop, round paper buttons ---- */
+body.theme-tale .lb__backdrop { background: rgba(38, 42, 70, 0.94); }
 body.theme-tale .lb__btn {
   border: 0;
   border-radius: 50%;
@@ -325,7 +355,21 @@ body.theme-tale .lb__btn:hover,
 body.theme-tale .lb__btn:focus-visible { background: var(--t-sun); }
 body.theme-tale .lb__hud { color: var(--t-paper); }
 
-/* Narrow screens: strings shorten so stars stay above the words. */
-@media (max-width: 760px) {
-  .t-hang__string { height: calc(var(--len) * 0.5); }
+/* ---- Leftover Editorial-FUI pieces, retoned ------------------------------ */
+body.theme-tale .watermark { display: none; }
+/* Artwork placed outside the gallery (scene slots) becomes a sticker. */
+body.theme-tale .plate {
+  padding: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(47, 53, 88, 0.16);
+}
+body.theme-tale .plate img { border-radius: 8px; }
+body.theme-tale .plate__tag {
+  mix-blend-mode: normal;
+  color: var(--t-paper);
+  background: var(--t-night);
+  padding: 0.15em 0.6em;
+  border-radius: 999px;
 }

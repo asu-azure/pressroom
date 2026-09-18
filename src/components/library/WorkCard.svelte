@@ -53,8 +53,8 @@
     <span class="card__go mono">{i18n.t('lib.open')} <span class="mk-hop" aria-hidden="true">→</span></span>
   </span>
   <!-- Tale-theme stickers; hidden on Editorial FUI pages. -->
-  <svg class="card__sticker card__sticker--star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{@html taleIcons.star}</svg>
-  <svg class="card__sticker card__sticker--moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{@html taleIcons.moon}</svg>
+  <span class="card__tape" aria-hidden="true"></span>
+  <svg class="card__sticker card__sticker--flower" viewBox="0 0 24 24" aria-hidden="true">{@html taleIcons.flower}</svg>
 </a>
 
 <style>
@@ -91,7 +91,8 @@
   .card__lock {
     margin-left: 0.5em;
   }
-  .card__sticker {
+  .card__sticker,
+  .card__tape {
     display: none;
   }
 
@@ -159,20 +160,31 @@
     z-index: 3;
     color: var(--t-night);
   }
-  :global(body.theme-tale) .card__sticker--star {
-    top: -0.75rem;
-    left: -0.75rem;
-    width: 1.6rem;
-    height: 1.6rem;
-    color: var(--t-sun);
-    filter: drop-shadow(0 1px 0 var(--t-night)) drop-shadow(0 -1px 0 var(--t-night))
-      drop-shadow(1px 0 0 var(--t-night)) drop-shadow(-1px 0 0 var(--t-night));
+  /* Masking tape holding the card to the page. */
+  :global(body.theme-tale) .card__tape {
+    display: block;
+    position: absolute;
+    top: -11px;
+    left: 50%;
+    z-index: 4;
+    width: 38%;
+    height: 24px;
+    translate: -50% 0;
+    rotate: -3deg;
+    background: rgba(230, 176, 74, 0.6);
+    clip-path: polygon(3% 0, 97% 4%, 100% 50%, 96% 100%, 2% 96%, 0 45%);
   }
-  :global(body.theme-tale) .card__sticker--moon {
+  :global(body.theme-tale) .card:nth-child(even) .card__tape,
+  :global(body.theme-tale) div:nth-child(even) > .card .card__tape {
+    rotate: 4deg;
+    background: rgba(143, 179, 194, 0.7);
+  }
+  :global(body.theme-tale) .card__sticker--flower {
     right: 0.7rem;
     bottom: 0.7rem;
-    width: 1.3rem;
-    height: 1.3rem;
+    width: 1.4rem;
+    height: 1.4rem;
+    fill: var(--t-sun);
   }
   @media (hover: hover) {
     :global(body.theme-tale .tile:hover) .card__cover,

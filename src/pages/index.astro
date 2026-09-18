@@ -4,11 +4,11 @@ import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
 import TaleIcon from '../components/tale/TaleIcon.astro';
-import Hang from '../components/tale/Hang.astro';
-import Moon from '../components/tale/Moon.astro';
 import TaleLabel from '../components/tale/TaleLabel.astro';
 import TaleRule from '../components/tale/TaleRule.astro';
 import Swatches from '../components/tale/Swatches.astro';
+import Burst from '../components/tale/Burst.astro';
+import Sunflower from '../components/tale/Sunflower.astro';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
@@ -25,59 +25,65 @@ const t = copy[DEFAULT_LANG];
 
 <Base theme="tale">
   <main class="spread spread--ink lib-shell">
-    {/* ============ HERO — a night-sky stage ============
-        The tale theme (styles/tale.css). The masthead sits on a sunflower→azure
-        →night gradient with stars hanging from the top edge; the artwork looks
-        out through a round window with a crescent resting on its rim. */}
+    {/* ============ HERO — the storybook cover ============
+        Flat sky panel, a concentric ring cropped by the top-right corner and a
+        burst of triangles in the bottom-left (DropOut's flat geometry, redrawn),
+        the art pinned down as a taped sticker, a sunflower for the series.
+        See styles/tale.css. */}
     <header class="th-hero">
       <div class="th-stage">
-        <span class="th-stage__arc" aria-hidden="true"></span>
-        <Hang x="6%" len="4.5rem" tone="paper" delay={0} />
-        <Hang x="17%" len="8rem" tone="sun" delay={0.8} size="1.1rem" />
-        <Hang x="31%" len="3rem" tone="paper" delay={1.6} size="0.95rem" />
-        <Hang x="52%" len="6.5rem" tone="sun" icon="moon" delay={0.4} size="1.2rem" />
-        <Hang x="93%" len="5rem" tone="paper" delay={1.2} size="1.1rem" />
+        <span class="t-ring th-stage__ring" aria-hidden="true"></span>
+        <Burst class="th-stage__burst t-spin" />
 
         <div class="th-copy">
           <p class="th-kicker" id="lib-kicker">ASU AZURE · PRESSROOM</p>
           <h1 class="th-title" data-vel>
-            <span class="reveal-mask"><span id="lib-title-line">Press<span class="th-title__room">room</span></span></span>
+            <span class="reveal-mask"
+              ><span id="lib-title-line"
+                >Press<span class="mk-scribble th-title__room"
+                  >room<svg class="mk-scribble__line" viewBox="0 0 100 21" preserveAspectRatio="none" aria-hidden="true"
+                    ><path pathLength="1" d="M2 13 C 18 5, 32 19, 50 10 S 82 6, 98 12"></path></svg
+                  ></span
+                ></span
+              ></span
+            >
           </h1>
-          <span class="th-tag">Asu Azure</span>
+          <div class="th-tagrow">
+            <span class="th-tag">Asu Azure</span>
+            <Sunflower class="th-tagrow__flower t-spin" />
+          </div>
           <p class="th-sub" id="lib-sub">Asu Azure のオリジナル作品をまとめた場所。</p>
           <a class="t-pill th-cta mk-hop-host" href="#shelf">
-            <TaleIcon name="star" /> READ <span class="mk-hop" aria-hidden="true">→</span>
+            READ <span class="mk-hop" aria-hidden="true">→</span>
           </a>
         </div>
 
-        <div class="th-portal">
-          <div class="th-portal__window" aria-hidden="true">
+        <figure class="th-art">
+          <div class="t-sticker t-tape th-art__sticker t-popup" aria-hidden="true">
             <Image
               src={heroArt}
               alt=""
               widths={[480, 720, 960]}
-              sizes="(max-width: 760px) 70vw, 30rem"
+              sizes="(max-width: 760px) 80vw, 32rem"
               format="webp"
-              quality={76}
+              quality={78}
               loading="eager"
               fetchpriority="high"
             />
           </div>
-          <Moon id="hero" class="th-portal__moon" />
-          <TaleIcon name="star" class="th-portal__spark t-twinkle" />
-          {/* The artist's own animated chibi signs the stage. Reduced motion
+          {/* The artist's own animated chibi signs the cover. Reduced motion
               gets the still frame through <picture>. */}
           <picture class="th-stamp">
             <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
             <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
           </picture>
-        </div>
+        </figure>
       </div>
     </header>
 
     <Showcase />
 
-    <div class="th-shelfhead" id="shelf">
+    <div class="th-shelfhead" id="shelf" data-t-in>
       <TaleLabel caption="本棚 · ASU AZURE" tone="sky">BOOKSHELF</TaleLabel>
       <TaleRule class="th-shelfhead__rule" />
     </div>
@@ -87,10 +93,9 @@ const t = copy[DEFAULT_LANG];
     {/* ============ ARTIST TEASER ============
         After the books: shelf first, artist second — a visitor who has just
         looked through the work is the one ready to ask who made it. */}
-    <section class="teaser" id="artist">
-      <div class="t-frame teaser__frame">
-        <Hang x="8%" len="3.4rem" tone="night" delay={0.3} size="1rem" />
-        <Hang x="88%" len="5.2rem" tone="night" icon="moon" delay={1.1} size="1.1rem" />
+    <section class="teaser" id="artist" data-t-in>
+      <div class="t-frame t-notebook teaser__frame">
+        <Sunflower class="teaser__flower t-spin" />
         <div class="teaser__inner">
           <div class="teaser__copy">
             <span class="teaser__k" data-i18n="teaser.kicker">{t['teaser.kicker']}</span>
@@ -99,11 +104,10 @@ const t = copy[DEFAULT_LANG];
             </h2>
             <p class="teaser__lede" data-i18n="teaser.lede">{t['teaser.lede']}</p>
             <a class="t-pill teaser__cta mk-hop-host" href="/asu" data-flock>
-              <TaleIcon name="paw" />
               <span data-i18n="teaser.cta">{t['teaser.cta']}</span> <span class="mk-hop" aria-hidden="true">→</span>
             </a>
           </div>
-          <picture class="teaser__seal" aria-hidden="true">
+          <picture class="teaser__seal t-in-pop" aria-hidden="true">
             <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
             <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
           </picture>
@@ -117,9 +121,9 @@ const t = copy[DEFAULT_LANG];
       <div class="lib-foot__row">
         <span class="lib-foot__c">© ASU AZURE</span>
         <nav class="lib-foot__links" aria-label="Elsewhere">
-          <a href="/asu" data-flock><TaleIcon name="star" /> ASU AZURE</a>
-          <a href="https://x.com/asukonpeki"><TaleIcon name="moon" /> X — @asukonpeki</a>
-          <a class="lib-foot__studio" href="/studio"><TaleIcon name="paw" /> STUDIO</a>
+          <a href="/asu" data-flock><TaleIcon name="flower" /> ASU AZURE</a>
+          <a href="https://x.com/asukonpeki"><TaleIcon name="tri" /> X — @asukonpeki</a>
+          <a class="lib-foot__studio" href="/studio"><TaleIcon name="spark" /> STUDIO</a>
         </nav>
       </div>
     </footer>
@@ -128,6 +132,13 @@ const t = copy[DEFAULT_LANG];
   {/* Trilingual copy for the artist teaser, so switching costs no request. */}
   <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
 </Base>
+
+<script>
+  // カキカキ (motion-kit): the underline under "room" draws itself once the
+  // title has risen. Reduced motion: the kit shows it already drawn.
+  const room = document.querySelector('.th-title__room');
+  if (room) setTimeout(() => room.classList.add('is-on'), 900);
+</script>
 
 <script>
   import { gsap } from 'gsap';
@@ -264,7 +275,7 @@ const t = copy[DEFAULT_LANG];
     flex-direction: column;
   }
 
-  /* ---------- Hero stage ---------- */
+  /* ---------- Hero: the storybook cover ---------- */
   .th-hero {
     padding: clamp(3.8rem, 9vh, 5.5rem) var(--pad) clamp(1.5rem, 4vh, 2.5rem);
   }
@@ -273,37 +284,38 @@ const t = copy[DEFAULT_LANG];
     overflow: hidden;
     isolation: isolate;
     display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
     align-items: center;
     gap: clamp(1.5rem, 4vw, 3rem);
-    min-height: clamp(30rem, 72svh, 44rem);
-    padding: clamp(4.5rem, 9vh, 6rem) clamp(1.6rem, 6vw, 5rem) clamp(2.5rem, 6vh, 4rem);
+    min-height: clamp(30rem, 70svh, 42rem);
+    padding: clamp(3rem, 8vh, 5rem) clamp(1.6rem, 6vw, 5rem);
     border-radius: 32px;
-    /* Night where the words are, sunflower where the window is. */
-    background: linear-gradient(245deg, var(--t-sun) 0%, #f7d27f 12%, var(--t-sky) 32%, var(--t-azure) 55%, var(--t-night) 86%);
-    box-shadow: 0 18px 50px rgba(43, 50, 99, 0.25);
-    color: var(--t-paper);
+    background-color: var(--t-sky);
+    background-image: radial-gradient(rgba(255, 253, 248, 0.45) 1.2px, transparent 1.5px);
+    background-size: 18px 18px;
+    color: var(--t-night);
   }
   .th-stage::before {
     content: '';
     position: absolute;
     inset: 14px;
-    z-index: -1;
-    border: 2.5px dashed rgba(255, 253, 247, 0.7);
+    z-index: 1;
+    border: 2.5px dashed rgba(47, 53, 88, 0.35);
     border-radius: 22px;
     pointer-events: none;
   }
-  .th-stage__arc {
+  .th-stage__ring {
+    top: clamp(-14rem, -18vw, -6rem);
+    right: clamp(-10rem, -12vw, -4rem);
+    width: clamp(16rem, 34vw, 30rem);
+  }
+  .th-stage :global(.th-stage__burst) {
     position: absolute;
-    z-index: -1;
-    top: 50%;
-    right: -28vmin;
-    width: 118vmin;
-    aspect-ratio: 1;
-    translate: 0 -50%;
-    border: 2px solid rgba(255, 253, 247, 0.32);
-    border-radius: 50%;
-    pointer-events: none;
+    left: clamp(-2.5rem, -2vw, -1rem);
+    bottom: clamp(-2.5rem, -2vw, -1rem);
+    z-index: 0;
+    width: clamp(7rem, 13vw, 11rem);
+    --spin: 60s;
   }
   .th-copy {
     position: relative;
@@ -315,117 +327,86 @@ const t = copy[DEFAULT_LANG];
     font-size: 0.72rem;
     font-weight: 700;
     letter-spacing: 0.22em;
-    opacity: 0.9;
+    color: var(--t-night-soft);
   }
   .th-title {
     margin: 0;
     font-weight: 900;
-    font-size: clamp(3rem, 8.6vw, 7.2rem);
-    line-height: 0.98;
+    font-size: clamp(3rem, 8.4vw, 7rem);
+    line-height: 1;
     letter-spacing: 0.01em;
-    text-shadow: 0 5px 0 rgba(20, 24, 60, 0.28);
     overflow-wrap: anywhere;
   }
+  /* Room for the hand-drawn underline inside the rising mask. */
+  .th-title .reveal-mask {
+    padding-bottom: 0.28em;
+  }
   .th-title__room {
-    color: var(--t-sun);
+    --mk-accent: var(--t-sun);
+  }
+  /* At display size the kit's non-scaling stroke + pathLength dash breaks into
+     fragments in Chromium; this underline uses a near-true-aspect viewBox
+     and a plain user-space stroke instead. */
+  .th-title :global(.mk-scribble__line) {
+    bottom: -0.1em;
+  }
+  .th-title :global(.mk-scribble__line path) {
+    vector-effect: none;
+    stroke-width: 2.4px;
+  }
+  .th-tagrow {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin-top: 0.4rem;
   }
   .th-tag {
     position: relative;
     display: inline-block;
-    margin-top: 0.9rem;
     padding: 0.2em 0.8em;
-    background: var(--t-paper);
+    background: var(--t-card);
     color: var(--t-night);
     font-weight: 900;
     font-size: clamp(0.95rem, 1.6vw, 1.2rem);
     letter-spacing: 0.06em;
     rotate: -3deg;
+    box-shadow: 0 4px 10px rgba(47, 53, 88, 0.15);
   }
-  .th-tag::after {
-    content: '';
-    position: absolute;
-    inset: -5px 5px 5px -5px;
-    border: 2px solid var(--t-paper);
-    pointer-events: none;
+  .th-tagrow :global(.th-tagrow__flower) {
+    width: clamp(2.2rem, 3.4vw, 3rem);
+    --spin: 30s;
   }
   .th-sub {
-    margin-top: 1.3rem;
+    margin-top: 1.2rem;
     max-width: 30em;
-    font-size: clamp(1rem, 1.6vw, 1.2rem);
-    line-height: 1.7;
+    font-size: clamp(1rem, 1.6vw, 1.15rem);
+    line-height: 1.75;
+    color: var(--t-night-soft);
   }
   .th-cta {
-    margin-top: 1.6rem;
-    background: var(--t-sun);
-    border-color: var(--t-sun);
-    color: var(--t-night);
-  }
-  .th-cta:hover,
-  .th-cta:focus-visible {
-    background: var(--t-paper);
-    border-color: var(--t-paper);
+    margin-top: 1.5rem;
   }
 
-  .th-portal {
+  .th-art {
     position: relative;
     z-index: 2;
     justify-self: center;
-    width: min(28rem, 34vw);
-    aspect-ratio: 1;
+    width: min(30rem, 38vw);
+    margin: 0;
   }
-  .th-portal::before {
-    content: '';
-    position: absolute;
-    inset: -18px;
-    border: 2.5px dashed rgba(255, 253, 247, 0.85);
-    border-radius: 50%;
-    pointer-events: none;
-  }
-  .th-portal__window {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    border-radius: 50%;
-    border: 8px solid var(--t-paper);
-    box-shadow: 0 18px 40px rgba(20, 24, 60, 0.35);
-    background: var(--t-night);
-  }
-  .th-portal__window :global(img) {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 30%;
-  }
-  .th-portal :global(.th-portal__moon) {
-    position: absolute;
-    top: -9%;
-    left: -12%;
-    z-index: 2;
-    width: 44%;
-    height: auto;
-    color: var(--t-sun);
-    rotate: -18deg;
-    filter: drop-shadow(0 6px 14px rgba(20, 24, 60, 0.35));
-  }
-  .th-portal :global(.th-portal__spark) {
-    position: absolute;
-    top: 4%;
-    right: 2%;
-    z-index: 2;
-    width: 2.1rem;
-    height: 2.1rem;
-    color: var(--t-paper);
+  .th-art__sticker {
+    rotate: 3deg;
   }
   .th-stamp {
     position: absolute;
-    right: -6%;
+    left: -10%;
     bottom: -8%;
-    z-index: 3;
+    z-index: 5;
     display: block;
     width: clamp(4.5rem, 9vw, 7rem);
     rotate: -8deg;
     pointer-events: none;
-    filter: drop-shadow(0 4px 10px rgba(20, 24, 60, 0.3));
+    filter: drop-shadow(0 4px 10px rgba(47, 53, 88, 0.25));
   }
   .th-stamp img {
     display: block;
@@ -436,16 +417,11 @@ const t = copy[DEFAULT_LANG];
   @media (max-width: 760px) {
     .th-stage {
       grid-template-columns: minmax(0, 1fr);
-      padding-top: 5.5rem;
-      text-align: left;
+      padding-top: 3.2rem;
     }
-    .th-portal {
-      width: min(18rem, 66vw);
-      margin: 0.5rem auto 1rem;
-    }
-    .th-stage__arc {
-      right: -60vmin;
-      top: 72%;
+    .th-art {
+      width: min(20rem, 76vw);
+      margin: 0.8rem auto 1.2rem;
     }
   }
 
@@ -469,8 +445,16 @@ const t = copy[DEFAULT_LANG];
   .teaser__frame {
     max-width: 1100px;
     margin-inline: auto;
-    padding-top: clamp(4.2rem, 9vh, 5.5rem);
+    padding-left: clamp(3.2rem, 6vw, 4.5rem);
     overflow: hidden;
+  }
+  .teaser__frame :global(.teaser__flower) {
+    position: absolute;
+    top: -3.2rem;
+    right: -3.2rem;
+    width: clamp(7rem, 12vw, 10rem);
+    opacity: 0.9;
+    --spin: 50s;
   }
   .teaser__inner {
     display: flex;
@@ -506,7 +490,7 @@ const t = copy[DEFAULT_LANG];
     margin: 0;
     color: var(--t-night-soft);
     font-size: clamp(0.92rem, 1.4vw, 1.02rem);
-    line-height: 1.85;
+    line-height: 1.9rem;
   }
   .teaser__cta {
     margin-top: 0.5rem;
