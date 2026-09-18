@@ -303,3 +303,20 @@ spans the navigation, covering the old page and uncovering the new one.
   known deferral, not an oversight: `Library.svelte` registers ScrollTrigger at module scope and
   would need auditing before it could SSR. The hero, showcase strip and artist teaser around it are
   static HTML, so the page is no longer content-empty on first paint.
+
+## Reader extras and the motion kit
+
+- **`src/styles/motion-kit.css`** holds small class-triggered motions adapted from
+  `yui540/css-animations` (MIT — keep the licence header). Used for the library/reader/uploader loaders
+  (`.mk-loader`), the lock gate (`.mk-brake` on a wrong password, `.mk-rollup` on unlock), and the card
+  pop/arrow hop. Everything lands on its final state under reduced motion.
+- **"ここすき" favourite pages** (idea and `HeartBurst.svelte` adapted from `yui540/comimi`, MIT):
+  long-press a page (500 ms, cancelled by >10px movement, a second finger or a scroll) → heart burst,
+  saved per work in localStorage (`loadFavorites`/`saveFavorites`). The chrome heart toggles the
+  current sheet. **FlipSurface treats a hold of 450 ms or more as not-a-tap** — without that guard a
+  long-press also turned the page. Don't remove it.
+- **Page grid** (▦ in the chrome): every page, a favourites tab, and SHARE, which copies the
+  `?p=pageId` deep link. Jumps go through `Reader.jump()`, which scrolls the row in scroll mode —
+  ScrollSurface reads its start index only at mount, so a bare `setCur` did nothing there.
+- Chrome icons are inline SVG: the subset mono webfont has no ♥/▦ glyphs.
+- The chrome hides after 3 s idle; never while a panel is open or focus is inside it.

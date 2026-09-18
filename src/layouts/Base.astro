@@ -2,6 +2,7 @@
 import '../styles/fonts.css';
 import '../styles/global.css';
 import '../styles/motion.css';
+import '../styles/motion-kit.css';
 
 interface Props {
   title?: string;
@@ -98,6 +99,7 @@ const jsonLd = JSON.stringify({
       }
     </style>
     <script is:inline>
+      document.documentElement.classList.add('mk-js');
       try {
         if (sessionStorage.getItem('pr:flock') !== null) {
           document.documentElement.classList.add('flock-cover');

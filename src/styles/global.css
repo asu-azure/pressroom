@@ -1561,3 +1561,11 @@ html.lb-open { overflow: hidden; }
   .fui--top { top: clamp(2.8rem, 8vh, 4.5rem); font-size: 0.52rem; }
   .index-num { font-size: clamp(3rem, 16vw, 5rem); }
 }
+
+/* ==========================================================================
+   Motion kit hooks (motion-kit.css — adapted from yui540/css-animations, MIT)
+   ========================================================================== */
+:root {
+  --mk-accent: var(--accent);
+  --mk-love: #e8a31a; /* "ここすき" hearts wear the sunflower amber, not red */
+}

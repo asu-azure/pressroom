@@ -58,18 +58,23 @@
     // A locked published work always has pages — empty means wrong password.
     if (error || !data?.length) {
       wrong = true;
+      // 急ブレーキ (motion-kit): the frame slams sideways and settles.
       if (!reduced && frame) {
-        gsap.fromTo(
-          frame,
-          { x: -7 },
-          { x: 0, duration: 0.45, ease: 'elastic.out(1.4, 0.28)' },
-        );
+        frame.classList.remove('is-wrong');
+        void frame.offsetWidth;
+        frame.classList.add('is-wrong');
       }
       inputEl?.select();
       return;
     }
     saveUnlock(work.id, password);
-    onUnlocked(data as PageRow[]);
+    // 巻き物 (motion-kit): the gate rolls itself up before the pages appear.
+    if (reduced || !frame) {
+      onUnlocked(data as PageRow[]);
+      return;
+    }
+    frame.classList.add('mk-rollup');
+    frame.addEventListener('animationend', () => onUnlocked(data as PageRow[]), { once: true });
   }
 
   function onKey(e: KeyboardEvent) {
@@ -85,7 +90,14 @@
 <div class="lg" role="dialog" aria-modal="true" aria-label={`${i18n.t('lock.title')} — ${work.title}`}>
   <button class="lg__backdrop" bind:this={backdrop} aria-label={i18n.t('cast.close')} onclick={onClose}></button>
 
-  <form class="lg__frame" bind:this={frame} onsubmit={submit}>
+  <form
+    class="lg__frame mk-brake"
+    bind:this={frame}
+    onsubmit={submit}
+    onanimationend={(e) => {
+      if (e.animationName === 'mk-brake') frame.classList.remove('is-wrong');
+    }}
+  >
     <span class="bracket bracket--tl" aria-hidden="true"></span>
     <span class="bracket bracket--br" aria-hidden="true"></span>
 

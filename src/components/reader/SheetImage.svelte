@@ -46,6 +46,7 @@
 <span
   class="si"
   class:si--blank={page.isBlank}
+  data-page-id={page.isBlank ? undefined : page.id}
   style={`aspect-ratio: ${page.width} / ${page.height}; --pw: ${page.width}; --ph: ${page.height};`}
 >
   {#if page.isBlank}
@@ -113,6 +114,8 @@
     background: #101012;
     max-width: 100%;
     max-height: 100%;
+    /* A long press marks a favourite — no iOS image callout on top of it. */
+    -webkit-touch-callout: none;
     /* Size container so .si__bubbles can read the box's rendered dimensions
        (cqw/cqh) cross-axis and reproduce object-fit:contain exactly. Safe:
        .si always has a determinate size from the surface CSS. */

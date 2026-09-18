@@ -4,11 +4,15 @@
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
   import { i18n } from '../../lib/i18n.svelte';
-  import { loadSettings, saveSettings, loadProgress, saveProgress, loadUnlock, clearUnlock } from '../../lib/persistence';
+  import {
+    loadSettings, saveSettings, loadProgress, saveProgress, loadUnlock, clearUnlock,
+    loadFavorites, saveFavorites, takeHint,
+  } from '../../lib/persistence';
   import ScrollSurface from './ScrollSurface.svelte';
   import FlipSurface from './FlipSurface.svelte';
   import ReaderChrome from './ReaderChrome.svelte';
   import NoteRail from './NoteRail.svelte';
+  import HeartBurst from './HeartBurst.svelte';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
@@ -21,6 +25,10 @@
   let cur = $state(0);
   let chrome = $state<ReaderChrome | null>(null);
   let highlightId = $state<string | null>(null);
+  let favorites = $state<string[]>([]);
+  let bursts = $state<{ id: number; x: number; y: number }[]>([]);
+  let toast = $state<string | null>(null);
+  let peel = $state(false);
 
   const coverSolo = $derived(work?.cover_solo ?? true);
   const sheets = $derived(
@@ -34,9 +42,8 @@
   const showRail = $derived(hasNote || (settings.translate && hasBubbles));
   const dirSign = $derived(work?.direction === 'rtl' ? -1 : 1);
 
-  const pageOrder = $derived(
-    [...pages].sort((a, b) => (a.sortKey < b.sortKey ? -1 : 1)).map((p) => p.id),
-  );
+  const orderedPages = $derived([...pages].sort((a, b) => (a.sortKey < b.sortKey ? -1 : 1)));
+  const pageOrder = $derived(orderedPages.map((p) => p.id));
   function pageNumberOf(pageId: string): number {
     return pageOrder.indexOf(pageId) + 1;
   }
@@ -113,7 +120,124 @@
       );
       if (idx > 0) cur = idx;
     }
+    favorites = loadFavorites(work.id);
     status = 'ready';
+
+    // First visit to any book: a page-corner peel says "turn me", and a toast
+    // teaches the long-press. Once per browser, never again.
+    if (takeHint('reader')) {
+      peel = settings.mode === 'flip';
+      say(i18n.t('rd.favHint'), 2600);
+      setTimeout(() => (peel = false), 1500);
+    }
+  }
+
+  /** Jump to a sheet. Scroll mode reads its start index only at mount, so it
+      has to be scrolled there explicitly. */
+  function jump(index: number) {
+    setCur(index);
+    if (settings.mode === 'scroll') {
+      document
+        .querySelector(`.ss__row[data-index="${cur}"]`)
+        ?.scrollIntoView({ block: 'start', behavior: 'instant' as ScrollBehavior });
+    }
+  }
+
+  function jumpToPage(pageId: string) {
+    const idx = sheetIndexOf(sheets, pageId);
+    if (idx >= 0) jump(idx);
+  }
+
+  // --- "ここすき" favourites (idea and burst adapted from comimi, MIT) ---
+  let toastTimer = 0;
+  function say(message: string, ms = 1600) {
+    toast = message;
+    clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => (toast = null), ms);
+  }
+
+  let burstId = 0;
+  function burst(x: number, y: number) {
+    const id = ++burstId;
+    bursts = [...bursts, { id, x, y }];
+    setTimeout(() => (bursts = bursts.filter((b) => b.id !== id)), 1700);
+  }
+
+  function storeFavorites(next: string[], message: string) {
+    favorites = next;
+    const kept = work ? saveFavorites(work.id, next) : false;
+    say(kept ? message : i18n.t('rd.favLocal'));
+  }
+
+  /** Long-press always adds (and always plays the burst), like comimi. */
+  function addFavorite(pageId: string, at: { x: number; y: number }) {
+    burst(at.x, at.y);
+    const next = favorites.includes(pageId) ? favorites : [...favorites, pageId];
+    storeFavorites(next, i18n.t('rd.favAdd'));
+  }
+
+  function removeFavorite(pageId: string) {
+    storeFavorites(favorites.filter((id) => id !== pageId), i18n.t('rd.favRemove'));
+  }
+
+  /** The chrome's heart: un-fave whatever is faved on this sheet, else fave its first page. */
+  function toggleCurrentFavorite() {
+    const ids = currentSheet?.pages.filter((p) => !p.isBlank).map((p) => p.id) ?? [];
+    if (!ids.length) return;
+    if (ids.some((id) => favorites.includes(id))) {
+      storeFavorites(favorites.filter((id) => !ids.includes(id)), i18n.t('rd.favRemove'));
+    } else {
+      storeFavorites([...favorites, ids[0]], i18n.t('rd.favAdd'));
+    }
+  }
+
+  async function sharePage() {
+    const pageId = currentSheet?.pages[0]?.id;
+    if (!pageId) return;
+    const url = new URL(location.href);
+    url.searchParams.set('p', pageId);
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      say(i18n.t('rd.copied'));
+    } catch {
+      say(i18n.t('rd.copyFail'));
+    }
+  }
+
+  // Long-press detection. Hands off anything that owns its own tap; movement
+  // past 10px, a second finger or a scroll (pointercancel) cancels it.
+  let press: { x: number; y: number; timer: number } | null = null;
+  let pressedAt = 0;
+  function cancelPress() {
+    if (press) clearTimeout(press.timer);
+    press = null;
+  }
+  function pressDown(e: PointerEvent) {
+    cancelPress();
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-bub], [data-nav], button, a, input')) return;
+    const pageId = target.closest<HTMLElement>('[data-page-id]')?.dataset.pageId;
+    if (!pageId) return;
+    const x = e.clientX;
+    const y = e.clientY;
+    press = {
+      x,
+      y,
+      timer: window.setTimeout(() => {
+        press = null;
+        pressedAt = performance.now();
+        navigator.vibrate?.(12);
+        addFavorite(pageId, { x, y });
+      }, 500),
+    };
+  }
+  function pressMove(e: PointerEvent) {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) cancelPress();
+  }
+  function pressMenu(e: MouseEvent) {
+    // Android raises the context menu on the same long press — swallow that one.
+    if (press || performance.now() - pressedAt < 800) e.preventDefault();
   }
 
   function setCur(index: number) {
@@ -198,7 +322,7 @@
 
 <div class="reader spread spread--ink">
   {#if status === 'loading'}
-    <p class="mono reader__status">{i18n.t('rd.loading')}</p>
+    <p class="mono reader__status"><span class="mk-loader" aria-hidden="true"></span> {i18n.t('rd.loading')}</p>
   {:else if status === 'missing' || !work}
     <div class="reader__status">
       <p class="mono">{i18n.t('rd.missing')}</p>
@@ -210,6 +334,14 @@
       <a class="mono reader__back" href="/">← {i18n.t('ov.back')}</a>
     </div>
   {:else}
+    <div
+      class="reader__pages"
+      onpointerdown={pressDown}
+      onpointermove={pressMove}
+      onpointerup={cancelPress}
+      onpointercancel={cancelPress}
+      oncontextmenu={pressMenu}
+    >
     {#key `${settings.mode}-${settings.layout}-${work.direction}`}
       {#if settings.mode === 'scroll'}
         <ScrollSurface
@@ -239,6 +371,18 @@
         />
       {/if}
     {/key}
+    </div>
+    {#each bursts as b (b.id)}
+      <HeartBurst x={b.x} y={b.y} />
+    {/each}
+    {#if peel}
+      <span
+        class="reader__peel mk-peel is-peeling"
+        class:mk-peel--left={work.direction === 'rtl'}
+        class:mk-peel--right={work.direction !== 'rtl'}
+        aria-hidden="true"
+      ></span>
+    {/if}
     {#if showRail && currentSheet}
       <NoteRail
         sheet={currentSheet}
@@ -262,10 +406,17 @@
       {chapterMarks}
       {currentChapter}
       {pageNumberOf}
+      pages={orderedPages}
+      {favorites}
       onSettings={patchSettings}
-      onJump={setCur}
+      onJump={jump}
+      onJumpPage={jumpToPage}
+      onToggleFavorite={toggleCurrentFavorite}
+      onRemoveFavorite={removeFavorite}
+      onShare={sharePage}
     />
   {/if}
+  <p class="mono reader__toast" class:is-on={toast} role="status" aria-live="polite">{toast ?? ''}</p>
 </div>
 
 <style>
@@ -284,5 +435,49 @@
   }
   .reader__back:hover {
     color: var(--accent);
+  }
+  /* Wrapper only for the long-press listeners — no box of its own. */
+  .reader__pages {
+    display: contents;
+  }
+  .reader__peel {
+    position: fixed;
+    bottom: 0;
+    z-index: 30;
+    width: 9rem;
+    aspect-ratio: 1;
+    pointer-events: none;
+  }
+  .reader__peel.mk-peel--right {
+    right: 0;
+  }
+  .reader__peel.mk-peel--left {
+    left: 0;
+  }
+  .reader__toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(3.4rem + env(safe-area-inset-bottom));
+    z-index: 60;
+    translate: -50% 0.6rem;
+    max-width: calc(100vw - 2 * var(--pad));
+    padding: 0.55em 1em;
+    background: rgba(12, 12, 13, 0.94);
+    border: 1px solid var(--line-strong);
+    color: var(--fg);
+    font-size: 0.62rem;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s var(--ease), translate 0.25s var(--ease);
+  }
+  .reader__toast.is-on {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reader__toast {
+      transition: none;
+    }
   }
 </style>

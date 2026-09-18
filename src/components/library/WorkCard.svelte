@@ -27,7 +27,7 @@
   });
 </script>
 
-<a class="card tile" href={`/w/${work.slug}`} data-cursor="READ">
+<a class="card tile mk-pop mk-hop-host" href={`/w/${work.slug}`} data-cursor="READ">
   {#if coverUrl && cropStyle}
     <div class="card__cover" style={cropStyle} role="img" aria-label={`Cover of ${work.title}`}></div>
   {:else if coverUrl}
@@ -49,7 +49,7 @@
     {/if}
     <!-- Says where the tap goes, so the overview isn't a surprise stop on the
          way to reading. -->
-    <span class="card__go mono">{i18n.t('lib.open')} →</span>
+    <span class="card__go mono">{i18n.t('lib.open')} <span class="mk-hop" aria-hidden="true">→</span></span>
   </span>
 </a>
 

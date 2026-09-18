@@ -113,6 +113,7 @@
   {#if busy || done > 0}
     <div class="up__progress">
       <span class="mono up__counter">
+        {#if busy}<span class="mk-loader" aria-hidden="true"></span>{/if}
         {#if files.length > 1}FILE {fileNo}/{files.length} · {/if}
         RASTERIZING {String(done).padStart(3, '0')}/{String(total || 0).padStart(3, '0')}
       </span>

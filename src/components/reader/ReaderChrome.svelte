@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Work, ReaderSettings, Sheet, ChapterMark } from '../../lib/types';
+  import type { Work, ReaderSettings, Sheet, ChapterMark, PageRec } from '../../lib/types';
   import { i18n } from '../../lib/i18n.svelte';
 
   let {
@@ -13,8 +13,14 @@
     chapterMarks,
     currentChapter,
     pageNumberOf,
+    pages,
+    favorites,
     onSettings,
     onJump,
+    onJumpPage,
+    onToggleFavorite,
+    onRemoveFavorite,
+    onShare,
   }: {
     work: Work;
     settings: ReaderSettings;
@@ -26,12 +32,64 @@
     chapterMarks: ChapterMark[];
     currentChapter: string | null;
     pageNumberOf: (pageId: string) => number;
+    pages: PageRec[];
+    favorites: string[];
     onSettings: (patch: Partial<ReaderSettings>) => void;
     onJump: (sheet: number) => void;
+    onJumpPage: (pageId: string) => void;
+    onToggleFavorite: () => void;
+    onRemoveFavorite: (pageId: string) => void;
+    onShare: () => void;
   } = $props();
 
   let panelOpen = $state(false);
   let tocOpen = $state(false);
+  let gridOpen = $state(false);
+  let gridTab = $state<'all' | 'fav'>('all');
+
+  // Drawn, not typed: the subset mono webfont has no ♥ or ▦, so glyphs fell back to specks.
+  const HEART =
+    'M16.29 3.3c-1.72 0-3.24.76-4.29 1.99C10.95 4.06 9.33 3.3 7.62 3.3 4.57 3.3 2 5.86 2 8.9v.57c.38 4.66 5.33 8.55 8.29 10.35.47.29 1.04.48 1.71.48.57 0 1.14-.19 1.71-.48 2.96-1.9 7.91-5.7 8.29-10.35V8.9c0-3.04-2.57-5.6-5.71-5.6Z';
+
+  const currentIds = $derived(currentSheet?.pages.map((p) => p.id) ?? []);
+  const currentFaved = $derived(currentIds.some((id) => favorites.includes(id)));
+  const readable = $derived(pages.filter((p) => !p.isBlank));
+  const favPages = $derived(readable.filter((p) => favorites.includes(p.id)));
+  const shown = $derived(gridTab === 'fav' ? favPages : readable);
+
+  function openGrid(tab: 'all' | 'fav' = 'all') {
+    gridTab = tab;
+    gridOpen = true;
+    tocOpen = false;
+    panelOpen = false;
+  }
+
+  // Chrome steps aside after 3 s without input, like comimi's overlay. Any
+  // pointer, key or wheel brings it back; it never hides while a panel is open
+  // or while keyboard focus is inside it.
+  let idle = $state(false);
+  const hidden = $derived(idle && !panelOpen && !tocOpen && !gridOpen);
+  $effect(() => {
+    let timer = 0;
+    const wake = () => {
+      idle = false;
+      clearTimeout(timer);
+      timer = window.setTimeout(function rest() {
+        if (document.activeElement?.closest('.rc-top, .rc-bottom')) {
+          timer = window.setTimeout(rest, 3000);
+          return;
+        }
+        idle = true;
+      }, 3000);
+    };
+    const events = ['pointermove', 'pointerdown', 'keydown', 'wheel', 'touchstart'] as const;
+    events.forEach((ev) => window.addEventListener(ev, wake, { passive: true }));
+    wake();
+    return () => {
+      clearTimeout(timer);
+      events.forEach((ev) => window.removeEventListener(ev, wake));
+    };
+  });
 
   export function togglePanel() {
     panelOpen = !panelOpen;
@@ -45,7 +103,7 @@
   }
 </script>
 
-<header class="rc-top">
+<header class="rc-top" class:is-idle={hidden}>
   <a class="mono rc-top__back" href={`/w/${work.slug}`} data-hover>← {i18n.t('rd.overview')}</a>
   <span class="mono rc-top__title">{work.title}</span>
   <div class="rc-top__actions">
@@ -63,7 +121,29 @@
         title={i18n.t('rd.toc')}
       >{i18n.t('rd.toc')}</button>
     {/if}
-    <button class="mono rc-btn" onclick={fullscreen} title="Fullscreen (f)">⛶</button>
+    <button
+      class="mono rc-btn rc-btn--heart"
+      class:is-on={currentFaved}
+      onclick={onToggleFavorite}
+      title={i18n.t('rd.fav')}
+      aria-label={i18n.t('rd.fav')}
+      aria-pressed={currentFaved}
+    ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d={HEART} /></svg></button>
+    <button
+      class="mono rc-btn"
+      class:is-active={gridOpen}
+      onclick={() => (gridOpen ? (gridOpen = false) : openGrid())}
+      title={i18n.t('rd.pages')}
+      aria-label={i18n.t('rd.pages')}
+    ><svg class="rc-ico rc-ico--grid" viewBox="0 0 24 24" aria-hidden="true"
+        ><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect
+          x="3"
+          y="14"
+          width="7"
+          height="7"
+        /><rect x="14" y="14" width="7" height="7" /></svg
+      ></button>
+    <button class="mono rc-btn rc-btn--fs" onclick={fullscreen} title="Fullscreen (f)">⛶</button>
     <button
       class="mono rc-btn"
       class:is-active={panelOpen}
@@ -73,7 +153,7 @@
   </div>
 </header>
 
-<footer class="rc-bottom">
+<footer class="rc-bottom" class:is-idle={hidden}>
   <span class="mono rc-bottom__counter">
     <span>
       {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
@@ -137,6 +217,67 @@
         <button class="mono rc-opt" class:is-on={i18n.lang === 'en'} onclick={() => i18n.set('en')}>EN</button>
       </div>
     </div>
+  </div>
+{/if}
+
+{#if gridOpen}
+  <div class="rc-toc rc-grid">
+    <button class="rc-toc__scrim" aria-label="Close pages" onclick={() => (gridOpen = false)}></button>
+    <nav class="rc-toc__body rc-grid__body" aria-label={i18n.t('rd.pages')}>
+      <div class="rc-grid__head">
+        <div class="rc-grid__tabs" role="tablist">
+          <button
+            class="mono rc-opt"
+            role="tab"
+            aria-selected={gridTab === 'all'}
+            class:is-on={gridTab === 'all'}
+            onclick={() => (gridTab = 'all')}
+          >{i18n.t('rd.all')} {readable.length}</button>
+          <button
+            class="mono rc-opt"
+            role="tab"
+            aria-selected={gridTab === 'fav'}
+            class:is-on={gridTab === 'fav'}
+            onclick={() => (gridTab = 'fav')}
+          ><svg class="rc-ico rc-ico--inline" viewBox="0 0 24 24" aria-hidden="true"><path d={HEART} /></svg>
+            {i18n.t('rd.fav')} {favPages.length}</button>
+        </div>
+        <button class="mono rc-grid__share mk-hop-host" onclick={onShare}>
+          {i18n.t('rd.share')} <span class="mk-hop" aria-hidden="true">↗</span>
+        </button>
+      </div>
+      {#if gridTab === 'fav' && !favPages.length}
+        <p class="rc-grid__empty">{i18n.t('rd.favEmpty')}</p>
+      {:else}
+        <ul class="rc-grid__list">
+          {#each shown as page (page.id)}
+            <li class="rc-grid__cell">
+              <button
+                class="rc-grid__item"
+                class:is-current={currentIds.includes(page.id)}
+                onclick={() => {
+                  onJumpPage(page.id);
+                  gridOpen = false;
+                }}
+              >
+                <img class="rc-grid__thumb" src={page.thumbUrl} alt="" loading="lazy" />
+                <span class="mono rc-grid__num">{String(pageNumberOf(page.id)).padStart(2, '0')}</span>
+                {#if favorites.includes(page.id)}
+                  <svg class="rc-grid__heart" viewBox="0 0 24 24" role="img" aria-label={i18n.t('rd.fav')}><path d={HEART} /></svg>
+                {/if}
+              </button>
+              {#if gridTab === 'fav'}
+                <button
+                  class="rc-grid__remove"
+                  aria-label={`${i18n.t('rd.favRemove')} — ${pageNumberOf(page.id)}`}
+                  onclick={() => onRemoveFavorite(page.id)}
+                >✕</button>
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </nav>
   </div>
 {/if}
 
@@ -220,6 +361,55 @@
   .rc-btn.is-active {
     color: var(--fg);
     border-color: var(--accent);
+  }
+  .rc-ico {
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    margin: auto;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linejoin: round;
+  }
+  .rc-ico--inline {
+    display: inline-block;
+    width: 0.9em;
+    height: 0.9em;
+    margin: 0 0.3em 0 0;
+    vertical-align: -0.1em;
+    fill: currentColor;
+    stroke: none;
+  }
+  .rc-btn--heart.is-on {
+    color: var(--mk-love);
+  }
+  .rc-btn--heart.is-on .rc-ico {
+    fill: currentColor;
+  }
+  /* No fullscreen API on iPhone; the slot is worth more to the heart. */
+  @media (pointer: coarse) and (max-width: 520px) {
+    .rc-btn--fs {
+      display: none;
+    }
+  }
+  /* Idle: the chrome steps aside so the page is all there is. */
+  .rc-top,
+  .rc-bottom {
+    transition: opacity 0.4s var(--ease);
+  }
+  .rc-top.is-idle,
+  .rc-bottom.is-idle {
+    opacity: 0;
+  }
+  .rc-top.is-idle > * {
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rc-top,
+    .rc-bottom {
+      transition: none;
+    }
   }
   .rc-noteflag {
     align-self: center;
@@ -388,5 +578,107 @@
   .rc-toc__title {
     font-size: 1.05rem;
     line-height: 1.25;
+  }
+  /* --- Page grid (the TOC drawer's shell, wider) --- */
+  .rc-grid__body {
+    width: min(26rem, 92vw);
+  }
+  .rc-grid__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 1rem;
+  }
+  .rc-grid__tabs {
+    display: flex;
+    gap: 0.4rem;
+  }
+  .rc-grid__tabs .rc-opt {
+    padding: 0.5em 0.8em;
+    white-space: nowrap;
+  }
+  .rc-grid__share {
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--fg-dim);
+    padding: 0.5em 0.8em;
+    cursor: pointer;
+  }
+  .rc-grid__share:hover {
+    color: var(--fg);
+    border-color: var(--accent);
+  }
+  .rc-grid__empty {
+    color: var(--fg-dim);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  .rc-grid__list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+  }
+  .rc-grid__cell {
+    position: relative;
+  }
+  .rc-grid__item {
+    position: relative;
+    display: block;
+    width: 100%;
+    padding: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease);
+  }
+  .rc-grid__item:hover {
+    border-color: var(--line-strong);
+  }
+  .rc-grid__item.is-current {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .rc-grid__thumb {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1131 / 1600;
+    object-fit: cover;
+  }
+  .rc-grid__num {
+    position: absolute;
+    left: 0.3rem;
+    bottom: 0.25rem;
+    font-size: 0.55rem;
+    color: var(--fg);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  }
+  .rc-grid__heart {
+    position: absolute;
+    right: 0.3rem;
+    bottom: 0.3rem;
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: var(--mk-love);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9));
+  }
+  .rc-grid__remove {
+    position: absolute;
+    top: -0.45rem;
+    right: -0.45rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 50%;
+    border: 1px solid var(--line-strong);
+    background: var(--ink-bg-soft);
+    color: var(--fg);
+    font-size: 0.65rem;
+    cursor: pointer;
+  }
+  .rc-grid__remove:hover {
+    border-color: var(--mk-love);
+    color: var(--mk-love);
   }
 </style>
