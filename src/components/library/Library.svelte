@@ -108,7 +108,7 @@
   {#if error}
     <p class="mono lib__status">{i18n.t('lib.offline')} — {error}</p>
   {:else if cards === null}
-    <p class="mono lib__status">{i18n.t('lib.loading')}</p>
+    <p class="mono lib__status"><span class="mk-loader" aria-hidden="true"></span> {i18n.t('lib.loading')}</p>
   {:else if cards.length === 0}
     <p class="mono lib__status">{i18n.t('lib.empty')}</p>
   {:else}

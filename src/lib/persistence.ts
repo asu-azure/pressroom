@@ -77,3 +77,38 @@ export function clearUnlock(workId: string): void {
     /* ignore */
   }
 }
+
+// --- "ここすき" favourite pages, per work (pageIds, in the order they were added) ---
+// Same reasoning as progress: pageIds survive the author reordering pages.
+const favoritesKeyFor = (workId: string) => `pressroom:favorites:${workId}`;
+
+export function loadFavorites(workId: string): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(favoritesKeyFor(workId)) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Returns false when the browser would not keep them (private mode, storage full). */
+export function saveFavorites(workId: string, pageIds: string[]): boolean {
+  try {
+    localStorage.setItem(favoritesKeyFor(workId), JSON.stringify(pageIds));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// --- One-time hints (the page-corner peel on a first flip-mode open) ---
+export function takeHint(name: string): boolean {
+  const key = `pressroom:hint:${name}`;
+  try {
+    if (localStorage.getItem(key)) return false;
+    localStorage.setItem(key, '1');
+    return true;
+  } catch {
+    return false; // can't remember it — better never than every time
+  }
+}

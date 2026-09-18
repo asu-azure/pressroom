@@ -318,6 +318,9 @@
       return;
     }
     if (g === 'pending') {
+      // A hold is not a tap: a long press marks the page as a favourite
+      // (Reader.svelte) and must not also turn it.
+      if (performance.now() - startT >= 450) return;
       // A tap, not a drag — page by screen half (physical side).
       const side = e.clientX < width / 2 ? -1 : 1;
       go(cur + side * s);
