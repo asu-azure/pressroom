@@ -52,6 +52,32 @@
     text-decoration: underline;
     text-underline-offset: 0.35em;
   }
+  /* Tale theme: rounded pills on a paper chip, no blend mode. */
+  :global(body.theme-tale) .langbar {
+    mix-blend-mode: normal;
+    gap: 0.3rem;
+    padding: 0.3rem;
+    border-radius: 999px;
+    background: var(--t-card);
+    border: 2px dashed var(--t-dash-soft);
+  }
+  :global(body.theme-tale) .langbar__sep {
+    display: none;
+  }
+  :global(body.theme-tale) .langbar__btn {
+    padding: 0.35em 0.9em;
+    border-radius: 999px;
+    color: var(--t-night);
+    opacity: 0.75;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  :global(body.theme-tale) .langbar__btn.is-active {
+    opacity: 1;
+    background: var(--t-night);
+    color: var(--t-paper);
+    text-decoration: none;
+  }
   .langbar__sep {
     color: #fff;
     opacity: 0.35;

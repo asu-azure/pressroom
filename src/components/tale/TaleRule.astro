@@ -1,0 +1,25 @@
+---
+/** A dashed rule with a sparkle at each end, optionally carrying a line of text. */
+import TaleIcon from './TaleIcon.astro';
+interface Props {
+  class?: string;
+}
+const { class: cls = '' } = Astro.props;
+const hasText = Astro.slots.has('default');
+---
+
+<p class={`t-rule ${cls}`}>
+  <TaleIcon name="spark" class="t-rule__end" />
+  <span class="t-rule__line" aria-hidden="true"></span>
+  {
+    hasText && (
+      <>
+        <span class="t-rule__text">
+          <slot />
+        </span>
+        <span class="t-rule__line" aria-hidden="true" />
+      </>
+    )
+  }
+  <TaleIcon name="spark" class="t-rule__end" />
+</p>

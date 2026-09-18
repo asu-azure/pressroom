@@ -1,0 +1,21 @@
+---
+import { taleIcons, type TaleIconName } from './taleIcons';
+
+interface Props {
+  name: TaleIconName;
+  class?: string;
+  /** Accessible name; omit for decoration (the default). */
+  label?: string;
+}
+const { name, class: cls = '', label } = Astro.props;
+---
+
+<svg
+  class={`t-icon ${cls}`}
+  viewBox="0 0 24 24"
+  fill="currentColor"
+  role={label ? 'img' : undefined}
+  aria-label={label}
+  aria-hidden={label ? undefined : 'true'}
+  set:html={taleIcons[name]}
+/>

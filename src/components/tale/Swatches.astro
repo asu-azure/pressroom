@@ -1,0 +1,14 @@
+---
+/** The palette itself as a motif: four little squares. */
+interface Props {
+  class?: string;
+}
+const { class: cls = '' } = Astro.props;
+---
+
+<span class={`t-swatches ${cls}`} aria-hidden="true">
+  <span style="background:var(--t-sun)"></span>
+  <span style="background:var(--t-sky)"></span>
+  <span style="background:var(--t-leaf)"></span>
+  <span style="background:var(--t-night)"></span>
+</span>

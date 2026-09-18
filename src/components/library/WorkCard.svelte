@@ -1,5 +1,6 @@
 <script lang="ts">
   import { i18n } from '../../lib/i18n.svelte';
+  import { taleIcons } from '../tale/taleIcons';
   import type { Work } from '../../lib/types';
 
   let {
@@ -51,6 +52,9 @@
          way to reading. -->
     <span class="card__go mono">{i18n.t('lib.open')} <span class="mk-hop" aria-hidden="true">→</span></span>
   </span>
+  <!-- Tale-theme stickers; hidden on Editorial FUI pages. -->
+  <svg class="card__sticker card__sticker--star" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{@html taleIcons.star}</svg>
+  <svg class="card__sticker card__sticker--moon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{@html taleIcons.moon}</svg>
 </a>
 
 <style>
@@ -86,6 +90,95 @@
   }
   .card__lock {
     margin-left: 0.5em;
+  }
+  .card__sticker {
+    display: none;
+  }
+
+  /* --- Tale theme: a dashed paper card, cover inset, words underneath ----- */
+  :global(body.theme-tale) .card {
+    aspect-ratio: auto;
+    overflow: visible;
+    padding: 0.7rem 0.7rem 0;
+    background: var(--t-card);
+    border: 2px dashed var(--t-dash-soft);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(43, 50, 99, 0.1);
+  }
+  :global(body.theme-tale) .card::after {
+    display: none;
+  }
+  :global(body.theme-tale) .card > img,
+  :global(body.theme-tale) .card__cover,
+  :global(body.theme-tale) .card__blank {
+    position: relative;
+    inset: auto;
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4 / 5.4;
+    border-radius: 6px;
+    object-fit: cover;
+  }
+  :global(body.theme-tale) .card__blank {
+    border-color: var(--t-dash-soft);
+  }
+  :global(body.theme-tale) .tile__tag {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    left: auto;
+    bottom: auto;
+    z-index: 2;
+    padding: 0.25em 0.7em;
+    border-radius: 999px;
+    background: var(--t-night);
+    color: var(--t-paper);
+    mix-blend-mode: normal;
+    font-size: 0.6rem;
+  }
+  :global(body.theme-tale) .card__meta {
+    position: relative;
+    padding: 0.8rem 0.3rem 2.2rem;
+    background: none;
+    gap: 0.35rem;
+  }
+  :global(body.theme-tale) .card__title {
+    color: var(--t-night);
+    font-weight: 900;
+  }
+  :global(body.theme-tale) .card__tags {
+    color: var(--t-night-soft);
+  }
+  :global(body.theme-tale) .card__go {
+    color: var(--t-azure);
+  }
+  :global(body.theme-tale) .card__sticker {
+    display: block;
+    position: absolute;
+    z-index: 3;
+    color: var(--t-night);
+  }
+  :global(body.theme-tale) .card__sticker--star {
+    top: -0.75rem;
+    left: -0.75rem;
+    width: 1.6rem;
+    height: 1.6rem;
+    color: var(--t-sun);
+    filter: drop-shadow(0 1px 0 var(--t-night)) drop-shadow(0 -1px 0 var(--t-night))
+      drop-shadow(1px 0 0 var(--t-night)) drop-shadow(-1px 0 0 var(--t-night));
+  }
+  :global(body.theme-tale) .card__sticker--moon {
+    right: 0.7rem;
+    bottom: 0.7rem;
+    width: 1.3rem;
+    height: 1.3rem;
+  }
+  @media (hover: hover) {
+    :global(body.theme-tale .tile:hover) .card__cover,
+    :global(body.theme-tale .tile:hover) > img {
+      transform: none;
+    }
   }
   .card__meta {
     position: absolute;

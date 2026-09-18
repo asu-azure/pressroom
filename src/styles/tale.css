@@ -1,0 +1,331 @@
+/* ==========================================================================
+   tale.css — the "fairy-tale" theme for the public pages (/, /asu, /w/[slug]).
+
+   Grammar inspired by yui540's "臆病な魔女" (Cowardly-Witch, MIT): dashed
+   rounded frames with colour bands, stars on strings, a crescent moon, boxed
+   titles, dashed rules with sparkle ends, dotted paper, a rounded face.
+   Nothing is copied from that project's images, logo, character or name —
+   every motif here is drawn for Pressroom, in Asu's own palette.
+
+   Scope: everything lives under `body.theme-tale`, which Base.astro sets only
+   when a page passes theme="tale". The reader, /lookbook and the Studio keep
+   Editorial FUI. `body.theme-tale` (0,1,1) also outranks motion.css's
+   `.spread--*` redeclarations and Svelte's scoped single-class rules.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Zen Maru Gothic';
+  src: url('/fonts/ZenMaruGothic-Medium.woff2') format('woff2');
+  font-weight: 400 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zen Maru Gothic';
+  src: url('/fonts/ZenMaruGothic-Bold.woff2') format('woff2');
+  font-weight: 600 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zen Maru Gothic';
+  src: url('/fonts/ZenMaruGothic-Black.woff2') format('woff2');
+  font-weight: 800 900;
+  font-display: swap;
+}
+/* Latin-only alias for database text. The full face is a subset of the kanji
+   in src/, so letting it claim CJK for author text would mix it glyph by glyph
+   with a system font (the failure CLAUDE.md documents for Noto). */
+@font-face {
+  font-family: 'Zen Maru Latin';
+  src: url('/fonts/ZenMaruGothic-Bold.woff2') format('woff2');
+  font-weight: 600 900;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2010-2027;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zen Maru Latin';
+  src: url('/fonts/ZenMaruGothic-Medium.woff2') format('woff2');
+  font-weight: 400 500;
+  unicode-range: U+0020-007E, U+00A0-00FF, U+2010-2027;
+  font-display: swap;
+}
+
+body.theme-tale {
+  --t-night: #2b3263;
+  --t-night-soft: #4a5288;
+  --t-azure: #3d8fd6;
+  --t-sky: #9fcdef;
+  --t-lilac: #b6c3ea;
+  --t-sun: #f2b53a;
+  --t-leaf: #a8c85a;
+  --t-paper: #fbf7ea;
+  --t-card: #fffdf7;
+  --t-dash: rgba(43, 50, 99, 0.55);
+  --t-dash-soft: rgba(43, 50, 99, 0.28);
+  --t-font: 'Zen Maru Gothic', 'Prompt', 'Hiragino Maru Gothic ProN', system-ui, sans-serif;
+  --t-font-authored: 'Zen Maru Latin', 'Prompt', 'Hiragino Maru Gothic ProN', 'Yu Gothic', 'Hiragino Kaku Gothic ProN',
+    'Noto Sans CJK JP', 'Meiryo', system-ui, sans-serif;
+  --t-radius: 18px;
+  --t-swing: 3.6s;
+
+  /* Re-point the house tokens, so every component that reads them follows. */
+  --accent: var(--t-azure);
+  --ink: var(--t-azure);
+  --mk-accent: var(--t-sun);
+  --font-display: var(--t-font);
+  --font-serif: var(--t-font);
+  --font-mono: var(--t-font);
+  --font-stack: var(--t-font);
+  --font-serif-authored: var(--t-font-authored);
+  --font-display-authored: var(--t-font-authored);
+
+  --bg: var(--t-paper);
+  --bg-soft: var(--t-card);
+  --fg: var(--t-night);
+  --fg-dim: var(--t-night-soft);
+  --fg-faint: rgba(43, 50, 99, 0.45);
+  --line: var(--t-dash-soft);
+  --line-strong: var(--t-dash);
+
+  background-color: var(--t-paper);
+  background-image: radial-gradient(rgba(43, 50, 99, 0.13) 1.1px, transparent 1.4px);
+  background-size: 16px 16px;
+  color: var(--t-night);
+  font-family: var(--t-font);
+  font-weight: 500;
+}
+/* Both spreads become the same dotted paper — the tale has one tone. */
+body.theme-tale .spread--ink,
+body.theme-tale .spread--paper {
+  --bg: transparent;
+  --fg: var(--t-night);
+  --fg-dim: var(--t-night-soft);
+  --fg-faint: rgba(43, 50, 99, 0.45);
+  --line: var(--t-dash-soft);
+  --line-strong: var(--t-dash);
+  background: transparent;
+  color: var(--t-night);
+}
+/* FUI furniture that has no place on paper. */
+body.theme-tale .grid-bg,
+body.theme-tale .grain,
+body.theme-tale .cursor { display: none; }
+body.theme-tale .progress-line { background: var(--t-sun); height: 4px; }
+body.theme-tale .progress-line::before,
+body.theme-tale .progress-line::after { display: none; }
+body.theme-tale .mono { letter-spacing: 0.06em; font-weight: 700; }
+
+/* ---- Icons ------------------------------------------------------------- */
+.t-icon { display: inline-block; width: 1em; height: 1em; vertical-align: -0.14em; flex-shrink: 0; }
+
+/* ---- Frame: rounded card, colour bands, dashed inner border -------------- */
+.t-frame {
+  --band-top: var(--t-sky);
+  --band-bottom: var(--t-leaf);
+  position: relative;
+  background: var(--t-card);
+  border-radius: var(--t-radius);
+  border-top: 14px solid var(--band-top);
+  border-bottom: 14px solid var(--band-bottom);
+  box-shadow: 0 10px 30px rgba(43, 50, 99, 0.12);
+  padding: clamp(1.6rem, 4vw, 3rem);
+}
+.t-frame::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border: 2.5px dashed var(--t-dash);
+  border-radius: calc(var(--t-radius) - 6px);
+  pointer-events: none;
+}
+.t-frame > * { position: relative; }
+
+/* ---- Label: boxed title, offset outline, tiny caption --------------------- */
+.t-label-wrap { display: inline-grid; justify-items: center; gap: 0.45rem; }
+.t-label {
+  --label-bg: var(--t-lilac);
+  position: relative;
+  display: inline-block;
+  margin: 0;
+  padding: 0.35em 1.3em;
+  background: var(--label-bg);
+  color: #fff;
+  font-family: var(--t-font);
+  font-weight: 900;
+  font-size: clamp(1.3rem, 2.6vw, 1.9rem);
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+}
+.t-label::after {
+  content: '';
+  position: absolute;
+  inset: -7px 7px 7px -7px;
+  border: 2.5px solid var(--t-night);
+  pointer-events: none;
+}
+.t-label--sun { --label-bg: var(--t-sun); }
+.t-label--leaf { --label-bg: var(--t-leaf); }
+.t-label--sky { --label-bg: var(--t-sky); }
+.t-label--night { --label-bg: var(--t-night); }
+.t-label__cap {
+  padding-top: 0.35rem;
+  border-top: 2px solid var(--t-night);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--t-night);
+}
+
+/* ---- Rule: sparkle — dashes — text — dashes — sparkle -------------------- */
+.t-rule {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  color: var(--t-night);
+  font-weight: 700;
+}
+.t-rule__line { flex: 1; border-top: 2.5px dashed var(--t-dash); min-width: 1.5rem; }
+.t-rule__end { width: 0.85rem; height: 0.85rem; color: var(--t-night-soft); }
+.t-rule__text { white-space: nowrap; font-size: clamp(0.95rem, 1.6vw, 1.15rem); }
+
+/* ---- Card: dashed paper card with a corner star ------------------------- */
+.t-card {
+  position: relative;
+  background: var(--t-card);
+  border: 2px dashed var(--t-dash-soft);
+  border-radius: 8px;
+}
+.t-card__star {
+  position: absolute;
+  top: -0.7rem;
+  left: -0.7rem;
+  z-index: 3;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--t-night);
+}
+.t-card__moon {
+  position: absolute;
+  right: 0.55rem;
+  bottom: 0.5rem;
+  z-index: 3;
+  width: 1.2rem;
+  height: 1.2rem;
+  color: var(--t-night);
+}
+
+/* ---- Round close button ------------------------------------------------- */
+.t-close {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  border: 0;
+  background: #fff;
+  color: var(--t-night);
+  box-shadow: 0 6px 18px rgba(43, 50, 99, 0.18);
+  cursor: pointer;
+}
+.t-close::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 2px dashed var(--t-dash);
+}
+.t-close::after {
+  content: '✕';
+  font-size: 1.3rem;
+  font-weight: 400;
+}
+
+/* ---- Pill button ----------------------------------------------------------- */
+.t-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.8em 1.6em;
+  border-radius: 999px;
+  border: 2.5px solid var(--t-night);
+  background: var(--t-night);
+  color: var(--t-paper);
+  font-family: var(--t-font);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.25s var(--ease), color 0.25s var(--ease);
+}
+.t-pill:hover,
+.t-pill:focus-visible { background: var(--t-sun); color: var(--t-night); }
+.t-pill--ghost { background: transparent; color: var(--t-night); }
+.t-pill--ghost:hover { background: var(--t-night); color: var(--t-paper); }
+
+/* ---- Swatches ---------------------------------------------------------------- */
+.t-swatches { display: inline-flex; gap: 0.5rem; }
+.t-swatches > span { width: 0.85rem; height: 0.85rem; border-radius: 2px; }
+
+/* ---- Hanging stars ------------------------------------------------------- */
+.t-hang {
+  position: absolute;
+  top: 0;
+  left: var(--x);
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  transform-origin: top center;
+  animation: t-swing var(--t-swing) ease-in-out var(--d) infinite alternate;
+  pointer-events: none;
+}
+.t-hang__string { width: 1.5px; height: var(--len); background: currentColor; opacity: 0.55; }
+.t-hang__icon { width: var(--size); height: var(--size); margin-top: -2px; }
+.t-hang--sun { color: var(--t-sun); }
+.t-hang--night { color: var(--t-night); }
+.t-hang--paper { color: var(--t-paper); }
+.t-hang--azure { color: var(--t-azure); }
+@keyframes t-swing {
+  from { rotate: -5deg; }
+  to { rotate: 5deg; }
+}
+.t-twinkle { animation: t-twinkle 2.8s ease-in-out var(--d, 0s) infinite; }
+@keyframes t-twinkle {
+  0%, 100% { opacity: 1; scale: 1; }
+  50% { opacity: 0.45; scale: 0.8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-hang, .t-twinkle { animation: none; }
+}
+
+/* ---- Lightbox on tale pages: night backdrop, round paper buttons ---------- */
+body.theme-tale .lb__backdrop { background: rgba(33, 38, 78, 0.93); }
+body.theme-tale .lb .bracket { display: none; }
+body.theme-tale .lb__btn {
+  border: 0;
+  border-radius: 50%;
+  width: 3.2rem;
+  height: 3.2rem;
+  background: var(--t-card);
+  color: var(--t-night);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+  font-family: var(--t-font);
+  font-weight: 700;
+}
+body.theme-tale .lb__btn::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  border: 2px dashed var(--t-dash);
+}
+body.theme-tale .lb__btn:hover,
+body.theme-tale .lb__btn:focus-visible { background: var(--t-sun); }
+body.theme-tale .lb__hud { color: var(--t-paper); }
+
+/* Narrow screens: strings shorten so stars stay above the words. */
+@media (max-width: 760px) {
+  .t-hang__string { height: calc(var(--len) * 0.5); }
+}

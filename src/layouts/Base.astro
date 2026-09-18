@@ -3,6 +3,7 @@ import '../styles/fonts.css';
 import '../styles/global.css';
 import '../styles/motion.css';
 import '../styles/motion-kit.css';
+import '../styles/tale.css';
 
 interface Props {
   title?: string;
@@ -11,6 +12,8 @@ interface Props {
   image?: string;
   /** Reader route drives its own scrolling — skip Lenis + progress hairline. */
   chromeless?: boolean;
+  /** 'tale' = the fairy-tale theme of the public pages (see tale.css). */
+  theme?: 'fui' | 'tale';
 }
 
 const {
@@ -18,7 +21,9 @@ const {
   description = "Where Asu Azure's original work is collected — read it online.",
   image,
   chromeless = false,
+  theme = 'fui',
 } = Astro.props;
+const tale = theme === 'tale';
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
 
@@ -43,12 +48,12 @@ const jsonLd = JSON.stringify({
 ---
 
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme={tale ? 'tale' : undefined}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#0c0c0d" />
+    <meta name="theme-color" content={tale ? '#fbf7ea' : '#0c0c0d'} />
     <link rel="canonical" href={canonical} />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
@@ -79,9 +84,20 @@ const jsonLd = JSON.stringify({
     />
     <title>{title}</title>
 
-    <link rel="preload" href="/fonts/StackSansHeadline-Regular.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/SpaceGrotesk-var.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/fonts/JetBrainsMono-var.woff2" as="font" type="font/woff2" crossorigin />
+    {
+      tale ? (
+        <>
+          <link rel="preload" href="/fonts/ZenMaruGothic-Bold.woff2" as="font" type="font/woff2" crossorigin />
+          <link rel="preload" href="/fonts/ZenMaruGothic-Black.woff2" as="font" type="font/woff2" crossorigin />
+        </>
+      ) : (
+        <>
+          <link rel="preload" href="/fonts/StackSansHeadline-Regular.woff2" as="font" type="font/woff2" crossorigin />
+          <link rel="preload" href="/fonts/SpaceGrotesk-var.woff2" as="font" type="font/woff2" crossorigin />
+          <link rel="preload" href="/fonts/JetBrainsMono-var.woff2" as="font" type="font/woff2" crossorigin />
+        </>
+      )
+    }
 
     {/* Flock transition handshake. This MUST be inline and in <head>: when a
         visitor arrives mid-sweep the page has to be covered before its first
@@ -93,10 +109,11 @@ const jsonLd = JSON.stringify({
         content: '';
         position: fixed;
         inset: 0;
-        background: #0c0c0d;
+        background: var(--flock-ink, #0c0c0d);
         z-index: 9998;
         pointer-events: none;
       }
+      html[data-theme='tale'] { --flock-ink: #2b3263; }
     </style>
     <script is:inline>
       document.documentElement.classList.add('mk-js');
@@ -110,7 +127,7 @@ const jsonLd = JSON.stringify({
       } catch (e) {}
     </script>
   </head>
-  <body data-chromeless={chromeless ? 'true' : null}>
+  <body data-chromeless={chromeless ? 'true' : null} class={tale ? 'theme-tale' : undefined}>
     <div class="grid-bg" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
     {!chromeless && <div class="progress-line" aria-hidden="true" />}

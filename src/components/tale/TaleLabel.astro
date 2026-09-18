@@ -1,0 +1,19 @@
+---
+/**
+ * Boxed section title with an offset outline and a small caption rule
+ * underneath — the tale theme's section heading. Pass the heading element's
+ * own attributes (data-i18n etc.) through `attrs` on the inner text span.
+ */
+interface Props {
+  as?: 'h1' | 'h2' | 'h3' | 'p';
+  caption?: string;
+  tone?: 'sky' | 'sun' | 'leaf' | 'night';
+  class?: string;
+}
+const { as: Tag = 'h2', caption, tone = 'sky', class: cls = '' } = Astro.props;
+---
+
+<div class={`t-label-wrap ${cls}`}>
+  <Tag class={`t-label t-label--${tone}`}><span class="t-label__text"><slot /></span></Tag>
+  {caption && <span class="t-label__cap" aria-hidden="true">{caption}</span>}
+</div>

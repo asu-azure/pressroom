@@ -230,6 +230,46 @@ const panels = Array.from({ length: PANELS }, (_, i) => i);
     }
   }
 
+  /* --- Tale theme: the slanted band becomes a row of pinned photos -------- */
+  :global(body.theme-tale) .strip {
+    --skew: 0deg;
+    --panel-h: clamp(8rem, 16vh, 11rem);
+    height: calc(var(--panel-h) + 2.4rem);
+    padding: 1.2rem var(--pad);
+    background: transparent;
+    border: 0;
+    overflow: visible;
+  }
+  :global(body.theme-tale) .strip::after {
+    display: none;
+  }
+  :global(body.theme-tale) .strip__row {
+    margin: 0;
+    gap: clamp(0.6rem, 1.6vw, 1.2rem);
+  }
+  :global(body.theme-tale) .strip__panel {
+    border: 5px solid var(--t-card);
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(43, 50, 99, 0.18);
+    overflow: hidden;
+    rotate: -1.6deg;
+  }
+  :global(body.theme-tale) .strip__panel:nth-child(even) {
+    rotate: 1.4deg;
+  }
+  :global(body.theme-tale) .strip__panel::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    z-index: 2;
+    border: 2px dashed rgba(255, 253, 247, 0.85);
+    border-radius: 8px;
+    pointer-events: none;
+  }
+  :global(body.theme-tale) .strip__inner {
+    transform: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .strip__panel,
     .strip__img {
