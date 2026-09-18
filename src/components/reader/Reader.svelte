@@ -127,8 +127,9 @@
     // teaches the long-press. Once per browser, never again.
     if (takeHint('reader')) {
       peel = settings.mode === 'flip';
-      say(i18n.t('rd.favHint'), 2600);
+      say(i18n.t('rd.modeHint'), 2600);
       setTimeout(() => (peel = false), 1500);
+      setTimeout(() => say(i18n.t('rd.favHint'), 2600), 2800);
     }
   }
 

@@ -121,6 +121,27 @@
         title={i18n.t('rd.toc')}
       >{i18n.t('rd.toc')}</button>
     {/if}
+    <!-- Flip vs scroll lived only inside the AA panel, and readers never found it. -->
+    <div class="rc-mode" role="group" aria-label={i18n.t('rd.mode')}>
+      <button
+        class="mono rc-btn rc-mode__opt"
+        class:is-on={settings.mode === 'flip'}
+        aria-pressed={settings.mode === 'flip'}
+        onclick={() => onSettings({ mode: 'flip' })}
+        title={i18n.t('rd.flip')}
+      ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"
+          ><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5Zm0 0v13" /></svg
+        ><span class="rc-mode__label">{i18n.t('rd.flip')}</span></button>
+      <button
+        class="mono rc-btn rc-mode__opt"
+        class:is-on={settings.mode === 'scroll'}
+        aria-pressed={settings.mode === 'scroll'}
+        onclick={() => onSettings({ mode: 'scroll' })}
+        title={i18n.t('rd.scroll')}
+      ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"
+          ><rect x="7" y="2.5" width="10" height="8" rx="1" /><rect x="7" y="13.5" width="10" height="8" rx="1" /></svg
+        ><span class="rc-mode__label">{i18n.t('rd.scroll')}</span></button>
+    </div>
     <button
       class="mono rc-btn rc-btn--heart"
       class:is-on={currentFaved}
@@ -148,7 +169,8 @@
       class="mono rc-btn"
       class:is-active={panelOpen}
       onclick={() => (panelOpen = !panelOpen)}
-      title="Settings (s)"
+      title={`${i18n.t('rd.settings')} (s)`}
+      aria-label={i18n.t('rd.settings')}
     >AA</button>
   </div>
 </header>
@@ -383,6 +405,37 @@
   }
   .rc-btn--heart.is-on {
     color: var(--mk-love);
+  }
+  .rc-mode {
+    display: flex;
+  }
+  .rc-mode__opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45em;
+  }
+  .rc-mode__opt + .rc-mode__opt {
+    border-left: 0;
+  }
+  .rc-mode__opt .rc-ico {
+    margin: 0;
+  }
+  .rc-mode__opt.is-on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--ink-fg);
+  }
+  /* Narrow screens: one button that offers the other mode. */
+  @media (max-width: 520px) {
+    .rc-mode__opt.is-on {
+      display: none;
+    }
+    .rc-mode__opt + .rc-mode__opt {
+      border-left: 1px solid var(--line-strong);
+    }
+    .rc-mode__label {
+      display: none;
+    }
   }
   .rc-btn--heart.is-on .rc-ico {
     fill: currentColor;
