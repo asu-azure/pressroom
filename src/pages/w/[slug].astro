@@ -3,6 +3,7 @@ import Base from '../../layouts/Base.astro';
 import BookOverview from '../../components/overview/BookOverview.svelte';
 import { supabaseServer } from '../../lib/supabaseServer';
 import { publicUrl } from '../../lib/storagePaths';
+import { cacheShell } from '../../lib/cache';
 
 // Server-output shell: the slug is only passed into the island; all page data
 // is still fetched client-side with the anon key (public read via RLS).
@@ -44,6 +45,8 @@ try {
 } catch {
   /* preview metadata is a nicety — never let it take the page down */
 }
+
+cacheShell(Astro);
 ---
 
 <Base title={title} description={description} image={image}>

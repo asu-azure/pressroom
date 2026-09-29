@@ -60,6 +60,20 @@ Use `src/lib/supabaseServer.ts` (anon key, no session persistence), never read a
 user-specific, and **always wrap in try/catch — a Supabase failure must degrade to a page that
 renders, never to a 500.**
 
+**Public SSR shells are CDN-cached** via `cacheShell(Astro)` (`src/lib/cache.ts`): the edge keeps a
+copy for 60 s and serves it stale while it refetches, the browser always revalidates. Used on `/`,
+`/asu`, `/lookbook`, `/w/[slug]` and the reader shell. So an author's save reaches visitors within
+about a minute (the Studio says so). **Never call it from `/studio/*`**, and never on a page that
+sets a cookie or reads anything user-specific.
+
+**Page scripts import copy helpers from `src/lib/siteCopyClient.ts`, never `siteCopy.ts`.** The
+latter imports the Supabase client and the whole copy registry; a page script importing
+`applyCopy` from it shipped ~200 KB of supabase-js to every `/asu` visitor.
+
+Prefetch is hover/focus only (`astro.config.mjs`). Shelf cards prefetch their overview on
+`pointerenter`, because they render after Astro's load-time link scan. Don't turn on
+`prefetchAll` + viewport: every card in view would fire an SSR function.
+
 `sanitizeRich()` needs DOMParser and therefore **cannot run on the server**. The write path is the
 sanitizing boundary (RichTextEditor sanitizes before every save); SSR uses `richForServer()`, a
 dependency-free validator that passes trusted markup through and degrades anything else to escaped
@@ -351,6 +365,9 @@ with no database.
   its metrics are in staff spaces, taken from Bravura's metadata.
 - **Sound is opt-in.** Nothing plays until a gate button is pressed. That press unlocks the
   element, then a 1.6 s pre-roll lets the first notes scroll in before t = 0.
+- **The MP3 (4.7 MB) is `preload="metadata"`.** The full download starts when a visitor reaches
+  for a gate button (pointerenter / focus / pointerdown), so a visitor who only looks at the jacket
+  never pays for it.
 - Page-only faces are declared in `src/styles/ost-fonts.css`: `'OST JP'`, `'OST Dot'` and
   `'OST Notation'`. The JP face is a **separate subset** from the site-wide Noto, so adding
   Japanese to `/ost` means re-subsetting that file, not the global one. The notation font is
@@ -392,7 +409,9 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   `resolveSheets()` joins them in every layout mode.
 - Storage paths are immutable (`works/{work_id}/{page_id}/…`, `cacheControl` 1 year) —
   reordering pages never touches storage.
-- **The shelf's book grid is still `client:only`**, so the cards are not server-rendered. That is a
+- **The shelf's book grid is still `client:only`**, so the cards are not server-rendered. Until it
+  hydrates, its `fallback` slot in `index.astro` shows six aspect-locked blank cards, so the page
+  below doesn't jump when the books arrive. That is a
   known deferral, not an oversight: `Library.svelte` registers ScrollTrigger at module scope and
   would need auditing before it could SSR. The hero, showcase strip and artist teaser around it are
   static HTML, so the page is no longer content-empty on first paint.

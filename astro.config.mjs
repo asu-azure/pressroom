@@ -10,4 +10,8 @@ export default defineConfig({
   output: 'server',
   adapter: vercel(),
   integrations: [svelte()],
+  // Hover/focus prefetch only. Prefetching every link in view would fire an SSR
+  // function per shelf card; cards prefetch themselves on pointerenter instead
+  // (WorkCard.svelte), since they render after the load-time link scan.
+  prefetch: { prefetchAll: false, defaultStrategy: 'hover' },
 });

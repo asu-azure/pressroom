@@ -33,6 +33,7 @@ import { supabaseServer } from '../lib/supabaseServer';
 import { toArtworkRec } from '../lib/storagePaths';
 import { resolveScenes } from '../lib/scenes';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
+import { cacheShell } from '../lib/cache';
 import { LANGS, LANG_LABEL, DEFAULT_LANG } from '../lib/lang';
 import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
 
@@ -81,6 +82,8 @@ const bg = async (img: ImageMetadata, width = 1600) =>
 const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.all([
   bg(scnField), bg(scnPath), bg(scnSea), bg(scnSky), bg(scnHill), bg(scnStreet), bg(scnDusk),
 ]);
+
+cacheShell(Astro);
 ---
 
 <Base title="Lookbook — Asu Azure" description="The cinematic act compositions, kept as a design reference.">
@@ -124,7 +127,7 @@ const [bgField, bgPath, bgSea, bgSky, bgHill, bgStreet, bgDusk] = await Promise.
 </Base>
 
 <script>
-  import { applyCopy, readCopyPayload } from '../lib/siteCopy';
+  import { applyCopy, readCopyPayload } from '../lib/siteCopyClient';
   import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
 
   // Same storage key as /asu and the shelf, so a visitor picks a language once

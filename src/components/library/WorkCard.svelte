@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { prefetch } from 'astro:prefetch';
   import { i18n } from '../../lib/i18n.svelte';
   import type { Work } from '../../lib/types';
 
@@ -27,7 +28,12 @@
   });
 </script>
 
-<a class="card tile mk-pop mk-hop-host" href={`/w/${work.slug}`}>
+<a
+  class="card tile mk-pop mk-hop-host"
+  href={`/w/${work.slug}`}
+  onpointerenter={() => prefetch(`/w/${work.slug}`)}
+  onfocus={() => prefetch(`/w/${work.slug}`)}
+>
   {#if coverUrl && cropStyle}
     <div class="card__cover" style={cropStyle} role="img" aria-label={`Cover of ${work.title}`}></div>
   {:else if coverUrl}

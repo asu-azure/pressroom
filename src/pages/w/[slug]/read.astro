@@ -1,9 +1,12 @@
 ---
 import Base from '../../../layouts/Base.astro';
 import Reader from '../../../components/reader/Reader.svelte';
+import { cacheShell } from '../../../lib/cache';
 
 // The reader drives its own scrolling (chromeless skips the global Lenis).
 const { slug } = Astro.params;
+
+cacheShell(Astro);
 ---
 
 <Base title="Reading — Pressroom" chromeless>

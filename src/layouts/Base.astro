@@ -111,7 +111,7 @@ const jsonLd = JSON.stringify({
           </a>
           <nav class="topbar__nav mono" aria-label="Primary">
             {nav.map((n) => (
-              <a href={n.href} aria-current={n.current ? 'page' : undefined}>
+              <a href={n.href} aria-current={n.current ? 'page' : undefined} data-astro-prefetch>
                 {n.label}
               </a>
             ))}

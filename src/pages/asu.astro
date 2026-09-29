@@ -29,6 +29,7 @@ import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { resolveScenes } from '../lib/scenes';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
 import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
+import { cacheShell } from '../lib/cache';
 
 export const prerender = false;
 
@@ -101,6 +102,8 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 // `resolveScenes()` still answers for every registered slot, act slots included:
 // the registry is deliberately left whole so saved author overrides are not
 // orphaned and scenes.test.ts keeps covering them.
+
+cacheShell(Astro);
 ---
 
 <Base
@@ -382,7 +385,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
   import { decode, assemble } from '../scripts/text';
   import { initDraw } from '../scripts/draw';
-  import { applyCopy, readCopyPayload } from '../lib/siteCopy';
+  import { applyCopy, readCopyPayload } from '../lib/siteCopyClient';
   import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
 
   gsap.registerPlugin(ScrollTrigger);

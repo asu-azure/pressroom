@@ -12,7 +12,7 @@
   import { supabase } from '../../lib/supabase';
   import { LANGS, LANG_LABEL, type Lang } from '../../lib/lang';
   import { COPY_FIELDS, SECTIONS, PAGE_GROUPS, type CopyField } from '../../data/copyKeys';
-  import { applyCopy } from '../../lib/siteCopy';
+  import { applyCopy } from '../../lib/siteCopyClient';
   import RichTextEditor from './RichTextEditor.svelte';
 
   let lang = $state<Lang>('ja');
@@ -283,7 +283,7 @@
     }
     overrides = next;
     saving = false;
-    flash(upserts.length || Object.values(reverts).some((r) => r.length) ? 'COPY SAVED' : 'NOTHING TO SAVE');
+    flash(upserts.length || Object.values(reverts).some((r) => r.length) ? 'COPY SAVED — LIVE FOR VISITORS WITHIN ~1 MIN' : 'NOTHING TO SAVE');
   }
 
   const dirty = $derived(

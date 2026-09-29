@@ -12,16 +12,17 @@
  * blank one and never a 500.
  */
 import { supabaseServer } from './supabaseServer';
-import { isLang, LANGS, type Lang } from './lang';
-import { COPY_FIELDS, FIELD_BY_KEY, defaultsFor, type CopyDict } from '../data/copyKeys';
-import { isRichSafe, richForServer } from './richtext';
+import { isLang } from './lang';
+import { COPY_FIELDS, FIELD_BY_KEY, defaultsFor } from '../data/copyKeys';
+import { richForServer } from './richtext';
+import type { CopyBundle } from './siteCopyClient';
 
-export type CopyBundle = Record<Lang, CopyDict>;
+// The browser half lives in siteCopyClient.ts so page scripts can import it
+// without dragging supabase-js and the whole copy registry into their bundle.
+export { COPY_PAYLOAD_ID, readCopyPayload, applyCopy, type CopyBundle } from './siteCopyClient';
 
 /** Keys whose value is HTML rather than a plain line. */
 const RICH_KEYS = new Set(COPY_FIELDS.filter((f) => f.type === 'rich').map((f) => f.key));
-
-export const COPY_PAYLOAD_ID = 'site-copy';
 
 function emptyBundle(): CopyBundle {
   return { ja: defaultsFor('ja'), en: defaultsFor('en'), th: defaultsFor('th') };
@@ -53,47 +54,4 @@ export async function loadCopy(): Promise<CopyBundle> {
     /* Network/DNS failure — the defaults already in `bundle` are the answer. */
   }
   return bundle;
-}
-
-/** Reads the JSON the page embedded for the client. Returns null if absent. */
-export function readCopyPayload(doc: Document = document): CopyBundle | null {
-  const el = doc.getElementById(COPY_PAYLOAD_ID);
-  if (!el?.textContent) return null;
-  try {
-    const parsed = JSON.parse(el.textContent) as CopyBundle;
-    return LANGS.every((l) => parsed?.[l]) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Swaps every marked node to `lang`.
- *
- * `data-i18n` sets text; `data-i18n-html` sets markup and is re-validated first,
- * so a tampered row loses its formatting rather than running.
- */
-export function applyCopy(bundle: CopyBundle, lang: Lang, root: ParentNode = document): void {
-  const dict = bundle[lang];
-  if (!dict) return;
-
-  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n]')) {
-    const value = dict[el.dataset.i18n ?? ''];
-    if (typeof value === 'string') el.textContent = value;
-  }
-
-  for (const el of root.querySelectorAll<HTMLElement>('[data-i18n-html]')) {
-    const value = dict[el.dataset.i18nHtml ?? ''];
-    if (typeof value !== 'string') continue;
-    if (isRichSafe(value)) el.innerHTML = value;
-    else el.textContent = value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  // Set `lang` on the document that actually owns `root`, not on whichever
-  // document called us. Identical for a page switching its own language, but the
-  // Studio's live preview passes an iframe: without this the preview keeps
-  // Latin leading for Thai (global.css scopes that fix on html[lang='th']) and
-  // the Studio's own <html lang> gets stomped to the previewed language.
-  const doc = (root as Node).ownerDocument ?? (root as Document);
-  doc.documentElement.lang = lang;
 }

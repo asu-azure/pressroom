@@ -1,12 +1,12 @@
 ---
 import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
-import '../styles/ost-fonts.css';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
+import { cacheShell } from '../lib/cache';
 
 // Was prerendered. The artist teaser below the shelf is now author-edited copy,
 // and a static build would freeze it until the next deploy — the author would
@@ -16,6 +16,8 @@ export const prerender = false;
 
 const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
+
+cacheShell(Astro);
 ---
 
 <Base>
@@ -75,7 +77,16 @@ const t = copy[DEFAULT_LANG];
 
     <Showcase />
 
-    <Library client:only="svelte" />
+    {/* The shelf is a client:only island, so until it hydrates the fallback
+        holds its place: aspect-locked blanks the size of real cards, which keeps
+        the teaser below from jumping when the books arrive. */}
+    <div id="shelf">
+      <Library client:only="svelte">
+        <div slot="fallback" class="shelf-skel" aria-hidden="true">
+          {Array.from({ length: 6 }, () => <span class="shelf-skel__card" />)}
+        </div>
+      </Library>
+    </div>
 
     {/* ============ ARTIST TEASER ============
         Sits AFTER the books, because the journey is shelf first, artist second —
@@ -141,7 +152,7 @@ const t = copy[DEFAULT_LANG];
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { decode } from '../scripts/text';
-  import { applyCopy, readCopyPayload } from '../lib/siteCopy';
+  import { applyCopy, readCopyPayload } from '../lib/siteCopyClient';
   import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
 
   gsap.registerPlugin(ScrollTrigger);
@@ -515,6 +526,22 @@ const t = copy[DEFAULT_LANG];
 </style>
 
 <style>
+  /* --- shelf placeholder (matches .lib / .lib__grid in Library.svelte) ----- */
+  .shelf-skel {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 42vw), 1fr));
+    gap: clamp(1rem, 2.5vw, 2rem);
+    padding: 0 var(--pad) clamp(3rem, 8vh, 5rem);
+  }
+  .shelf-skel__card {
+    aspect-ratio: 4 / 5.4;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--bg-soft);
+    animation: shelf-skel 1.4s ease-in-out infinite alternate;
+  }
+  @keyframes shelf-skel { to { opacity: 0.45; } }
+
   /* --- OST band: a ticker, not a section ----------------------------------- */
   .ost-band {
     position: relative;
@@ -557,7 +584,7 @@ const t = copy[DEFAULT_LANG];
     white-space: nowrap;
     animation: ost-band-run 26s linear infinite;
   }
-  .ost-band__run b { font-family: 'OST JP', var(--font-jp); font-weight: 900; letter-spacing: 0.08em; }
+  .ost-band__run b { font-weight: 700; letter-spacing: 0.08em; }
   .ost-band:hover .ost-band__run { animation-duration: 12s; }
   @keyframes ost-band-run { to { transform: translateX(-50%); } }
   @keyframes ost-band-rec { 50% { opacity: 0.2; } }

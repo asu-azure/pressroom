@@ -16,6 +16,8 @@
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
+  /* kana, CJK punctuation, kanji, full-width forms — Latin never fetches it */
+  unicode-range: U+3000-30FF, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF, U+FF00-FFEF;
 }
 @font-face {
   font-family: 'OST Dot';

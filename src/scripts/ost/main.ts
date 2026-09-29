@@ -148,6 +148,21 @@ export function initOst() {
   };
   audio.addEventListener('progress', onProgress);
   audio.addEventListener('canplaythrough', () => { loadLbl.textContent = 'READY ✓'; });
+  // The MP3 is 4.7 MB, so the page asks only for its metadata. The full download
+  // starts the moment a visitor reaches for a gate button — the 1.6 s pre-roll
+  // covers the first buffer, and the progress label shows the rest.
+  const warm = () => {
+    if (audio.preload === 'auto') return;
+    audio.preload = 'auto';
+    loadLbl.textContent = 'LOADING 0%';
+    try { audio.load(); } catch { /* the play() call below still fetches it */ }
+  };
+  for (const id of ['gate-play', 'gate-muted']) {
+    const b = $(id);
+    b.addEventListener('pointerenter', warm);
+    b.addEventListener('focus', warm);
+    b.addEventListener('pointerdown', warm);
+  }
   $('gate-play').addEventListener('click', () => start(false));
   $('gate-muted').addEventListener('click', () => start(true));
 
