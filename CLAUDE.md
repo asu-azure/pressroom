@@ -351,6 +351,14 @@ spans the navigation, covering the old page and uncovering the new one.
   to JPEG. Prefer uploading PDFs from Chrome/Edge desktop.
 - Page order uses **fractional index keys** (`fractional-indexing`): a reorder is one row
   UPDATE — never renumber all pages.
+- **Every `sort_key` column is `collate "C"`, and that is load-bearing.** The keys are ASCII
+  base62 and `generateKeyBetween()` produces them in *byte* order, but Postgres here defaults to
+  `en_US.UTF-8`, which compares letters case-insensitively first — so `'aa'` sorts **before**
+  `'aZ'`. Once keys pass `aZ` the two orderings diverge: the client reads the wrong row as "last",
+  asks for the key after it, and gets one that already exists. Symptom is a hard stop, not a flake
+  — *every* subsequent insert fails with `duplicate key value violates unique constraint
+  "…_sort_key_key"`, and the list is mis-ordered besides. This bit `artworks` at 37 pieces.
+  If you add another fractionally-indexed table, pin the collation on the column.
 - Forced spreads share a `spread_pair_id` uuid on exactly two page rows; the reader's
   `resolveSheets()` joins them in every layout mode.
 - Storage paths are immutable (`works/{work_id}/{page_id}/…`, `cacheControl` 1 year) —

@@ -22,7 +22,15 @@ create table if not exists artworks (
   title      text not null default '',
   medium     text not null default '',  -- drives the filter chips on /asu
   alt        text not null default '',
-  sort_key   text not null,             -- fractional-indexing key; reorder = 1 UPDATE
+  -- fractional-indexing key; reorder = 1 UPDATE.
+  -- collate "C" is load-bearing: these are ASCII base62 keys and the library
+  -- generates them in BYTE order. Under the database default (en_US.UTF-8)
+  -- letters compare case-insensitively first, so 'aa' sorts BEFORE 'aZ' — the
+  -- app then reads the wrong row as "last", asks for the key after it, and gets
+  -- one that already exists. That is a hard stop: every upload past 'aZ' fails
+  -- with `duplicate key value violates unique constraint artworks_sort_key_key`,
+  -- and the gallery orders wrongly besides.
+  sort_key   text collate "C" not null,
   featured   boolean not null default false,
   published  boolean not null default true,
   width      int not null,
@@ -35,6 +43,11 @@ create table if not exists artworks (
   constraint artworks_sort_key_key unique (sort_key) deferrable initially deferred
 );
 create index if not exists artworks_order on artworks (sort_key);
+
+-- Idempotent repair for projects created before the collation was pinned above.
+-- Safe to re-run: no data is rewritten, only the column's collation metadata and
+-- the dependent index/constraint.
+alter table artworks alter column sort_key type text collate "C";
 
 alter table artist_profile enable row level security;
 alter table artworks enable row level security;

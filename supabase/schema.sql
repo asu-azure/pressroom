@@ -42,7 +42,12 @@ create table works (
 create table pages (
   id             uuid primary key default gen_random_uuid(),
   work_id        uuid not null references works(id) on delete cascade,
-  sort_key       text not null,   -- fractional-indexing key; reorder = 1 UPDATE
+  -- fractional-indexing key; reorder = 1 UPDATE.
+  -- collate "C" is load-bearing — see the long note in artist.sql. These keys are
+  -- ASCII base62 generated in BYTE order; the database default (en_US.UTF-8)
+  -- compares letters case-insensitively first, so once keys reach lowercase the
+  -- app reads the wrong row as "last" and regenerates a key that already exists.
+  sort_key       text collate "C" not null,
   spread_pair_id uuid,            -- same uuid on BOTH pages of a forced spread
   width          int  not null,   -- intrinsic px of the full variant
   height         int  not null,
@@ -116,6 +121,10 @@ create index pages_chapter on pages (chapter_id);
 alter table pages drop constraint pages_work_id_sort_key_key;
 alter table pages add constraint pages_work_id_sort_key_key
   unique (work_id, sort_key) deferrable initially deferred;
+
+-- Idempotent repair for projects created before the collation was pinned on the
+-- column above. Safe to re-run: no data is rewritten.
+alter table pages alter column sort_key type text collate "C";
 
 alter table chapters enable row level security;
 
