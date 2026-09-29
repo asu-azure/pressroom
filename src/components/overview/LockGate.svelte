@@ -3,6 +3,7 @@
   import { supabase } from '../../lib/supabase';
   import { saveUnlock } from '../../lib/persistence';
   import { i18n } from '../../lib/i18n.svelte';
+  import { sfx } from '../../scripts/sound';
   import type { PageRow, Work } from '../../lib/types';
 
   let {
@@ -68,6 +69,7 @@
       return;
     }
     saveUnlock(work.id, password);
+    sfx.chord('unlock');
     // 巻き物 (motion-kit): the gate rolls itself up before the pages appear.
     if (reduced || !frame) {
       onUnlocked(data as PageRow[]);

@@ -323,6 +323,7 @@
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
           <a
             class="ov-btn mono"
+            data-sfx="open"
             href={continueAt ? continueHref : readHref}
             onclick={(e) => locked && openLock(continueAt ? continueHref : readHref, e)}
           >
@@ -332,6 +333,7 @@
           {#if continueAt}
             <a
               class="ov-btn ov-btn--ghost mono"
+              data-sfx="open"
               href={readHref}
               onclick={(e) => locked && openLock(readHref, e)}
             >

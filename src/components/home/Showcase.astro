@@ -55,6 +55,7 @@ const panels = Array.from({ length: PANELS }, (_, i) => i);
         <button
           type="button"
           class="strip__panel"
+          data-sfx="note"
           data-panel={i}
           data-index={i % slides.length}
           aria-label={slides[i % slides.length].alt}

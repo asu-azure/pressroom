@@ -13,6 +13,7 @@
   import ReaderChrome from './ReaderChrome.svelte';
   import NoteRail from './NoteRail.svelte';
   import HeartBurst from './HeartBurst.svelte';
+  import { sfx } from '../../scripts/sound';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
@@ -159,6 +160,7 @@
 
   let burstId = 0;
   function burst(x: number, y: number) {
+    sfx.sparkle();
     const id = ++burstId;
     bursts = [...bursts, { id, x, y }];
     setTimeout(() => (bursts = bursts.filter((b) => b.id !== id)), 1700);
@@ -241,8 +243,17 @@
     if (press || performance.now() - pressedAt < 800) e.preventDefault();
   }
 
+  // A paper tick per page turn. Scroll mode reports pages as they pass, so it
+  // is thinned to one tick per 250 ms rather than a rattle.
+  let lastTick = 0;
   function setCur(index: number) {
-    cur = Math.max(0, Math.min(sheets.length - 1, index));
+    const next = Math.max(0, Math.min(sheets.length - 1, index));
+    const now = performance.now();
+    if (next !== cur && (settings.mode === 'flip' || now - lastTick > 250)) {
+      lastTick = now;
+      sfx.tick();
+    }
+    cur = next;
     const first = sheets[cur]?.pages[0];
     if (work && first) saveProgress(work.id, first.id);
   }

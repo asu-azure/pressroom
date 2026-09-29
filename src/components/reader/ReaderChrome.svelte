@@ -2,6 +2,7 @@
   import type { Work, ReaderSettings, Sheet, ChapterMark, PageRec } from '../../lib/types';
   import { i18n } from '../../lib/i18n.svelte';
   import { punch } from '../../scripts/mv';
+  import { sfx } from '../../scripts/sound';
 
   let {
     work,
@@ -54,6 +55,14 @@
 
   const currentIds = $derived(currentSheet?.pages.map((p) => p.id) ?? []);
   const currentFaved = $derived(currentIds.some((id) => favorites.includes(id)));
+
+  // UI sounds (theme-song notes). The reader has no site header, so its switch
+  // lives in the settings panel; the choice is shared with the rest of the site.
+  let soundOn = $state(sfx.enabled());
+  function setSound(next: boolean) {
+    sfx.set(next);
+    soundOn = next;
+  }
 
   // MV punch: the page number and the heart kick once when they change.
   let counterEl: HTMLElement | undefined = $state();
@@ -232,6 +241,13 @@
       <div class="rc-panel__opts">
         <button class="mono rc-opt" class:is-on={settings.mode === 'flip'} onclick={() => onSettings({ mode: 'flip' })}>{i18n.t('rd.flip')}</button>
         <button class="mono rc-opt" class:is-on={settings.mode === 'scroll'} onclick={() => onSettings({ mode: 'scroll' })}>{i18n.t('rd.scroll')}</button>
+      </div>
+    </div>
+    <div class="rc-panel__group">
+      <span class="mono rc-panel__label">SOUND</span>
+      <div class="rc-panel__opts">
+        <button class="mono rc-opt" class:is-on={!soundOn} onclick={() => setSound(false)}>OFF</button>
+        <button class="mono rc-opt" class:is-on={soundOn} onclick={() => setSound(true)}>ON ♪</button>
       </div>
     </div>
     <div class="rc-panel__group">

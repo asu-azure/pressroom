@@ -31,6 +31,7 @@
 <a
   class="card tile mk-pop mk-hop-host"
   href={`/w/${work.slug}`}
+  data-sfx="note open"
   onpointerenter={() => prefetch(`/w/${work.slug}`)}
   onfocus={() => prefetch(`/w/${work.slug}`)}
 >

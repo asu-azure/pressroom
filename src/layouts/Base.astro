@@ -150,12 +150,19 @@ const jsonLd = JSON.stringify({
       import Lenis from 'lenis';
       import { gsap } from 'gsap';
       import { ScrollTrigger } from 'gsap/ScrollTrigger';
-      import { initMv } from '../scripts/mv';
+      import { initMv, strike } from '../scripts/mv';
+      import { initSound } from '../scripts/sound';
 
       gsap.registerPlugin(ScrollTrigger);
 
       // MV motion: converge entrances and note strikes (src/scripts/mv.ts).
       initMv();
+
+      // UI sounds: notes of the theme song, off until the visitor turns them on
+      // (src/scripts/sound.ts). /ost plays the real song and opts out.
+      if (!document.querySelector('[data-no-sfx]')) {
+        initSound({ onNote: (x, y) => strike(x, y, 'amber') });
+      }
 
       // Mobile browsers fire resize when the URL bar collapses; recomputing every
       // trigger there made start positions jump around mid-scroll.

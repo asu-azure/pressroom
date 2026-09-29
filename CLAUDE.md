@@ -415,6 +415,29 @@ rehearsal boxes, stop hatching or quote brackets), same clock.
   `pagehide` pauses the element.
 - While it plays it dispatches `pr:music` (detail `true`/`false`) on `document`; the UI sounds duck.
 
+## UI sounds — the theme song under the pointer (`src/scripts/sound.ts`)
+
+Notes of 「扉の向こう」 synthesised with Web Audio: triangle + a quiet sine an octave up, one lowpass,
+4 ms attack, short exponential decay. **No sample files.** Budget is a couple of KB.
+
+- **Off by default.** The switch is SOUND in the site header, and a SOUND row in the reader's
+  settings panel (the reader has no header). The choice lives in `localStorage['pr:sound']` and is
+  read at module load, so an island and Base agree whichever script runs first.
+- The `AudioContext` is only created inside a gesture (the switch click). If sound was left on, the
+  first `pointerdown`/`keydown` resumes it; hovers before that are silent — browsers require it.
+  `navigator.audioSession.type = 'ambient'` where supported (iOS silent switch, no interrupting the
+  visitor's own music). Silent in a hidden tab; ducked while `pr:music` says a song is playing.
+  `/ost` (`data-no-sfx`) opts out entirely.
+- **Hooks are attributes**, delegated from Base, so Svelte islands need no imports:
+  `data-sfx="note"` (mouse hover → the next note of the hook; sweeping across the shelf plays it,
+  and it resets after 2.5 s of quiet), `data-sfx="open"` (press → D♭maj7), `data-sfx="tap"`
+  (click → one soft note). Space-separated: shelf cards are `data-sfx="note open"`. Direct calls:
+  the reader's page turn → `sfx.tick()` (thinned to 4/s in scroll mode), the ここすき burst →
+  `sfx.sparkle()`, a correct lock password → `sfx.chord('unlock')`.
+- `MOTIF` and `CHORDS` are hardcoded so no page needs the JSON to play a note.
+  **`src/scripts/ost/motif.test.ts` checks them against `perd-pratu.json`** — a remix that moves
+  the chorus fails the test instead of drifting silently.
+
 ## The artist signature stamp
 
 The vermillion box holding a single kanji is **retired**. The artist's own animated chibi doodle

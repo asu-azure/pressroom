@@ -16,6 +16,7 @@
     {#if i > 0}<span class="langbar__sep">/</span>{/if}
     <button
       class="langbar__btn"
+      data-sfx="tap"
       class:is-active={i18n.lang === l.code}
       onclick={() => i18n.set(l.code)}
     >{l.label}</button>
