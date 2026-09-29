@@ -25,13 +25,7 @@ const REVEAL_MS = 1150;
 const REDUCED_MS = 240;
 /** Cell size for the velocity-averaging grid, in px. */
 const CELL = 48;
-// The curtain wears the page's own ink: near-black on Editorial FUI pages,
-// night navy on tale pages (Base.astro sets --flock-ink on <html>).
-let INK = '#0c0c0d';
-function readInk() {
-  const v = getComputedStyle(document.documentElement).getPropertyValue('--flock-ink').trim();
-  if (v) INK = v;
-}
+const INK = '#0c0c0d';
 
 interface Bird {
   x: number;
@@ -298,7 +292,6 @@ export async function flockTo(href: string, dir: 1 | -1): Promise<void> {
  * the opposite way from the trip out.
  */
 export function initFlock(): void {
-  readInk();
   // --- arrival -------------------------------------------------------------
   let flag: string | null = null;
   try {
