@@ -316,6 +316,36 @@ act-character → craft → act-select → act-3d → act-grid → contact.
   scene slots above decide, per act, between the photograph, a pinned plate and a full backdrop.
   With an empty gallery each slot degrades to its photograph and the acts still stand up.
 
+## `/ost` — the main theme as a moving score
+
+「扉の向こう」 Main Theme, the book's song, played as a grand staff that scrolls past a playhead
+in time with the MP3. **It is its own theme and leaves the rest of the site alone.** It opens as
+a Shibuya-style CD-single jacket (obi, vertical title, a barcode drawn from the score's
+density). From there the scene follows the song: paper for most of it, ink for the Beethoven
+section, Akihabara neon/CRT for the 8-bit duet, a night stage for the final chorus, and paper
+again for the coda. `MODE_BY_SECTION` in `src/scripts/ost/main.ts` is the switch. Prerendered,
+with no database.
+
+- **Sync comes from the data, not from animation timing.** `src/data/ost/perd-pratu.json` was
+  exported from the same source that rendered `public/ost/perd-pratu.mp3`. A notehead is centred
+  on its onset, so it touches the line exactly when it sounds. The clock is `audio.currentTime`,
+  eased by `performance.now()` between the element's coarse updates. If the audio fails, the
+  same clock runs on `performance.now()` alone. See `src/data/ost/README.md` to swap in a new
+  mix.
+- `score.ts` turns MIDI into notation: staff, step, spelling against four flats, accidentals held
+  to the end of the bar, chords, stems, beams. `render.ts` is one canvas using SMuFL glyphs. All
+  its metrics are in staff spaces, taken from Bravura's metadata.
+- **Sound is opt-in.** Nothing plays until a gate button is pressed. That press unlocks the
+  element, then a 1.6 s pre-roll lets the first notes scroll in before t = 0.
+- Page-only faces are declared in `src/styles/ost-fonts.css`: `'OST JP'`, `'OST Dot'` and
+  `'OST Notation'`. The JP face is a **separate subset** from the site-wide Noto, so adding
+  Japanese to `/ost` means re-subsetting that file, not the global one. The notation font is
+  Bravura (OFL, Reserved Font Name). The subset is therefore renamed, so never call it Bravura.
+- Reduced motion drops the pop, particles, glitch, wipe and banners. The score still scrolls,
+  because the moving score is the content.
+- Entry points: the `NOW PLAYING` ticker between the shelf hero and the showcase, and `OST ♪` in
+  the footer. Both use `data-flock`.
+
 ## The artist signature stamp
 
 The vermillion box holding a single kanji is **retired**. The artist's own animated chibi doodle

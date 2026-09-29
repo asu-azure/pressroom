@@ -1,0 +1,33 @@
+/* /ost faces — loaded only by pages that import this file (/ost and the
+   homepage's OST ticker), and only fetched when a glyph actually needs them.
+
+   'OST JP'  Noto Sans JP, subset to the characters /ost and the ticker use.
+             Deliberately a separate family from the site-wide 'Noto Sans JP'
+             subset (which is built from src/ kanji): regenerating that one
+             would have touched every page. Add JA text to /ost → re-subset
+             this file (see src/data/ost/README.md).
+   'OST Dot' DotGothic16 for the Akihabara 8-bit HUD.
+   'OST Notation'  SMuFL music glyphs subset from Bravura (SIL OFL 1.1). The
+             font's Reserved Font Name means a modified (subset) copy must not
+             be called Bravura, so it is renamed inside and out. */
+@font-face {
+  font-family: 'OST JP';
+  src: url('/fonts/NotoSansJP-ost.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OST Dot';
+  src: url('/fonts/DotGothic16-ost.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'OST Notation';
+  src: url('/fonts/PressroomNotation.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
