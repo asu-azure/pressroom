@@ -37,7 +37,7 @@
     <p class="mono login__error">{error}</p>
   {/if}
 
-  <button class="login__btn mono" type="submit" disabled={busy} data-magnetic>
+  <button class="login__btn mono" type="submit" disabled={busy}>
     {busy ? 'CHECKING…' : 'ENTER THE PRESSROOM →'}
   </button>
 </form>

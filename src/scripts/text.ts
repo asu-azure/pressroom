@@ -10,7 +10,7 @@ import { gsap } from 'gsap';
 
 const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&/0123456789';
 
-export function decode(el: HTMLElement, finalText: string, duration = 1100) {
+export function decode(el: HTMLElement, finalText: string, duration = 400) {
   const start = performance.now();
   const len = finalText.length;
   function frame(now: number) {

@@ -212,8 +212,7 @@
       'click',
       (e) => {
         const target = e.target as Element | null;
-        // Never let the preview navigate away from the page being edited — on
-        // /asu a [data-flock] link would also start the bird-flock transition.
+        // Never let the preview navigate away from the page being edited.
         if (target?.closest('a[href]')) {
           e.preventDefault();
           e.stopPropagation();

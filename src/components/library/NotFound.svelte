@@ -11,7 +11,7 @@
   <p class="mono">{i18n.t('nf.kicker')}</p>
   <h1 class="mega">404</h1>
   <p class="serif nf__sub">{i18n.t('nf.title')}</p>
-  <a class="mono nf__back" href="/" data-magnetic>← {i18n.t('nf.back')}</a>
+  <a class="mono nf__back" href="/">← {i18n.t('nf.back')}</a>
 </div>
 
 <style>

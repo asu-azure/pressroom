@@ -13,16 +13,9 @@
   --flow-grad: linear-gradient(100deg, #2742f0, #18c4d6, #6aa0ff, #e8a31a, #2742f0);
 }
 
-/* ---- 1. Signature spreads: a section flips its own ink/paper tone ----------
-   Make sections full-bleed (padding, not max-width) so tone blocks span edge to
-   edge. Child CSS should reference the semantic vars, never hardcoded hex. */
-.spread { transition: background-color .6s var(--ease), color .6s var(--ease); }
-.spread--ink   { --bg:#0c0c0d; --fg:#f4f1ea; --fg-dim:#9a968c; --fg-faint:#57544c; --line:rgba(244,241,234,.10); --line-strong:rgba(244,241,234,.22); background:var(--bg); color:var(--fg); }
-/* NOTE: this file loads AFTER global.css, so at equal specificity these win.
-   Each value therefore reads global.css's token first and keeps the literal only
-   as a standalone fallback — otherwise retoning paper here silently overrides
-   the design tokens and editing them appears to do nothing. */
-.spread--paper { --bg:var(--paper-bg,#e8edf6); --fg:var(--paper-fg,#121822); --fg-dim:var(--paper-fg-dim,#4c5a71); --fg-faint:var(--paper-fg-faint,#93a2b8); --line:var(--paper-line,rgba(38,82,158,.16));  --line-strong:var(--paper-line-strong,rgba(38,82,158,.34));  background:var(--bg); color:var(--fg); }
+/* ---- 1. Signature spreads live in global.css only ------------------------
+   This file used to re-declare .spread--ink / .spread--paper and, loading after
+   global.css, silently won the cascade. Tokens now have exactly one home. */
 
 /* ---- 2. Mask-reveal: a line of text rises out from behind a clip -----------
    Wrap each line: <span class="reveal-mask"><span>Text</span></span>
@@ -235,7 +228,7 @@
 
 /* Editorial reveal-row gallery — alternating big image + index/medium/title. Each row's
    image + meta carry [data-reveal] and mask in on scroll (reversible via toggleActions in JS).
-   Hover keeps the image zoom; pair with displacement.ts for the WebGL ripple on [data-art]. */
+   Hover keeps the image zoom. */
 .rows { position: relative; z-index: 2; display: grid; gap: clamp(3rem, 9vw, 7rem); }
 .row { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: clamp(1.5rem, 5vw, 4rem); align-items: center; }
 .row--rev { grid-template-columns: 0.85fr 1.15fr; }

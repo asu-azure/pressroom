@@ -61,7 +61,7 @@ const t = copy[DEFAULT_LANG];
         One slim ticker between the masthead and the shelf: the way in to /ost,
         the book's main theme played as a moving score. Thin on purpose — the
         shelf still comes first, this only has to be noticed. */}
-    <a class="ost-band" href="/ost" data-flock data-hover aria-label="OST — 扉の向こう Main Theme">
+    <a class="ost-band" href="/ost" aria-label="OST — 扉の向こう Main Theme">
       <span class="ost-band__tag">NOW PLAYING <i aria-hidden="true"></i></span>
       <span class="ost-band__track" aria-hidden="true">
         <span class="ost-band__run">
@@ -100,7 +100,7 @@ const t = copy[DEFAULT_LANG];
             <span class="reveal-mask"><span data-line data-i18n="teaser.title">{t['teaser.title']}</span></span>
           </h2>
           <p class="teaser__lede" data-i18n="teaser.lede">{t['teaser.lede']}</p>
-          <a class="mono teaser__cta" href="/asu" data-flock data-magnetic data-hover>
+          <a class="mono teaser__cta" href="/asu">
             <span data-i18n="teaser.cta">{t['teaser.cta']}</span> <span aria-hidden="true">→</span>
           </a>
         </div>
@@ -125,10 +125,10 @@ const t = copy[DEFAULT_LANG];
     <footer class="lib-foot">
       <span class="mono">© ASU AZURE</span>
       <span class="lib-foot__links">
-        <a class="mono" href="/asu" data-flock data-magnetic>ASU AZURE ↗</a>
-        <a class="mono" href="/ost" data-flock data-magnetic>OST ♪</a>
-        <a class="mono" href="https://x.com/asukonpeki" data-magnetic>X — @ASUKONPEKI</a>
-        <a class="mono lib-foot__studio" href="/studio" data-magnetic>STUDIO ⌘</a>
+        <a class="mono" href="/asu">ASU AZURE ↗</a>
+        <a class="mono" href="/ost">OST ♪</a>
+        <a class="mono" href="https://x.com/asukonpeki">X — @ASUKONPEKI</a>
+        <a class="mono lib-foot__studio" href="/studio">STUDIO ⌘</a>
       </span>
     </footer>
   </main>
@@ -172,7 +172,7 @@ const t = copy[DEFAULT_LANG];
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!reduced) {
     const kicker = document.getElementById('lib-kicker');
-    if (kicker) decode(kicker, kicker.textContent ?? '', 950);
+    if (kicker) decode(kicker, kicker.textContent ?? '', 450);
 
     const line = document.getElementById('lib-title-line');
     if (line) {
@@ -399,29 +399,27 @@ const t = copy[DEFAULT_LANG];
     overflow: hidden;
   }
   /* --- ink retone of the proof-sheet decor -------------------------------
-     All of this decor is authored in global.css against cream paper: blue-black
-     marks, and notebook ruling in a blue that only reads on a light ground. On
-     ink every one of them would vanish, so each is inverted here. Scoped to
-     .teaser, so the paper spreads on /asu are untouched. */
+     All of this decor is authored in global.css against cream paper: dark marks
+     and a cobalt grid tuned for a light ground. On ink the marks would vanish,
+     so each is inverted here. Scoped to .teaser, so the paper spreads on /asu
+     are untouched. */
   .teaser .paper-grid {
-    /* Keep the notebook ruling — it is the artist identity, and it survives the
-       tone flip as light-on-dark. The red margin rule stays red. */
     background-image:
-      repeating-linear-gradient(180deg, rgba(160, 190, 240, 0.14) 0 1px, transparent 1px var(--rule-step));
+      linear-gradient(rgba(106, 160, 255, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(106, 160, 255, 0.07) 1px, transparent 1px);
   }
-  .teaser .paper-grid::before { background: rgba(216, 92, 99, 0.34); }
   .teaser .crop::before,
   .teaser .crop::after { background: rgba(244, 241, 234, 0.42); }
-  .teaser .regmark { border-color: rgba(216, 92, 99, 0.55); }
+  .teaser .regmark { border-color: rgba(244, 241, 234, 0.42); }
   .teaser .regmark::before,
-  .teaser .regmark::after { background: rgba(216, 92, 99, 0.55); }
+  .teaser .regmark::after { background: rgba(244, 241, 234, 0.42); }
   .teaser .ruler { color: rgba(244, 241, 234, 0.30); }
   .teaser__wm {
     bottom: 2%;
     right: calc(var(--pad) * 0.6);
     font-size: clamp(3rem, 9vw, 6rem);
-    /* Default --wm-stroke is blue-black for paper; this is the ink value the
-       book hero already uses. */
+    /* Default --wm-stroke is dark for paper; this is the ink value the book
+       hero already uses. */
     --wm-stroke: rgba(244, 241, 234, 0.09);
   }
   .teaser__reg { top: 14%; right: 30%; }

@@ -5,7 +5,7 @@ import Dashboard from '../../components/studio/Dashboard.svelte';
 export const prerender = true;
 ---
 
-<Base title="Studio — Pressroom">
+<Base title="Studio — Pressroom" topbar={false}>
   <main class="spread spread--ink studio-shell">
     <Dashboard client:only="svelte" />
   </main>

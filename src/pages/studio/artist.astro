@@ -7,7 +7,7 @@ import StudioArtist from '../../components/studio/StudioArtist.svelte';
 export const prerender = true;
 ---
 
-<Base title="Artist — Pressroom Studio">
+<Base title="Artist — Pressroom Studio" topbar={false}>
   <main class="spread spread--ink studio-shell">
     <StudioArtist client:only="svelte" />
   </main>

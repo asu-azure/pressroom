@@ -27,7 +27,7 @@
   });
 </script>
 
-<a class="card tile mk-pop mk-hop-host" href={`/w/${work.slug}`} data-cursor="READ">
+<a class="card tile mk-pop mk-hop-host" href={`/w/${work.slug}`}>
   {#if coverUrl && cropStyle}
     <div class="card__cover" style={cropStyle} role="img" aria-label={`Cover of ${work.title}`}></div>
   {:else if coverUrl}
@@ -66,23 +66,12 @@
     border: 1px dashed var(--line-strong);
   }
   /* Cropped cover — background-image so an arbitrary pan+zoom frame can be
-     shown. Matches .tile img fill + hover scale. */
+     shown. Matches .tile img fill; like it, it stays still on hover. */
   .card__cover {
     position: absolute;
     inset: 0;
     width: 100%;
     height: 100%;
-    transition: transform 0.65s var(--ease);
-  }
-  /* Gated on a real pointer — see the note on .tile in global.css. On touch an
-     unguarded :hover eats the first tap. */
-  @media (hover: hover) {
-    :global(.tile:hover) .card__cover {
-      transform: scale(1.06);
-    }
-  }
-  :global(.tile:focus-visible) .card__cover {
-    transform: scale(1.06);
   }
   .card__lock {
     margin-left: 0.5em;

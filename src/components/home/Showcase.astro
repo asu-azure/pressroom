@@ -57,7 +57,6 @@ const panels = Array.from({ length: PANELS }, (_, i) => i);
           class="strip__panel"
           data-panel={i}
           data-index={i % slides.length}
-          data-cursor="VIEW"
           aria-label={slides[i % slides.length].alt}
         >
           {/* Two stacked layers per panel so a change crossfades instead of popping. */}

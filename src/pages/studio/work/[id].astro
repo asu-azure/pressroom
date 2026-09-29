@@ -5,7 +5,7 @@ import WorkEditor from '../../../components/studio/WorkEditor.svelte';
 const { id } = Astro.params;
 ---
 
-<Base title="Work editor — Pressroom">
+<Base title="Work editor — Pressroom" topbar={false}>
   <main class="spread spread--ink editor-shell">
     <WorkEditor client:only="svelte" workId={id!} />
   </main>

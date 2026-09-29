@@ -80,6 +80,7 @@ const liner: string[][] = [
 <Base
   title="扉の向こう — Main Theme · Pressroom"
   description="「扉の向こう、ひまわりの5枚の花びら」主題曲。流れる楽譜で聴く。 The main theme of Beyond the Door, played as a moving score."
+  topbar={false}
 >
   <main class="ost" id="ost" data-mode="paper" data-state="gate">
     <section class="ost-stage" id="ost-stage" aria-label="扉の向こう — moving score">
@@ -114,7 +115,7 @@ const liner: string[][] = [
       {/* ---------------- HUD ---------------- */}
       <header class="ost-top">
         <div class="ost-top__l">
-          <a class="ost-back" href="/" data-flock="back" data-hover><span aria-hidden="true">←</span> SHELF</a>
+          <a class="ost-back" href="/" data-vt="back"><span aria-hidden="true">←</span> SHELF</a>
           <span class="ost-cat">PRSS-0001 <b class="ost-jp">扉の向こう</b></span>
         </div>
         <div class="ost-sec" aria-live="polite">
@@ -154,7 +155,7 @@ const liner: string[][] = [
             const end = sections[i + 1]?.[0] ?? dur;
             return (
               <li style={`flex-grow:${(end - t).toFixed(2)}`}>
-                <button type="button" data-seek={t} data-hover aria-label={`${ja} ${en} ${fmt(t)}`}>
+                <button type="button" data-seek={t} aria-label={`${ja} ${en} ${fmt(t)}`}>
                   <span class="ost-chapters__fill"></span>
                   <span class="ost-chapters__lbl"><b>{String(i + 1).padStart(2, '0')}</b> <span class="ost-jp">{ja}</span></span>
                 </button>
@@ -163,14 +164,14 @@ const liner: string[][] = [
           })}
         </ol>
         <div class="ost-ctl">
-          <button type="button" class="ost-play" id="ost-play" aria-label="Play / pause" data-hover>
+          <button type="button" class="ost-play" id="ost-play" aria-label="Play / pause">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l12.5-7.5z"></path><g class="i-pause"><rect x="6" y="4.5" width="4" height="15"></rect><rect x="14" y="4.5" width="4" height="15"></rect></g></svg>
           </button>
           <span class="ost-time"><b id="ost-time">0:00.0</b> / {fmt(audioLen)}</span>
           <span class="ost-bar">BAR <b id="ost-bar">001</b>/{bars.length - 1}</span>
           <span class="ost-beats" id="ost-beats" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
           <span class="ost-vu" id="ost-vu" aria-hidden="true">{Array.from({ length: 16 }, () => <i></i>)}</span>
-          <button type="button" class="ost-mute" id="ost-mute" aria-pressed="false" data-hover>SOUND <b>ON</b></button>
+          <button type="button" class="ost-mute" id="ost-mute" aria-pressed="false">SOUND <b>ON</b></button>
         </div>
       </div>
 
@@ -182,8 +183,8 @@ const liner: string[][] = [
         <p class="ost-end__ja ost-jp">おしまい</p>
         <p class="ost-end__en">THANK YOU FOR LISTENING</p>
         <div class="ost-end__ctl">
-          <button type="button" id="ost-replay" data-hover>↺ REPLAY</button>
-          <a href="/" data-flock="back" data-hover>← BACK TO THE SHELF</a>
+          <button type="button" id="ost-replay">↺ REPLAY</button>
+          <a href="/" data-vt="back">← BACK TO THE SHELF</a>
         </div>
       </div>
 
@@ -243,7 +244,7 @@ const liner: string[][] = [
         </picture>
 
         <div class="gate-go">
-          <button type="button" class="gate-play" id="gate-play" data-hover>
+          <button type="button" class="gate-play" id="gate-play">
             <svg class="gate-play__ring" viewBox="0 0 200 200" aria-hidden="true">
               <defs><path id="ring-path" d="M100,100 m-82,0 a82,82 0 1,1 164,0 a82,82 0 1,1 -164,0"></path></defs>
               <text><textPath href="#ring-path">PLAY WITH SOUND ✦ 音を出して再生 ✦ PLAY WITH SOUND ✦ 音を出して再生 ✦</textPath></text>
@@ -253,7 +254,7 @@ const liner: string[][] = [
           </button>
           <div class="gate-go__side">
             <span class="gate-load" id="gate-load">LOADING 0%</span>
-            <button type="button" class="gate-muted" id="gate-muted" data-hover>無音で観る — WATCH MUTED</button>
+            <button type="button" class="gate-muted" id="gate-muted">無音で観る — WATCH MUTED</button>
             <span class="gate-hint">HEADPHONES RECOMMENDED ／ SPACE ▶❚❚ · ← → 5s · M</span>
           </div>
         </div>
@@ -274,7 +275,7 @@ const liner: string[][] = [
       <ol class="notes-list">
         {sections.map(([t, bar, en, ja], i) => (
           <li>
-            <button type="button" data-seek={t} data-top data-hover>
+            <button type="button" data-seek={t} data-top>
               <span class="nl-t">{fmt(t)}</span>
               <span class="nl-b">BAR {String(bar).padStart(3, '0')}</span>
               <span class="nl-ja ost-jp">{ja}</span>

@@ -120,7 +120,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 
   <main class="asu">
     <!-- ============ 00 · HERO (ink) ============ -->
-    <section id="hero" class="spread spread--ink asu__hero" data-draw-scope data-constellation>
+    <section id="hero" class="spread spread--ink asu__hero" data-draw-scope>
       {featured && (
         <div class="asu__heroArt" aria-hidden="true">
           <img src={featured.medUrl} alt="" decoding="async" fetchpriority="high" />
@@ -189,7 +189,6 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
                 class="tile tile--natural asu__tile asu__tile--lead"
                 data-medium={featured.medium}
                 data-lb-open={lbIndex.get(featured.id)}
-                data-cursor="VIEW"
                 aria-label={`${featured.title || 'Untitled'} — open larger`}
               >
                 <img
@@ -212,7 +211,6 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
                 class="tile tile--natural asu__tile"
                 data-medium={w.medium}
                 data-lb-open={lbIndex.get(w.id)}
-                data-cursor="VIEW"
                 aria-label={`${w.title || 'Untitled'} — open larger`}
               >
                 <img
@@ -324,7 +322,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
                 </span>
                 <p class="serif" data-i18n="comm.note">{t['comm.note']}</p>
                 {commissionsOpen && links.email && (
-                  <a class="mono asu__commCta" href={`mailto:${links.email}`} data-magnetic>
+                  <a class="mono asu__commCta" href={`mailto:${links.email}`}>
                     <span data-i18n="comm.cta">{t['comm.cta']}</span> <span aria-hidden="true">→</span>
                   </a>
                 )}
@@ -342,7 +340,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     </section>
 
     <!-- ============ 03 · CONTACT + RETURN (ink) ============ -->
-    <footer class="spread spread--ink asu__contact" data-draw-scope data-constellation>
+    <footer class="spread spread--ink asu__contact" data-draw-scope>
       <span class="bracket bracket--bl" aria-hidden="true"></span>
       <span class="mono asu__num asu__num--ink">
         <span class="asu__numDigits">03</span>
@@ -351,24 +349,24 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
       <p class="mega asu__contactLabel" data-i18n="contact.label">{t['contact.label']}</p>
       <div class="asu__contactRow">
         {links.x && (
-          <a class="serif asu__contactLink" href={links.x} target="_blank" rel="noopener me" data-magnetic>
+          <a class="serif asu__contactLink" href={links.x} target="_blank" rel="noopener me">
             {links.x_handle || 'X'}
           </a>
         )}
         {links.email && (
-          <a class="serif asu__contactLink" href={`mailto:${links.email}`} data-magnetic>
+          <a class="serif asu__contactLink" href={`mailto:${links.email}`}>
             {links.email}
           </a>
         )}
       </div>
-      <a class="mono asu__back" href="/" data-flock="back" data-magnetic>
+      <a class="mono asu__back" href="/" data-vt="back">
         <span aria-hidden="true">←</span> <span data-i18n="contact.back">{t['contact.back']}</span>
       </a>
     </footer>
 
     {/* Persistent return chip — the shelf is never more than one click away.
         Glyph only: it sits over the artwork and must not grow with the copy. */}
-    <a class="mono asu__backFixed" href="/" data-flock="back" aria-label={t['contact.back']}>
+    <a class="mono asu__backFixed" href="/" data-vt="back" aria-label={t['contact.back']}>
       <span aria-hidden="true">←</span>
     </a>
   </main>
@@ -383,16 +381,13 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
   import { decode, assemble } from '../scripts/text';
-  import { initAmbient } from '../scripts/ambient';
   import { initDraw } from '../scripts/draw';
-  import { initDistortion } from '../scripts/displacement';
   import { applyCopy, readCopyPayload } from '../lib/siteCopy';
   import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
 
   gsap.registerPlugin(ScrollTrigger);
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const coarse = window.matchMedia('(pointer: coarse)').matches;
 
   // --- language -------------------------------------------------------------
   // Shares one key with the reader chrome, so a visitor picks a language once
@@ -442,7 +437,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   // --- hero -----------------------------------------------------------------
   if (!reduced) {
     const kicker = document.getElementById('asu-kicker');
-    if (kicker) decode(kicker, kicker.textContent ?? '', 900);
+    if (kicker) decode(kicker, kicker.textContent ?? '', 450);
     const nameEl = document.getElementById('asu-name');
     if (nameEl) assemble(nameEl, { delay: 0.18 });
 
@@ -526,19 +521,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   // components/acts/ActRuntime.astro, which /lookbook includes.
   // Each module owns its reduced-motion / coarse-pointer fallback, so these are
   // called unconditionally and opt themselves down.
-  document.querySelectorAll<HTMLElement>('[data-constellation]').forEach((el) => initAmbient(el, { reduced }));
   initDraw(document, { reduced });
-
-  // WebGL ripple on hover, desktop only and only where the context exists.
-  if (!coarse && !reduced) {
-    let webgl = false;
-    try {
-      webgl = !!document.createElement('canvas').getContext('webgl');
-    } catch {
-      webgl = false;
-    }
-    if (webgl) document.querySelectorAll<HTMLElement>('[data-art]').forEach(initDistortion);
-  }
 </script>
 
 <style>
@@ -563,7 +546,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
   /* ---------- language bar ---------- */
   .asu__langs {
     position: fixed;
-    top: clamp(0.6rem, 2vh, 1.1rem);
+    top: var(--chrome-top, clamp(0.6rem, 2vh, 1.1rem));
     right: clamp(0.6rem, 2vw, 1.4rem);
     z-index: 40;
     display: flex;
@@ -779,7 +762,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
     background-image: repeating-linear-gradient(
       180deg,
       transparent 0 calc(1lh - 1px),
-      var(--rule-blue) calc(1lh - 1px) 1lh
+      var(--paper-rule) calc(1lh - 1px) 1lh
     );
   }
   .asu__prose :global(strong) {

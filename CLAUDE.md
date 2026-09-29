@@ -13,8 +13,8 @@ of single/double layout and scroll/flip mode. Public read, author-only write.
 
 **The visitor journey is shelf first, artist second.** `/` is the bookshelf; **two** entry points
 lead to `/asu` — the artist teaser, which now sits **after** the grid (a visitor who has just looked
-through the work is the one ready to ask who made it), and a footer link. The trip plays the
-bird-flock wipe. `/asu` always offers a route back.
+through the work is the one ready to ask who made it), and a footer link — plus the site header on
+every public page. `/asu` always offers a route back.
 
 The teaser is **ink**, not the cream spread it used to be: below the grid a tone flip would land as
 a bright slab between two dark blocks. Its proof-sheet decor is retoned in `index.astro`'s scoped
@@ -89,38 +89,53 @@ text. See `src/lib/richtext.ts` and its tests.
 3. Create the author user (email+password) in Auth, then **disable public signups**.
 4. Put the project URL + anon key in `.env`.
 
-## Design system (inherited "Editorial FUI")
+## Design system ("Editorial FUI", aligned with the owner's portfolio site)
 
 - Tokens & utilities live in `src/styles/global.css` (CSS custom properties — reuse, don't
   hardcode). Signature spreads `.spread--ink` / `.spread--paper` flip the semantic tokens.
-  **`motion.css` loads after `global.css` and re-declares both spreads at equal specificity,
-  so it wins the cascade.** Its values now read the `--paper-*` / token names with literals only
-  as standalone fallbacks; if you retone a spread, check that file too or your token edit will
-  appear to do nothing.
-- **Paper is a Thai school notebook, not cream proof-sheet.** Faintly blue-white stock
-  (`--paper-bg`), blue horizontal ruling (`.paper-grid`), red margin rule down the gutter. Red
-  (`--rule-red`) is *paper stock* — the margin rule and the registration mark only. It is never
-  an interactive or brand colour: the accent is still cobalt and the warm counterpoint is still
-  amber, so the rule below is unchanged for everything that is not ruled paper.
-  **Lines only — no grid.** The vertical grid was dropped; next to the red margin rule it read
-  as one system too many.
-- **Long-form prose rules itself.** `.paper-grid` is `inset:0` on its section, so its rules start
-  at the section edge — an unknowable distance above the first baseline — and any pitch that
-  disagrees with the text *beats* against it (30.6px rules under a 37.8px line box is what made
-  the synopsis unreadable). So the bio and the synopsis use `.paper-grid--margin` (margin rule
-  only) and each `<p>` draws its own ruling pitched in **`lh`** — the element's own computed line
-  box, which matches by construction. Don't "simplify" that to `calc(font-size × line-height)`:
-  the browser rounds the used font-size, which drifts 0.015px per line. Paragraph gaps are `1lh`,
-  so the rhythm carries across paragraphs. Don't reintroduce section ruling there.
-- Serif narrates (Fraunces), grotesk punches (Space Grotesk / Stack Sans Headline), mono
-  micro-labels (JetBrains Mono `.mono`). One cobalt accent `#2742f0`; warm counterpoint is
-  sunflower amber `#e8a31a`, not red. "Printer's proof-sheet" decor (crop marks, registration
-  marks, ruler ticks, hanko) is the house flavor — very on-theme here.
-- Motion: Lenis + GSAP wired in `src/layouts/Base.astro`. Scroll entrances must be reversible
-  (`toggleActions: 'play none none reverse'` or scrub — never `once: true`). Ease:
-  `cubic-bezier(0.22, 1, 0.36, 1)`. Reader page flips are transform-only (`translate3d`).
-- Always honor `prefers-reduced-motion` and coarse pointers (no custom cursor, native
-  scrolling fallbacks).
+  **`global.css` is the only place the spreads are declared.** `motion.css` used to re-declare
+  them and, loading later, silently won the cascade; don't add them back there.
+- **Paper is cream proof-sheet stock** (`--paper-bg #e9e4d8`) with a faint cobalt blueprint grid
+  (`.paper-grid`), crop and registration marks in `--paper-mark`. It replaced the blue Thai-notebook
+  stock (blue ruling + red margin rule) in the 2026-09 redesign, by the owner's choice.
+- **Long-form prose rules itself.** `.paper-grid` is `inset:0` on its section, so a grid would start
+  at the section edge — an unknowable distance above the first baseline — and beat against the text.
+  So the bio and the synopsis use `.paper-grid--margin` (sheet left blank) and each `<p>` draws its
+  own ruling in `--paper-rule`, pitched in **`lh`** — the element's own computed line box, which
+  matches by construction. Don't "simplify" that to `calc(font-size × line-height)`: the browser
+  rounds the used font-size, which drifts 0.015px per line. Paragraph gaps are `1lh`.
+- Serif narrates (Fraunces), grotesk punches (Space Grotesk), mono micro-labels (JetBrains Mono
+  `.mono`). Preloads are exactly those three. One cobalt accent `#2742f0`; warm counterpoint is
+  sunflower amber `#e8a31a`. Proof-sheet decor (crop marks, registration marks, ruler ticks) is
+  the house flavour. Stack Sans Headline is `/ost`-only and declared in `ost-fonts.css`.
+- **Site header** (`.topbar` in `Base.astro`): PRESSROOM · SHELF · ASU AZURE · OST ♪ · sound toggle.
+  Opaque, same on ink and paper, height published as `--topbar-h`. Pages that own their whole
+  screen pass `topbar={false}` (`/ost`, Studio) or `chromeless` (reader). Fixed page chrome that sat
+  at the very top (LangBar, `/asu` language bar, the overview back chip) reads `--chrome-top`.
+- Cards and tiles: hairline border, 12px radius, the whole card lifts 4px and takes an accent frame
+  on hover. **The picture never zooms**, so artwork is never recropped. Buttons are `.btn` pills.
+- Motion: Lenis (0.8 s) + GSAP wired in `src/layouts/Base.astro`. Scroll entrances must be
+  reversible (`toggleActions: 'play none none reverse'` or scrub — never `once: true`). Ease:
+  `cubic-bezier(0.22, 1, 0.36, 1)`. `[data-vel]` headings lean with scroll speed (±5°). Reader page
+  flips are transform-only (`translate3d`). Keep each effect short (decode scramble is 400 ms).
+- **Page changes are cross-document View Transitions** (`@view-transition` in `global.css`): a
+  clip-path wipe, bottom-up going forward, top-down going back (history, or a link with
+  `data-vt="back"`). No JS on the critical path; unsupported browsers just navigate. The topbar has
+  its own `view-transition-name`, so it stays put.
+- Always honor `prefers-reduced-motion` (everything lands on its final state) and coarse pointers.
+
+### Removed on purpose — do not reintroduce
+
+- **Custom cursor and `[data-cursor]` labels** — a second cursor that trails the real one reads as lag.
+- **Magnetic hover (`[data-magnetic]`)** — click targets that move are harder to hit.
+- **The bird-flock page transition (`flock.ts`)** — it covered the destination until its module
+  loaded (2.5 s failsafe) and drew up to 2400 boids per frame. View Transitions replace it.
+- **OGL displacement on `/asu`** and the `ogl` dependency — a WebGL context on the page whose job is
+  to show the art. **Film grain** (`.grain`) — a full-viewport animated blend layer.
+- **The ambient constellation canvas on `/asu`** (still used by the `/lookbook` acts) and the kanji
+  watermark on the book hero.
+- **The storybook ("tale") theme** of 2026-09-18, reverted in favour of this system. Recoverable
+  losslessly from the git tag `tale-storybook-v1`.
 
 ## The artist page (`/asu`) and its Studio editor
 
@@ -188,7 +203,7 @@ Every word on `/asu` and the homepage artist teaser is author-edited, in three l
   in the preview jumps to its field; focusing a field scrolls the preview to it and follows the
   section's `page` to `/asu`, `/` or `/lookbook`.
   **⚠ Every preview-only behaviour — the click handler, the hover outline, the link guard that stops
-  `data-flock` navigation — is injected INTO the iframe from `StudioCopy.svelte`. None of it lives
+  navigation — is injected INTO the iframe from `StudioCopy.svelte`. None of it lives
   in the pages, so a visitor can never receive editing chrome. Keep it that way.** Verified by
   build: `is-copytarget` / `data-fieldkey` appear in the `StudioArtist` bundle only, loaded solely
   by `/studio/artist`.
@@ -303,13 +318,12 @@ act-character → craft → act-select → act-3d → act-grid → contact.
   rendered as raw images. Ported verbatim from `art/src/pages/index.astro` (~lines 778-828). If
   anything else from the art site looks wrong here, check that repo before writing new rules.
 - Modules in `src/scripts/`: `cinema`, `channel`, `scatter`, `grid3d`, `perspective`, `select`,
-  `ambient`, `draw`, `displacement`, `kinetic`. Each owns its own reduced-motion / coarse-pointer
+  `ambient`, `draw`, `kinetic`. Each owns its own reduced-motion / coarse-pointer
   fallback, so the page calls them unconditionally.
 - **`text.ts` and `kinetic.ts` both export `assemble`, and they are different.** `text.ts`'s is the
   hero-name version already in use; kinetic's is per-character. `/asu` imports the latter as
   `kineticAssemble`.
-- `displacement.ts` needs WebGL (`ogl`) — gated on a live context and a fine pointer. `draw.ts`
-  needs `DrawSVGPlugin`, which ships in the public `gsap` package since 3.13.
+- `draw.ts` needs `DrawSVGPlugin`, which ships in the public `gsap` package since 3.13.
 - Act backdrops are scenery photos in `src/assets/scenery/`, encoded through `getImage()` at
   quality 60 — they sit behind a scrim and must never be full-quality.
 - Every act's imagery is the author's **own artwork** where they want it, not fixed files — the
@@ -343,8 +357,9 @@ with no database.
   Bravura (OFL, Reserved Font Name). The subset is therefore renamed, so never call it Bravura.
 - Reduced motion drops the pop, particles, glitch, wipe and banners. The score still scrolls,
   because the moving score is the content.
-- Entry points: the `NOW PLAYING` ticker between the shelf hero and the showcase, and `OST ♪` in
-  the footer. Both use `data-flock`.
+- Entry points: the `NOW PLAYING` ticker between the shelf hero and the showcase, `OST ♪` in the
+  footer and in the site header. `/ost` itself has no site header (`topbar={false}`); its own HUD
+  carries the way back.
 
 ## The artist signature stamp
 
@@ -353,22 +368,6 @@ The vermillion box holding a single kanji is **retired**. The artist's own anima
 the `/asu` hero and every book's synopsis (the library author card that also used it is retired).
 Animated WebP cannot be paused with
 CSS, so each placement uses `<picture>` with the still frame under `prefers-reduced-motion`.
-
-## The bird-flock transition
-
-`src/scripts/flock.ts` — a canvas boids flock drags an ink curtain across the viewport; the sweep
-spans the navigation, covering the old page and uncovering the new one.
-
-- Any `<a data-flock>` opts in (`data-flock="back"` reverses the sweep direction). Wiring is
-  delegated from `Base.astro`, so links inside Svelte islands work.
-- The handshake is `sessionStorage['pr:flock']`, because a real navigation tears down all JS. **The
-  inline script in `Base.astro`'s `<head>` is load-bearing** — it paints `html.flock-cover` before
-  first paint, otherwise the destination flashes its hero before the module mounts. It also carries
-  a 2.5 s failsafe that clears the cover if the module never runs.
-- Flocking is O(n): birds deposit velocity into a coarse grid, then steer toward their own cell's
-  average. Neighbour queries would be O(n²). All birds are stroked as one path per frame.
-- Bird count scales with viewport area (600–2400) and DPR is capped at 2.
-- `prefers-reduced-motion` gets a plain 240 ms ink fade with no birds.
 
 ## Gotchas
 

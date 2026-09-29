@@ -25,7 +25,7 @@
 <style>
   .langbar {
     position: fixed;
-    top: calc(0.9rem + env(safe-area-inset-top));
+    top: var(--chrome-top, calc(0.9rem + env(safe-area-inset-top)));
     right: var(--pad);
     z-index: 90;
     display: flex;

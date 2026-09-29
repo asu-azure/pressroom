@@ -31,3 +31,14 @@
   font-style: normal;
   font-display: block;
 }
+
+/* Stack Sans Headline: the jacket's display face. /ost is the only page that
+   sets it, so it lives here rather than in global.css (where it used to be
+   preloaded on every page and used by none). */
+@font-face {
+  font-family: 'Stack Sans Headline';
+  src: url('/fonts/StackSansHeadline-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

@@ -82,7 +82,7 @@
 
 <div class="up">
   <div class="up__row">
-    <label class="up__file mono" data-hover>
+    <label class="up__file mono">
       <input type="file" accept="application/pdf" multiple onchange={pick} disabled={busy} />
       {files.length === 0
         ? 'SELECT PDF(S)…'

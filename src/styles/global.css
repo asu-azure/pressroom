@@ -1,19 +1,9 @@
 /* ============================================================
    Pressroom — global styles
-   Aesthetic: "Editorial FUI" (inherited from the Asu Azure art site) —
-   magazine signature-spreads that flip between ink (dark) and paper (cream),
-   serif narrates / grotesk punches, one cobalt accent, award-style motion.
+   Aesthetic: "Editorial FUI" — magazine signature-spreads that flip between
+   ink (dark) and paper (cream), serif narrates / grotesk punches / mono labels,
+   one cobalt accent, short motion that lands on its final state.
    ============================================================ */
-
-/* ---- Self-hosted display face (files in /public/fonts) ----
-   Stack Sans Headline — notched modernist display sans (Latin); headings. */
-@font-face {
-  font-family: 'Stack Sans Headline';
-  src: url('/fonts/StackSansHeadline-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
 
 /* Thai faces, carried over from the retired asu-art one-pager. Both are
    LOOPLESS (ไม่มีหัว) — the looped Royal Institute of Siam was dropped. They sit
@@ -64,24 +54,21 @@
   --ink-line: rgba(244, 241, 234, 0.10);
   --ink-line-strong: rgba(244, 241, 234, 0.22);
 
-  /* ---- Paper tone — Thai school-notebook stock ----
-     A faintly blue-white sheet ruled in blue, with the red margin rule down the
-     left. Replaces the retired cream proof-sheet; see .paper-grid below. */
-  --paper-bg: #e4e8ee;
-  --paper-bg-soft: #eff2f7;
-  --paper-fg: #121822;
-  --paper-fg-dim: #44526a;
-  --paper-fg-faint: #93a2b8;
-  --paper-line: rgba(38, 82, 158, 0.16);
-  --paper-line-strong: rgba(38, 82, 158, 0.34);
-
-  /* Notebook ruling — shared by .paper-grid and the paper decor marks. Red is
-     paper stock here (margin rule, registration mark), never a brand or
-     interactive colour: the accent is still cobalt, the warm one still amber. */
-  --rule-blue: rgba(63, 111, 191, 0.18);
-  --rule-red: rgba(199, 58, 66, 0.38);
-  --paper-ink-line: rgba(19, 34, 66, 0.45);
-  --rule-step: clamp(26px, 3.4vh, 34px);
+  /* ---- Paper tone — cream proof-sheet stock ----
+     Warm cream with a faint cobalt blueprint grid (.paper-grid below). The blue
+     Thai-notebook stock it replaces is retired; long prose still rules itself
+     (see --paper-rule) but in the paper's own warm line colour. */
+  --paper-bg: #e9e4d8;
+  --paper-bg-soft: #f1ece2;
+  --paper-fg: #16140f;
+  --paper-fg-dim: #5f5a4e;
+  --paper-fg-faint: #a8a08e;
+  --paper-line: rgba(22, 20, 15, 0.14);
+  --paper-line-strong: rgba(22, 20, 15, 0.30);
+  /* Dark hairline for proof marks and drawn geometry on paper */
+  --paper-mark: rgba(22, 20, 15, 0.45);
+  /* Ruling under long prose (bio, synopsis) — quieter than --paper-line */
+  --paper-rule: rgba(22, 20, 15, 0.10);
 
   /* One cobalt accent — reads on both tones (kai-group / financial-create) */
   --ink: #2742f0;          /* kept name: this var IS "the accent" across the site */
@@ -131,19 +118,18 @@
   --font-display: 'Space Grotesk', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Ekkamai Vibe', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;
-  /* Self-hosted EN/TH faces. Both Thai faces are LOOPLESS (ไม่มีหัว):
-     Stack Sans Headline (Latin) → English headings + big display.
+  /* Self-hosted TH faces. Both are LOOPLESS (ไม่มีหัว):
      Prompt (Latin+Thai, generous top metrics) → Thai display, so a
        background-clip mega does not shear the vowel/tone marks.
      Ekkamai Vibe (w300–800, Latin+Thai) → Thai text + FUI micro-labels.
      These are only ever reached by Thai glyphs — the Latin face wins first in
      every stack above. */
-  --font-stack: 'Stack Sans Headline', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-prompt: 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-ekkamai: 'Ekkamai Vibe', 'Noto Sans JP', system-ui, sans-serif;
 
-  /* Mega display scale — recurring giant emphasis words (SAKAZUKI / GUEST motif) */
-  --font-mega: clamp(3rem, 13vw, 11rem);
+  /* Mega display scale — the one giant word per page (masthead, artist name, 404).
+     Loud, but a step below the old 13vw so the page under it is still the point. */
+  --font-mega: clamp(2.8rem, 10vw, 8.5rem);
 
   /* Moving-gradient palette for .flow-text (cobalt → cyan → amber, looping) */
   --flow-grad: linear-gradient(100deg, #2742f0, #18c4d6, #6aa0ff, #e8a31a, #2742f0);
@@ -982,29 +968,109 @@ html[lang='th'] .act__head[data-i18n-html] {
 
 /* ============================================================
    MOTION III — cinema-cohesion pass
-   film grain, scroll-progress hairline, section index nav,
+   scroll-progress hairline, section index nav,
    artist signature stamp, archive drag strip, FUI lightbox.
    ============================================================ */
 
-/* ---- Film grain: full-page SVG turbulence, whisper-quiet opacity ---- */
-.grain {
+/* ---- Site header (Base.astro, every page that doesn't own its whole screen).
+   Opaque, always visible, same on ink and paper — a visitor must always be able
+   to find the way back to the shelf. Height is published as --topbar-h so
+   anchors and fixed page chrome can clear it. ---- */
+:root { --topbar-h: 3.25rem; }
+@media (min-width: 761px) { :root { --topbar-h: 3.75rem; } }
+
+.topbar {
   position: fixed;
-  inset: -60px;
-  z-index: 80;
-  pointer-events: none;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 240px 240px;
-  animation: grain-jump 0.9s steps(4) infinite;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 85;
+  height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) var(--pad) 0;
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 2.4vw, 2rem);
+  background: rgba(12, 12, 13, 0.82);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid rgba(244, 241, 234, 0.12);
+  view-transition-name: topbar;
 }
-@keyframes grain-jump {
-  0%   { transform: translate3d(0, 0, 0); }
-  25%  { transform: translate3d(-24px, 16px, 0); }
-  50%  { transform: translate3d(18px, -22px, 0); }
-  75%  { transform: translate3d(-10px, -12px, 0); }
-  100% { transform: translate3d(0, 0, 0); }
+.topbar__mark {
+  color: #f4f1ea;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+  transition: color 0.25s var(--ease);
 }
+.topbar__mark span { color: var(--accent); transition: color 0.25s var(--ease); }
+.topbar__mark:hover { color: var(--accent); }
+.topbar__mark:hover span { color: #f4f1ea; }
+.topbar__nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.9rem, 2vw, 1.8rem);
+  margin-left: auto;
+}
+.topbar__nav a,
+.topbar__sound {
+  color: rgba(244, 241, 234, 0.72);
+  font-size: 0.62rem;
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  transition: color 0.25s var(--ease);
+}
+.topbar__nav a:hover,
+.topbar__nav a[aria-current='page'] { color: #fff; }
+/* the current page gets an underline, not just a brightness change */
+.topbar__nav a[aria-current='page']::after {
+  content: '';
+  display: block;
+  height: 1px;
+  margin-top: 0.35em;
+  background: var(--accent);
+}
+.topbar__sound {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.5em 1em;
+  border: 1px solid rgba(244, 241, 234, 0.3);
+  border-radius: 999px;
+  background: none;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.topbar__sound[hidden] { display: none; }
+.topbar__sound:hover { color: #fff; border-color: var(--accent); }
+.topbar__soundDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease);
+}
+.topbar__sound[aria-pressed='true'] { color: #fff; border-color: var(--accent); }
+.topbar__sound[aria-pressed='true'] .topbar__soundDot { background: #e8a31a; border-color: #e8a31a; }
+@media (max-width: 560px) {
+  .topbar { gap: 0.8rem; }
+  .topbar__nav { gap: 0.8rem; }
+  .topbar__nav a { font-size: 0.56rem; letter-spacing: 0.1em; }
+  .topbar__mark { font-size: 0.62rem; letter-spacing: 0.16em; }
+  .topbar__sound { padding: 0.45em 0.6em; }
+  .topbar__sound [data-sound-label] { display: none; }
+}
+@media (max-width: 380px) {
+  .topbar__mark span { display: none; }
+}
+
+/* Fixed page chrome that used to sit at the very top clears the header. */
+body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top) + 0.7rem); }
+
+/* Anchored sections must clear the fixed header. */
+[id] { scroll-margin-top: calc(var(--topbar-h) + 1rem); }
 
 /* ---- Scroll-progress hairline (top edge, chromatic like .rgb-line) ---- */
 .progress-line {
@@ -1020,7 +1086,7 @@ html[lang='th'] .act__head[data-i18n-html] {
 }
 .progress-line::before, .progress-line::after { content: ''; position: absolute; inset: 0; mix-blend-mode: screen; }
 .progress-line::before { background: #18c4d6; animation: rgb-jit 3.2s ease-in-out infinite; }
-.progress-line::after  { background: #ff3d8b; animation: rgb-jit 3.2s ease-in-out infinite reverse; }
+.progress-line::after  { background: #e8a31a; animation: rgb-jit 3.2s ease-in-out infinite reverse; }
 
 /* ---- Section index nav (desktop): right-edge mono waypoints ---- */
 .secnav {
@@ -1191,6 +1257,7 @@ html[lang='th'] .act__head[data-i18n-html] {
   width: 100%;
   padding: 0;
   border: 1px solid var(--line);
+  border-radius: 12px;
   background: var(--bg-soft);
   cursor: pointer;
   overflow: hidden;
@@ -1198,6 +1265,7 @@ html[lang='th'] .act__head[data-i18n-html] {
   font: inherit;
   color: inherit;
   text-align: left;
+  transition: translate 0.3s var(--ease);
 }
 .tile img {
   position: absolute;
@@ -1205,22 +1273,24 @@ html[lang='th'] .act__head[data-i18n-html] {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.65s var(--ease), filter 0.65s var(--ease);
 }
-/* Hover effects are gated on a real hovering pointer. Unguarded, a touch
-   device applies :hover on the FIRST tap and only activates the link on the
-   second — the tap appears to do nothing. :focus-visible stays outside the
-   query so keyboard users keep the same affordance. */
+/* The whole card lifts and takes an accent frame; the picture itself stays
+   still, so the artwork is never cropped differently on hover.
+   Hover is gated on a real hovering pointer. Unguarded, a touch device applies
+   :hover on the FIRST tap and only activates the link on the second — the tap
+   appears to do nothing. :focus-visible stays outside the query so keyboard
+   users keep the same affordance. */
 @media (hover: hover) {
-  .tile:hover img { transform: scale(1.06); }
+  .tile:hover { translate: 0 -4px; }
 }
-.tile:focus-visible img { transform: scale(1.06); }
+.tile:focus-visible { translate: 0 -4px; outline: none; }
 .tile::after {
-  /* cobalt frame sweeps on hover */
   content: '';
   position: absolute;
   inset: 0;
   border: 1.5px solid var(--accent);
+  border-radius: inherit;
+  background: rgba(39, 66, 240, 0.08);
   opacity: 0;
   transition: opacity 0.3s var(--ease);
   pointer-events: none;
@@ -1394,38 +1464,24 @@ html.lb-open { overflow: hidden; }
    All decorative: z 0–1 under the section's z-2 content.
    ============================================================ */
 
-/* Notebook ruling: blue horizontal rules only. The vertical grid this started as
-   was one system too many next to the red margin rule — a school notebook is
-   lines for writing, not graph paper. */
+/* Faint cobalt blueprint grid, feathered top and bottom. */
 .paper-grid {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background-image:
-    repeating-linear-gradient(180deg, var(--rule-blue) 0 1px, transparent 1px var(--rule-step));
+    linear-gradient(rgba(39, 66, 240, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 66, 240, 0.08) 1px, transparent 1px);
+  background-size: clamp(40px, 6vw, 80px) clamp(40px, 6vw, 80px);
   -webkit-mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
   mask-image: linear-gradient(180deg, transparent, #000 12%, #000 88%, transparent);
 }
-/* The red margin rule, as on a school exercise book. Offset from the section's
-   own --pad so it lands in the gutter left of the text at every width. The
-   parent's mask covers this pseudo too, so it fades top and bottom with the
-   rules instead of butting into the section edge. */
-.paper-grid::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: calc(var(--pad) * 0.55);
-  width: 1px;
-  background: var(--rule-red);
-}
-/* Written pages (bio, synopsis): their paragraphs carry their own ruling, pitched
-   to the text's line box so the words ride the lines. A second set of rules from
-   the sheet would run at a different pitch and beat against them, which is what
-   made long copy hard to read in the first place — so here the sheet contributes
-   the margin rule only. */
+/* Written pages (bio, synopsis): the paragraphs rule themselves, pitched
+   to their own line box. A grid behind them would run at a different pitch and
+   beat against the rules, so these sections keep the sheet blank. */
 .paper-grid--margin { background-image: none; }
+
 
 /* Giant outlined kanji watermark (scroll-parallaxed via [data-wm]).
    Each paper section carries a trilingual hollow cluster: the vertical kanji
@@ -1438,7 +1494,7 @@ html.lb-open { overflow: hidden; }
   z-index: 0;
   line-height: 1;
   color: transparent;
-  -webkit-text-stroke: 1.5px var(--wm-stroke, rgba(19, 34, 66, 0.15));
+  -webkit-text-stroke: 1.5px var(--wm-stroke, rgba(22, 20, 15, 0.15));
   transition: -webkit-text-stroke-color 0.8s var(--ease);
   /* glint: a faint light band travels through the hollow letterforms */
   background-image: linear-gradient(115deg, transparent 42%, rgba(39, 66, 240, 0.13) 50%, transparent 58%);
@@ -1490,7 +1546,7 @@ html.lb-open { overflow: hidden; }
   z-index: 1;
   pointer-events: none;
 }
-.crop::before, .crop::after { content: ''; position: absolute; background: rgba(19,34,66,0.45); }
+.crop::before, .crop::after { content: ''; position: absolute; background: var(--paper-mark); }
 .crop::before { top: 0; left: 38%; right: 0; height: 1px; }
 .crop::after  { left: 0; top: 38%; bottom: 0; width: 1px; }
 .crop--tl { top: 1rem; left: 1rem; }
@@ -1498,18 +1554,17 @@ html.lb-open { overflow: hidden; }
 .crop--bl { bottom: 1rem; left: 1rem; transform: scaleY(-1); }
 .crop--br { bottom: 1rem; right: 1rem; transform: scale(-1); }
 
-/* Registration mark ⊕ — red, as on a real press proof. This is the one place
-   the notebook's red reads as a mark rather than ruling. */
+/* Registration mark ⊕ */
 .regmark {
   position: absolute;
   z-index: 1;
   width: clamp(14px, 1.6vw, 20px);
   aspect-ratio: 1;
-  border: 1px solid rgba(199,58,66,0.60);
+  border: 1px solid var(--paper-mark);
   border-radius: 50%;
   pointer-events: none;
 }
-.regmark::before, .regmark::after { content: ''; position: absolute; background: rgba(199,58,66,0.60); }
+.regmark::before, .regmark::after { content: ''; position: absolute; background: var(--paper-mark); }
 .regmark::before { left: -28%; right: -28%; top: 50%; height: 1px; }
 .regmark::after  { top: -28%; bottom: -28%; left: 50%; width: 1px; }
 
@@ -1522,7 +1577,7 @@ html.lb-open { overflow: hidden; }
   width: 14px;
   z-index: 1;
   pointer-events: none;
-  color: rgba(19,34,66,0.32);
+  color: rgba(22, 20, 15, 0.35);
   background-image:
     repeating-linear-gradient(180deg, currentColor 0 1px, transparent 1px 12px),
     repeating-linear-gradient(180deg, currentColor 0 1.5px, transparent 1.5px 60px);
@@ -1543,8 +1598,8 @@ html.lb-open { overflow: hidden; }
 .chips span { width: clamp(10px, 1.2vw, 15px); aspect-ratio: 1; }
 .chips .chips__label { width: auto; aspect-ratio: auto; margin-left: 0.6em; font-size: 0.55rem; color: var(--fg-faint); }
 
-/* Drawn-geometry stroke tuned for notebook paper (cobalt default is fine; ink-white isn't) */
-.draw-svg [data-draw].is-dark { stroke: var(--paper-ink-line); }
+/* Drawn-geometry stroke tuned for paper (cobalt default is fine; ink-white isn't) */
+.draw-svg [data-draw].is-dark { stroke: var(--paper-mark); }
 
 /* Limit a draw overlay to the first viewport of a very tall section so the
    percent-based geometry stays composed instead of stretching across screens */
@@ -1573,4 +1628,59 @@ html.lb-open { overflow: hidden; }
 :root {
   --mk-accent: var(--accent);
   --mk-love: #e8a31a; /* "ここすき" hearts wear the sunflower amber, not red */
+}
+
+/* ==========================================================================
+   Page change — cross-document View Transitions (replaces the bird flock).
+   No router and no JS on the critical path: browsers without support simply
+   navigate. The topbar has its own name, so it stays put while the page wipes.
+   Forward wipes bottom-up; html[data-vt='back'] (history, data-vt="back") wipes
+   top-down. The MV glitch variant is layered on in mv.css.
+   ========================================================================== */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: mk-vt-out 0.42s cubic-bezier(0.7, 0, 0.3, 1) both; }
+::view-transition-new(root) { animation: mk-vt-in 0.42s cubic-bezier(0.7, 0, 0.3, 1) both; }
+html[data-vt='back']::view-transition-old(root) { animation-name: mk-vt-out-back; }
+html[data-vt='back']::view-transition-new(root) { animation-name: mk-vt-in-back; }
+@keyframes mk-vt-out { to { opacity: 0.4; translate: 0 -2%; } }
+@keyframes mk-vt-in  { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes mk-vt-out-back { to { opacity: 0.4; translate: 0 2%; } }
+@keyframes mk-vt-in-back  { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+
+/* ---- Buttons: pill, hairline, accent fill on hover ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.85em 1.5em;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--fg);
+  background: none;
+  cursor: pointer;
+  transition: background 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease);
+}
+.btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn--lead { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn--lead:hover { background: var(--fg); border-color: var(--fg); color: var(--bg); }
+
+/* Respect users who prefer no motion: everything lands on its final state. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .flow-text {
+    -webkit-text-fill-color: currentColor;
+    color: var(--fg);
+    background: none;
+  }
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }

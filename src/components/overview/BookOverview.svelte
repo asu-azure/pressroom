@@ -208,7 +208,7 @@
   function decodeIn(node: HTMLElement) {
     if (reduced) return;
     const text = node.textContent ?? '';
-    decode(node, text, 900);
+    decode(node, text, 450);
   }
 
   /** Book title gathers on load. decode() can't be used — the titles are
@@ -279,7 +279,7 @@
 <LangBar />
 
 {#if status === 'ready'}
-  <a class="ov-backchip mono" href="/" data-magnetic>← {i18n.t('rd.library')}</a>
+  <a class="ov-backchip mono" href="/">← {i18n.t('rd.library')}</a>
 {/if}
 
 {#if status === 'loading'}
@@ -292,7 +292,6 @@
 {:else}
   <!-- ACT I: cover hero (ink) -->
   <section class="ov-hero spread spread--ink">
-    <span class="watermark ov-hero__wm" aria-hidden="true" data-vel>{work.title.slice(0, 1)}</span>
     <div class="bracket bracket--tl" aria-hidden="true"></div>
     <div class="bracket bracket--tr" aria-hidden="true"></div>
     <div class="ov-hero__inner">
@@ -324,7 +323,6 @@
           <a
             class="ov-btn mono"
             href={continueAt ? continueHref : readHref}
-            data-magnetic
             onclick={(e) => locked && openLock(continueAt ? continueHref : readHref, e)}
           >
             {#if locked}<span aria-hidden="true">🔒 </span>{/if}
@@ -334,7 +332,6 @@
             <a
               class="ov-btn ov-btn--ghost mono"
               href={readHref}
-              data-magnetic
               onclick={(e) => locked && openLock(readHref, e)}
             >
               {i18n.t('ov.start')}
@@ -389,7 +386,7 @@
         <div class="ov-chapter" use:reveal>
           <div class="ov-strip" class:is-rtl={work.direction === 'rtl'}>
             {#each frontPages.filter((p) => !p.isBlank) as page (page.id)}
-              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`} data-cursor="READ">
+              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`}>
                 <img src={page.thumbUrl} alt="" loading="lazy" />
                 <span class="mono ov-thumb__num">{String(ordered.indexOf(page) + 1).padStart(2, '0')}</span>
                 {#if page.note}<span class="ov-thumb__note" title="note"></span>{/if}
@@ -408,7 +405,7 @@
           </header>
           <div class="ov-strip" class:is-rtl={work.direction === 'rtl'}>
             {#each frontPages.filter((p) => !p.isBlank) as page (page.id)}
-              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`} data-cursor="READ">
+              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`}>
                 <img src={page.thumbUrl} alt="" loading="lazy" />
                 <span class="mono ov-thumb__num">{String(ordered.indexOf(page) + 1).padStart(2, '0')}</span>
                 {#if page.note}<span class="ov-thumb__note" title="note"></span>{/if}
@@ -427,7 +424,6 @@
             <a
               class="mono ov-chapter__read"
               href={`/w/${slug}/read?p=${encodeURIComponent(firstReadable!.id)}`}
-              data-magnetic
             >{i18n.t('ov.start')} →</a>
           </header>
           <div class="ov-strip" class:is-rtl={work.direction === 'rtl'}>
@@ -435,14 +431,13 @@
               <a
                 class="ov-thumb ov-thumb--cover"
                 href={`/w/${slug}/read?p=${encodeURIComponent(firstReadable!.id)}`}
-                data-cursor="READ"
               >
                 <img src={chCover.thumbUrl} alt={`${ch.title} — cover`} loading="lazy" />
                 <span class="mono ov-thumb__tag">{i18n.t('rd.toc')}</span>
               </a>
             {/if}
             {#each chPages.filter((p) => !p.isBlank) as page (page.id)}
-              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`} data-cursor="READ">
+              <a class="ov-thumb" href={`/w/${slug}/read?p=${encodeURIComponent(page.id)}`}>
                 <img src={page.thumbUrl} alt="" loading="lazy" />
                 <span class="mono ov-thumb__num">{String(ordered.indexOf(page) + 1).padStart(2, '0')}</span>
                 {#if page.note}<span class="ov-thumb__note" title="note"></span>{/if}
@@ -478,7 +473,6 @@
               class="ov-castTile"
               style={`--c:${c.color}`}
               onclick={() => openCast(i)}
-              data-cursor="VIEW"
             >
               <span class="ov-castTile__frame">
                 {#if c.iconUrl}
@@ -530,11 +524,10 @@
 
   <!-- Page foot: back link + imprint, always the last leaf (ink) -->
   <footer class="ov-foot spread spread--ink">
-    <a class="mono ov-foot__back" href="/" data-magnetic>← {i18n.t('ov.back')}</a>
+    <a class="mono ov-foot__back" href="/">← {i18n.t('ov.back')}</a>
     <span class="ov-foot__right">
-      <!-- The artist is reachable from a book too, not only from the shelf.
-           data-flock hands navigation to the bird sweep (see flock.ts). -->
-      <a class="mono ov-foot__artist" href="/asu" data-flock data-magnetic>ASU AZURE ↗</a>
+      <!-- The artist is reachable from a book too, not only from the shelf. -->
+      <a class="mono ov-foot__artist" href="/asu">ASU AZURE ↗</a>
       <span class="mono">© ASU AZURE</span>
     </span>
   </footer>
@@ -572,15 +565,6 @@
     align-items: center;
     overflow: hidden;
     isolation: isolate;
-  }
-  .ov-hero__wm {
-    top: 8%;
-    right: 4%;
-    --wm-stroke: rgba(244, 241, 234, 0.09);
-    /* This watermark is the work title's first character — author text. Global
-       .watermark pins --font-serif-jp (the subsetted webfont) and sits later in
-       global.css than .authored, so it would win; this scoped rule outranks both. */
-    font-family: var(--font-serif-authored);
   }
   /* "Scroll for more" cue — proof-sheet flavour: mono label, registration
      hairline, a cobalt chevron that bounces. Fades once the reader scrolls. */
@@ -725,9 +709,6 @@
     }
     .ov-hero__cover {
       max-width: min(70vw, 18rem);
-    }
-    .ov-hero__wm {
-      display: none;
     }
   }
 
@@ -931,7 +912,7 @@
     background-image: repeating-linear-gradient(
       180deg,
       transparent 0 calc(1lh - 1px),
-      var(--rule-blue) calc(1lh - 1px) 1lh
+      var(--paper-rule) calc(1lh - 1px) 1lh
     );
   }
   /* Authored stack, not --font-serif: these headings are author text too, so the
@@ -1025,7 +1006,7 @@
   }
   .ov-backchip {
     position: fixed;
-    top: calc(0.9rem + env(safe-area-inset-top));
+    top: var(--chrome-top, calc(0.9rem + env(safe-area-inset-top)));
     left: var(--pad);
     z-index: 90;
     mix-blend-mode: difference;

@@ -104,7 +104,7 @@
 </script>
 
 <header class="rc-top" class:is-idle={hidden}>
-  <a class="mono rc-top__back" href={`/w/${work.slug}`} data-hover>← {i18n.t('rd.overview')}</a>
+  <a class="mono rc-top__back" href={`/w/${work.slug}`}>← {i18n.t('rd.overview')}</a>
   <span class="mono rc-top__title">{work.title}</span>
   <div class="rc-top__actions">
     {#if hasNote}
