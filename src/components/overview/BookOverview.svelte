@@ -6,6 +6,7 @@
   import { sortedChapters } from '../../lib/chapterOrder';
   import { loadProgress, loadUnlock, clearUnlock } from '../../lib/persistence';
   import { decode, assemble } from '../../scripts/text';
+  import { converge } from '../../scripts/mv';
   import { stamp, stampStatic } from '../../data/showcase';
   import { toRichHtml } from '../../lib/richtext';
   import { i18n } from '../../lib/i18n.svelte';
@@ -359,7 +360,7 @@
     <div class="ov-toc__inner">
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
-        <h2 class="serif ov-toc__title" use:headingIn>{i18n.t('ov.contents')}</h2>
+        <h2 class="serif ov-toc__title" use:headingIn use:converge>{i18n.t('ov.contents')}</h2>
         <span class="ov-toc__rule" aria-hidden="true"></span>
         <span class="mono">{locked ? '——' : realPageCount} {i18n.t('ov.pages')}</span>
       </header>
@@ -462,7 +463,7 @@
       <div class="ov-cast__inner">
         <header class="ov-cast__head" use:reveal>
           <span class="index-num" aria-hidden="true">人</span>
-          <h2 class="serif ov-cast__title" use:headingIn>{i18n.t('ov.cast')}</h2>
+          <h2 class="serif ov-cast__title" use:headingIn use:converge>{i18n.t('ov.cast')}</h2>
           <span class="ov-cast__rule" aria-hidden="true"></span>
           <span class="mono">{pad2(castList.length)}</span>
         </header>

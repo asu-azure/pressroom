@@ -159,7 +159,7 @@ cacheShell(Astro);
           <span class="asu__numDigits">01</span>
           <span data-i18n="works.sub">{t['works.sub']}</span>
         </span>
-        <h2 class="serif asu__h2">
+        <h2 class="serif asu__h2" data-mv-converge>
           <span class="reveal-mask"><span data-line data-i18n="works.title">{t['works.title']}</span></span>
         </h2>
         <span class="mono asu__count">{pad2(works.length)} PCS</span>
@@ -266,7 +266,7 @@ cacheShell(Astro);
             <span class="asu__numDigits">02</span>
             <span data-i18n="story.tag">{t['story.tag']}</span>
           </span>
-          <h2 class="serif asu__h2">
+          <h2 class="serif asu__h2" data-mv-converge>
             <span class="reveal-mask"><span data-line data-i18n="story.title">{t['story.title']}</span></span>
           </h2>
         </div>
@@ -383,7 +383,8 @@ cacheShell(Astro);
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
-  import { decode, assemble } from '../scripts/text';
+  import { decode } from '../scripts/text';
+  import { slideIn, punch } from '../scripts/mv';
   import { initDraw } from '../scripts/draw';
   import { applyCopy, readCopyPayload } from '../lib/siteCopyClient';
   import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
@@ -442,7 +443,7 @@ cacheShell(Astro);
     const kicker = document.getElementById('asu-kicker');
     if (kicker) decode(kicker, kicker.textContent ?? '', 450);
     const nameEl = document.getElementById('asu-name');
-    if (nameEl) assemble(nameEl, { delay: 0.18 });
+    if (nameEl) slideIn(nameEl, { delay: 0.12 });
 
     // The hanko presses in, like a seal on paper.
     gsap.fromTo(

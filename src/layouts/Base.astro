@@ -3,6 +3,7 @@ import '../styles/fonts.css';
 import '../styles/global.css';
 import '../styles/motion.css';
 import '../styles/motion-kit.css';
+import '../styles/mv.css';
 
 interface Props {
   title?: string;
@@ -149,8 +150,12 @@ const jsonLd = JSON.stringify({
       import Lenis from 'lenis';
       import { gsap } from 'gsap';
       import { ScrollTrigger } from 'gsap/ScrollTrigger';
+      import { initMv } from '../scripts/mv';
 
       gsap.registerPlugin(ScrollTrigger);
+
+      // MV motion: converge entrances and note strikes (src/scripts/mv.ts).
+      initMv();
 
       // Mobile browsers fire resize when the URL bar collapses; recomputing every
       // trigger there made start positions jump around mid-scroll.
@@ -177,8 +182,11 @@ const jsonLd = JSON.stringify({
         const ev = e as Event & { viewTransition?: unknown; activation?: { navigationType?: string } };
         if (!ev.viewTransition) return;
         const back = ev.activation?.navigationType === 'traverse' || backLink;
+        // Opening the reader is a change of scene: a punch-in, not the glitch cut.
+        const to = (ev.activation as { entry?: { url?: string } } | undefined)?.entry?.url ?? '';
+        const dir = /\/w\/[^/]+\/read/.test(to) ? 'reader' : back ? 'back' : 'fwd';
         try {
-          sessionStorage.setItem('pr:vt', back ? 'back' : 'fwd');
+          sessionStorage.setItem('pr:vt', dir);
         } catch {}
       });
       window.addEventListener('pagereveal', (e) => {
@@ -189,8 +197,8 @@ const jsonLd = JSON.stringify({
           sessionStorage.removeItem('pr:vt');
         } catch {}
         const nav = (performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.type;
-        if (ev.viewTransition && (dir === 'back' || nav === 'back_forward')) {
-          document.documentElement.dataset.vt = 'back';
+        if (ev.viewTransition && (dir === 'reader' || dir === 'back' || nav === 'back_forward')) {
+          document.documentElement.dataset.vt = dir === 'reader' ? 'reader' : 'back';
           setTimeout(() => delete document.documentElement.dataset.vt, 700);
         }
       });

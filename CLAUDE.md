@@ -138,6 +138,26 @@ text. See `src/lib/richtext.ts` and its tests.
   its own `view-transition-name`, so it stays put.
 - Always honor `prefers-reduced-motion` (everything lands on its final state) and coarse pointers.
 
+### MV motion (`src/styles/mv.css` + `src/scripts/mv.ts`)
+
+The vocabulary of the owner's music-video engine (`music-repo/visualizer/player2`), cut down for a
+page. Each helper is ≤ 600 ms, first-view or interaction only, and lands on its final state under
+reduced motion. Continuous effects (bloom, grain, letterbox, shimmer) stay in the videos.
+
+- `[data-mv-converge]` / `use:converge` — RGB split converging plus two clip bands, on section
+  headings. Drawn with `text-shadow` inside the keyframes only, so `applyCopy()` can swap the
+  words at any time. Islands must use the action: they mount after `initMv()` sweeps the page.
+- `slideIn(el)` — characters shoot in from both sides and brake (the `/asu` name). Never splits
+  Thai; mark-stacking scripts fall back to converge. `mv.ts` keeps its own copy of the
+  `MARK_SCRIPTS` test, because importing `kinetic.ts` would put split-type on every page.
+- `punch(el)` — a 180 ms scale kick (reader page number and heart, lightbox open). Needs a box
+  that takes transforms: inline spans must be `inline-block`.
+- `strike(x, y)` — the note-strike ring, fixed to the viewport. Pressing any `.tile`, `.btn` or
+  `[data-strike]` rings one at the pointer.
+- The page transition opens with a 110 ms stepped cut (jitter + channel split) before the wipe.
+  Opening the reader uses `html[data-vt='reader']`: a plain punch-in, because reading is a change
+  of scene.
+
 ### Removed on purpose — do not reintroduce
 
 - **Custom cursor and `[data-cursor]` labels** — a second cursor that trails the real one reads as lag.

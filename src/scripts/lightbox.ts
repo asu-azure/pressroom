@@ -8,6 +8,7 @@
 // different [data-*] hooks, so the two never cross-wire).
 
 import { gsap } from 'gsap';
+import { punch } from './mv';
 
 export interface LightboxItem {
   src: string;
@@ -84,6 +85,7 @@ export function initLightbox(items: LightboxItem[], opts: { reduced?: boolean } 
     lastFocus = document.activeElement as HTMLElement | null;
     show(i);
     root.hidden = false;
+    punch(stage);
     lenis()?.stop();
     document.documentElement.classList.add('lb-open');
     if (!reduced) {

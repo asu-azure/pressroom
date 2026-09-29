@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Work, ReaderSettings, Sheet, ChapterMark, PageRec } from '../../lib/types';
   import { i18n } from '../../lib/i18n.svelte';
+  import { punch } from '../../scripts/mv';
 
   let {
     work,
@@ -53,6 +54,22 @@
 
   const currentIds = $derived(currentSheet?.pages.map((p) => p.id) ?? []);
   const currentFaved = $derived(currentIds.some((id) => favorites.includes(id)));
+
+  // MV punch: the page number and the heart kick once when they change.
+  let counterEl: HTMLElement | undefined = $state();
+  let heartEl: HTMLElement | undefined = $state();
+  let lastCur = -1;
+  $effect(() => {
+    const c = cur;
+    if (lastCur !== -1 && c !== lastCur) punch(counterEl);
+    lastCur = c;
+  });
+  let lastFaved: boolean | null = null;
+  $effect(() => {
+    const f = currentFaved;
+    if (lastFaved !== null && f !== lastFaved) punch(heartEl);
+    lastFaved = f;
+  });
   const readable = $derived(pages.filter((p) => !p.isBlank));
   const favPages = $derived(readable.filter((p) => favorites.includes(p.id)));
   const shown = $derived(gridTab === 'fav' ? favPages : readable);
@@ -144,6 +161,7 @@
     </div>
     <button
       class="mono rc-btn rc-btn--heart"
+      bind:this={heartEl}
       class:is-on={currentFaved}
       onclick={onToggleFavorite}
       title={i18n.t('rd.fav')}
@@ -177,7 +195,7 @@
 
 <footer class="rc-bottom" class:is-idle={hidden}>
   <span class="mono rc-bottom__counter">
-    <span>
+    <span class="rc-bottom__num" bind:this={counterEl}>
       {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       {#if currentChapter}<span class="rc-bottom__ch">· {currentChapter}</span>{/if}
     </span>
@@ -490,6 +508,11 @@
     justify-content: space-between;
     gap: 1rem;
     color: var(--fg-dim);
+  }
+  /* inline-block so the MV punch (a `scale`) applies; inline boxes ignore transforms */
+  .rc-bottom__num {
+    display: inline-block;
+    transform-origin: left center;
   }
   .rc-bottom__ch {
     color: var(--fg-faint);

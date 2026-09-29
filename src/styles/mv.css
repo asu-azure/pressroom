@@ -1,0 +1,100 @@
+/* ==========================================================================
+   MV motion — the vocabulary of the music-video engine (music-repo
+   visualizer/player2), cut down for a page someone is reading.
+
+   The MV rules, and how they translate:
+     things ARRIVE with an RGB split converging, a glitch band, a punch or a
+       fast slide            → .mv-converge, slideIn(), .mv-punch
+     a note STRIKES as a ring of light that expands and decays
+                             → strike() / .mv-strike
+     cuts land hard           → the glitch page transition below
+     the MV's ex(age, τ) = 2^(-age/τ) "fast then braking, never quite still"
+                             → cubic-bezier(0.16, 1, 0.3, 1)
+     step(t, fps) jitter      → steps()
+
+   House rules: every effect is 600 ms or less, runs on first view or on
+   interaction only, never parks text hidden without html.mk-js, and lands on
+   its final state under prefers-reduced-motion. No continuous shimmer, bloom,
+   grain or letterbox — those belong to video, not to a page.
+   ========================================================================== */
+
+:root {
+  --mv-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --mv-r: rgba(255, 61, 77, 0.75);   /* the MV's red channel */
+  --mv-c: rgba(24, 196, 214, 0.75);  /* and its cyan */
+}
+
+/* ---- RGB split converging (type.js channels/split + slicesFor) ------------
+   Two coloured copies of the glyphs start a third of an em apart and slide into
+   the real one, while two clip bands jump for the first quarter. Drawn with
+   text-shadow only inside the keyframes: nothing is duplicated in the DOM, so
+   applyCopy() can swap the words at any time. mv.ts toggles .is-in on view. */
+html.mk-js [data-mv-converge].is-in {
+  animation: mv-converge 0.42s var(--mv-ease) both;
+}
+@keyframes mv-converge {
+  0%   { text-shadow: -0.35em 0 var(--mv-r), 0.35em 0 var(--mv-c); clip-path: inset(0 0 58% 0); translate: -0.03em 0; }
+  7%   { clip-path: inset(46% 0 12% 0); translate: 0.05em 0; }
+  14%  { clip-path: inset(12% 0 50% 0); translate: -0.02em 0; }
+  24%  { clip-path: inset(-20% -5% -20% -5%); translate: 0 0; }
+  100% { text-shadow: 0 0 rgba(255, 61, 77, 0), 0 0 rgba(24, 196, 214, 0); clip-path: none; }
+}
+
+/* ---- Punch (mv.js: z *= 1 + 0.12·ex(age, 0.07)) --------------------------- */
+.mv-punch { animation: mv-punch 0.18s var(--mv-ease); }
+@keyframes mv-punch { from { scale: 1.08; } to { scale: 1; } }
+
+/* ---- Note strike (player.js drawGlow): an accent ring plus a soft glow that
+   expands and decays at the pointer. Fixed to the viewport, so it needs
+   nothing from the element that was pressed. ------------------------------- */
+.mv-strike {
+  position: fixed;
+  z-index: 95;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 0 18px 2px rgba(39, 66, 240, 0.45), inset 0 0 10px rgba(106, 160, 255, 0.35);
+  pointer-events: none;
+  animation: mv-strike 0.48s var(--mv-ease) forwards;
+}
+.mv-strike--amber {
+  border-color: #e8a31a;
+  box-shadow: 0 0 18px 2px rgba(232, 163, 26, 0.45), inset 0 0 10px rgba(255, 214, 102, 0.35);
+}
+@keyframes mv-strike {
+  from { scale: 0.4; opacity: 1; }
+  to   { scale: 2.2; opacity: 0; }
+}
+
+/* ---- Page change: a hard cut before the wipe (post.js glitch) --------------
+   For the first ~110 ms the incoming page jitters sideways in three steps and
+   its colour channels split, then the portfolio's clip-path wipe (global.css)
+   carries it the rest of the way. Entering the reader is a change of scene,
+   not a glitch: a plain punch-in instead. */
+::view-transition-new(root) {
+  animation:
+    mv-vt-cut 0.11s steps(3, end) both,
+    mk-vt-in 0.42s cubic-bezier(0.7, 0, 0.3, 1) both;
+}
+html[data-vt='back']::view-transition-new(root) {
+  animation:
+    mv-vt-cut 0.11s steps(3, end) both,
+    mk-vt-in-back 0.42s cubic-bezier(0.7, 0, 0.3, 1) both;
+}
+@keyframes mv-vt-cut {
+  0%   { translate: -14px 0; filter: drop-shadow(6px 0 0 var(--mv-r)) drop-shadow(-6px 0 0 var(--mv-c)); }
+  50%  { translate: 10px 0; }
+  100% { translate: 0 0; filter: none; }
+}
+html[data-vt='reader']::view-transition-old(root) { animation: mv-vt-fade 0.3s ease both; }
+html[data-vt='reader']::view-transition-new(root) { animation: mv-vt-punch 0.3s var(--mv-ease) both; }
+@keyframes mv-vt-fade  { to { opacity: 0; } }
+@keyframes mv-vt-punch { from { scale: 1.03; opacity: 0; } to { scale: 1; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  html.mk-js [data-mv-converge].is-in,
+  .mv-punch { animation: none; }
+  .mv-strike { display: none; }
+}
