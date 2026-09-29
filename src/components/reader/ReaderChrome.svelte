@@ -3,6 +3,7 @@
   import { i18n } from '../../lib/i18n.svelte';
   import { punch } from '../../scripts/mv';
   import { sfx } from '../../scripts/sound';
+  import { MUSIC } from '../../lib/features';
 
   let {
     work,
@@ -243,13 +244,15 @@
         <button class="mono rc-opt" class:is-on={settings.mode === 'scroll'} onclick={() => onSettings({ mode: 'scroll' })}>{i18n.t('rd.scroll')}</button>
       </div>
     </div>
-    <div class="rc-panel__group">
-      <span class="mono rc-panel__label">SOUND</span>
-      <div class="rc-panel__opts">
-        <button class="mono rc-opt" class:is-on={!soundOn} onclick={() => setSound(false)}>OFF</button>
-        <button class="mono rc-opt" class:is-on={soundOn} onclick={() => setSound(true)}>ON ♪</button>
+    {#if MUSIC}
+      <div class="rc-panel__group">
+        <span class="mono rc-panel__label">SOUND</span>
+        <div class="rc-panel__opts">
+          <button class="mono rc-opt" class:is-on={!soundOn} onclick={() => setSound(false)}>OFF</button>
+          <button class="mono rc-opt" class:is-on={soundOn} onclick={() => setSound(true)}>ON ♪</button>
+        </div>
       </div>
-    </div>
+    {/if}
     <div class="rc-panel__group">
       <span class="mono rc-panel__label">{i18n.t('rd.fit')}</span>
       <div class="rc-panel__opts">

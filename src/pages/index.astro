@@ -4,6 +4,7 @@ import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
 import NowPlaying from '../components/NowPlaying.astro';
+import { MUSIC } from '../lib/features';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
@@ -64,7 +65,7 @@ cacheShell(Astro);
 
     {/* The book's theme song as a moving score — the way in to /ost, and the
         note-playing from the music videos brought onto the shelf. */}
-    <NowPlaying />
+    {MUSIC && <NowPlaying />}
 
     {/* The shelf is a client:only island, so until it hydrates the fallback
         holds its place: aspect-locked blanks the size of real cards, which keeps
@@ -126,7 +127,7 @@ cacheShell(Astro);
       <span class="mono">© ASU AZURE</span>
       <span class="lib-foot__links">
         <a class="mono" href="/asu">ASU AZURE ↗</a>
-        <a class="mono" href="/ost">OST ♪</a>
+        {MUSIC && <a class="mono" href="/ost">OST ♪</a>}
         <a class="mono" href="https://x.com/asukonpeki">X — @ASUKONPEKI</a>
         <a class="mono lib-foot__studio" href="/studio">STUDIO ⌘</a>
       </span>

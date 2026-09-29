@@ -4,6 +4,7 @@ import '../styles/global.css';
 import '../styles/motion.css';
 import '../styles/motion-kit.css';
 import '../styles/mv.css';
+import { MUSIC } from '../lib/features';
 
 interface Props {
   title?: string;
@@ -29,7 +30,7 @@ const path = Astro.url.pathname.replace(/\/$/, '') || '/';
 const nav = [
   { href: '/#shelf', label: 'SHELF', current: path === '/' },
   { href: '/asu', label: 'ASU AZURE', current: path === '/asu' },
-  { href: '/ost', label: 'OST ♪', current: path === '/ost' },
+  ...(MUSIC ? [{ href: '/ost', label: 'OST ♪', current: path === '/ost' }] : []),
 ];
 
 const canonical = new URL(Astro.url.pathname, Astro.site);
@@ -117,10 +118,12 @@ const jsonLd = JSON.stringify({
               </a>
             ))}
           </nav>
-          <button class="topbar__sound mono" type="button" data-sound-toggle aria-pressed="false" hidden>
-            <span class="topbar__soundDot" aria-hidden="true"></span>
-            <span data-sound-label>SOUND OFF</span>
-          </button>
+          {MUSIC && (
+            <button class="topbar__sound mono" type="button" data-sound-toggle aria-pressed="false" hidden>
+              <span class="topbar__soundDot" aria-hidden="true"></span>
+              <span data-sound-label>SOUND OFF</span>
+            </button>
+          )}
         </header>
       )
     }
@@ -152,6 +155,7 @@ const jsonLd = JSON.stringify({
       import { ScrollTrigger } from 'gsap/ScrollTrigger';
       import { initMv, strike } from '../scripts/mv';
       import { initSound } from '../scripts/sound';
+      import { MUSIC } from '../lib/features';
 
       gsap.registerPlugin(ScrollTrigger);
 
@@ -160,7 +164,7 @@ const jsonLd = JSON.stringify({
 
       // UI sounds: notes of the theme song, off until the visitor turns them on
       // (src/scripts/sound.ts). /ost plays the real song and opts out.
-      if (!document.querySelector('[data-no-sfx]')) {
+      if (MUSIC && !document.querySelector('[data-no-sfx]')) {
         initSound({ onNote: (x, y) => strike(x, y, 'amber') });
       }
 

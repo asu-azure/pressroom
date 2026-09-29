@@ -13,6 +13,8 @@
  * switch and the visitor's own music is not interrupted.
  */
 
+import { MUSIC } from '../lib/features';
+
 /** Chorus top line, 46.2–53.6 s of perd-pratu.json `rh` (motif.test.ts keeps it honest). */
 export const MOTIF = [77, 75, 73, 72, 70, 79, 77, 75, 70, 72, 80, 79, 77, 75, 77, 75, 72, 68, 72, 68];
 /** The chords under it: D♭maj7 when a book opens, E♭ when a lock opens. */
@@ -26,6 +28,7 @@ let out: AudioNode | null = null;
 // Read at module load, so an island asking sfx.enabled() gets the stored
 // choice no matter whether it or Base.astro's script ran first.
 let on = (() => {
+  if (!MUSIC) return false;
   try {
     return localStorage.getItem(KEY) === '1';
   } catch {

@@ -364,6 +364,19 @@ act-character → craft → act-select → act-3d → act-grid → contact.
   scene slots above decide, per act, between the photograph, a pinned plate and a full backdrop.
   With an empty gallery each slot degrades to its photograph and the acts still stand up.
 
+## Music features are behind a flag (`PUBLIC_MUSIC`)
+
+The song is still a placeholder, so **everything musical is off in production**: `/ost`, the NOW
+PLAYING band, the `OST ♪` links, the SOUND switch and the UI sounds. `src/lib/features.ts` exports
+`MUSIC` (`import.meta.env.PUBLIC_MUSIC === 'true'`); every entry point checks it.
+
+- **`/ost` lives in `src/routes/ost.astro`, not `src/pages/`.** `astro.config.mjs` injects the route
+  only when the flag is on, so with it off `/ost` is a real 404. Don't move it back into `pages/`.
+- With the flag off, the build also deletes `ost/` (the placeholder MP3 in `public/ost/`) from the
+  output, so the file is not deployed at all.
+- Local work: `PUBLIC_MUSIC=true` in `.env`. Going live: set `PUBLIC_MUSIC=true` in the Vercel
+  project env and redeploy — no code change.
+
 ## `/ost` — the main theme as a moving score
 
 「扉の向こう」 Main Theme, the book's song, played as a grand staff that scrolls past a playhead
@@ -372,7 +385,7 @@ a Shibuya-style CD-single jacket (obi, vertical title, a barcode drawn from the 
 density). From there the scene follows the song: paper for most of it, ink for the Beethoven
 section, Akihabara neon/CRT for the 8-bit duet, a night stage for the final chorus, and paper
 again for the coda. `MODE_BY_SECTION` in `src/scripts/ost/main.ts` is the switch. Prerendered,
-with no database.
+with no database. Only exists when `PUBLIC_MUSIC=true` (see above).
 
 - **Sync comes from the data, not from animation timing.** `src/data/ost/perd-pratu.json` was
   exported from the same source that rendered `public/ost/perd-pratu.mp3`. A notehead is centred
