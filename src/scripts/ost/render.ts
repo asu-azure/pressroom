@@ -93,6 +93,10 @@ export class StaffRenderer {
   /** 0..1 slice-shift glitch strength (set by main during Akiba transitions) */
   glitch = 0;
   reduced = false;
+  /** Mini layout for the homepage player: the grand staff sized to a short
+      band, with no rehearsal boxes, stop-time hatching or quote brackets —
+      those live above the system and need the full-height stage. */
+  mini = false;
   private fx: Fx[] = [];
   private hitCursor = 0;
   private lastLabel = -9;
@@ -119,6 +123,17 @@ export class StaffRenderer {
     this.canvas.width = Math.round(r.width * this.dpr);
     this.canvas.height = Math.round(r.height * this.dpr);
     const portrait = this.h > this.w;
+    if (this.mini) {
+      // chord symbols (~5sp) + grand staff (14sp) + ledger room, filling the band
+      this.sp = Math.max(4.5, Math.min(9, this.h / 23));
+      this.pps = this.sp * 22;
+      this.compact = this.w < 720;
+      this.clefW = this.sp * (this.compact ? 5.4 : 12.6);
+      this.playX = Math.max(this.w * 0.3, this.clefW + this.sp * 6);
+      this.tTop = this.h * 0.5 - 4.5 * this.sp;
+      this.bTop = this.tTop + 10 * this.sp;
+      return;
+    }
     this.sp = Math.max(7, Math.min(15, portrait ? this.w * 0.027 : Math.min(this.h * 0.019, this.w * 0.012)));
     this.pps = this.sp * (portrait ? 21 : 24);
     this.compact = this.w < 720;
@@ -157,9 +172,9 @@ export class StaffRenderer {
     const t1 = now + (this.w - this.playX) / this.pps + 0.5;
 
     this.drawStaffLines(0, this.w, 1 + this.pulse * 0.9);
-    this.drawStops(now, t0, t1);
+    if (!this.mini) this.drawStops(now, t0, t1);
     this.drawBars(now, t0, t1);
-    this.drawQuotes(now, t0, t1);
+    if (!this.mini) this.drawQuotes(now, t0, t1);
     this.drawChords(now, t0, t1);
     this.drawPlayhead();
 
@@ -250,7 +265,7 @@ export class StaffRenderer {
       ctx.fillStyle = this.theme.dim;
       ctx.font = `500 ${sp * 0.8}px 'JetBrains Mono', monospace`;
       ctx.fillText(String(b + 1), x + sp * 0.3, yTop - sp * 1.1);
-      if (secIdx >= 0) this.drawRehearsal(secIdx, x);
+      if (secIdx >= 0 && !this.mini) this.drawRehearsal(secIdx, x);
     }
   }
 
@@ -262,7 +277,7 @@ export class StaffRenderer {
     const box = sp * 2.1;
     ctx.fillStyle = this.theme.text;
     ctx.fillRect(x, y, box, box);
-    ctx.fillStyle = this.theme.name === 'paper' ? '#efeee9' : '#0c0c0d';
+    ctx.fillStyle = this.theme.name === 'paper' ? '#f1ece2' : '#0c0c0d';
     if (this.theme.name === 'akiba') ctx.fillStyle = '#07060c';
     ctx.font = `700 ${sp * 1.35}px 'Space Grotesk', sans-serif`;
     ctx.textAlign = 'center';
@@ -296,7 +311,7 @@ export class StaffRenderer {
       ctx.font = `600 ${sp * 0.78}px 'JetBrains Mono', monospace`;
       const tw = ctx.measureText(text).width;
       const lx = Math.min(Math.max(xa + sp * 0.5, this.clefW + sp * 3), xb - tw - sp * 0.5);
-      ctx.fillStyle = this.theme.name === 'paper' ? '#efeee9' : this.theme.name === 'akiba' ? '#07060c' : '#0c0c0d';
+      ctx.fillStyle = this.theme.name === 'paper' ? '#f1ece2' : this.theme.name === 'akiba' ? '#07060c' : '#0c0c0d';
       ctx.fillRect(lx - sp * 0.3, y - sp * 0.6, tw + sp * 0.6, sp * 1.2);
       ctx.fillStyle = this.theme.accent;
       ctx.fillText(text, lx, y + sp * 0.28);

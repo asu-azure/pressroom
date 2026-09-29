@@ -376,10 +376,13 @@ with no database.
 
 - **Sync comes from the data, not from animation timing.** `src/data/ost/perd-pratu.json` was
   exported from the same source that rendered `public/ost/perd-pratu.mp3`. A notehead is centred
-  on its onset, so it touches the line exactly when it sounds. The clock is `audio.currentTime`,
-  eased by `performance.now()` between the element's coarse updates. If the audio fails, the
-  same clock runs on `performance.now()` alone. See `src/data/ost/README.md` to swap in a new
-  mix.
+  on its onset, so it touches the line exactly when it sounds. The clock (`ScoreClock` in
+  `src/scripts/ost/clock.ts`, shared with the homepage player) runs on `performance.now()` and
+  eases toward `audio.currentTime` every frame. If the audio fails, it keeps running silently.
+  See `src/data/ost/README.md` to swap in a new mix.
+- `audioLen` in `ost.astro` is the MP3's length (234 s), deliberately not `duration` from the
+  JSON (233.7 s): the last chord rings past the final note-off.
+- `?t=<sec>` resumes there ("RESUME FROM 0:52" on the gate). The homepage player links with it.
 - `score.ts` turns MIDI into notation: staff, step, spelling against four flats, accidentals held
   to the end of the bar, chords, stems, beams. `render.ts` is one canvas using SMuFL glyphs. All
   its metrics are in staff spaces, taken from Bravura's metadata.
@@ -394,9 +397,23 @@ with no database.
   Bravura (OFL, Reserved Font Name). The subset is therefore renamed, so never call it Bravura.
 - Reduced motion drops the pop, particles, glitch, wipe and banners. The score still scrolls,
   because the moving score is the content.
-- Entry points: the `NOW PLAYING` ticker between the shelf hero and the showcase, `OST ♪` in the
-  footer and in the site header. `/ost` itself has no site header (`topbar={false}`); its own HUD
+- Entry points: the `NOW PLAYING` band on the shelf, `OST ♪` in the footer and in the site header. `/ost` itself has no site header (`topbar={false}`); its own HUD
   carries the way back.
+
+### The homepage player (`src/components/NowPlaying.astro`)
+
+The first eight bars of the chorus (window read from the JSON at build) on a short ink band between
+the showcase and the shelf. Same renderer in its `mini` layout (grand staff sized to the band; no
+rehearsal boxes, stop hatching or quote brackets), same clock.
+
+- **Nothing heavy loads with the page.** `mini.ts` dynamically imports `score`, `render` and the
+  JSON when the band is within 200 px of the viewport or a visitor reaches for ▶; the notation font
+  is requested at the same moment. The MP3 is `preload="none"` until ▶. An inline SVG staff stands
+  in until the first frame, so first paint is complete without JS.
+- The song does not survive navigation (that needs an SPA router, which would break the module-scope
+  GSAP/Lenis setup and the islands). `FULL SCORE →` hands `/ost` the current time via `?t=`, and
+  `pagehide` pauses the element.
+- While it plays it dispatches `pr:music` (detail `true`/`false`) on `document`; the UI sounds duck.
 
 ## The artist signature stamp
 

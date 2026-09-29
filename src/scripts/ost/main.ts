@@ -11,6 +11,7 @@ import { gsap } from 'gsap';
 import raw from '../../data/ost/perd-pratu.json';
 import { buildScore, lowerBound, barAt, type OstData } from './score';
 import { StaffRenderer, THEMES, prettyChord } from './render';
+import { ScoreClock } from './clock';
 
 type Mode = 'paper' | 'ink' | 'akiba' | 'night';
 // Shibuya paper for the song, ink for Beethoven, Akihabara for the 8-bit duet,
@@ -44,24 +45,16 @@ export function initOst() {
   } catch { /* the fallbacks still draw */ }
 
   // ------------------------------------------------------------------ clock
-  let base = -PREROLL;
-  let perfBase = performance.now();
-  let playing = false;
+  const ck = new ScoreClock(-PREROLL);
   let preroll = false;
   let started = false;
   let ended = false;
   let audioOK = true;
   let userMuted = false;
 
-  const clock = () => (playing ? base + (performance.now() - perfBase) / 1000 : base);
+  const clock = () => ck.now();
   const follow = () => {
-    if (!audioOK || !playing || preroll || audio.paused) return;
-    const est = clock();
-    const diff = audio.currentTime - est;
-    if (Math.abs(diff) > 0.08) {
-      base = audio.currentTime;
-      perfBase = performance.now();
-    } else base += diff * 0.06;
+    if (audioOK && !preroll) ck.follow(audio);
   };
 
   audio.addEventListener('error', () => {
@@ -74,9 +67,7 @@ export function initOst() {
       seek(0);
       hideEnd();
     }
-    base = clock();
-    perfBase = performance.now();
-    playing = true;
+    ck.start();
     root!.dataset.state = 'play';
     if (audioOK && !preroll) {
       audio.muted = userMuted;
@@ -84,18 +75,16 @@ export function initOst() {
     }
   }
   function pause() {
-    base = clock();
-    playing = false;
+    ck.stop();
     audio.pause();
     root!.dataset.state = 'pause';
   }
-  const toggle = () => (playing ? pause() : play());
+  const toggle = () => (ck.playing ? pause() : play());
 
   function seek(t: number) {
     t = Math.max(0, Math.min(duration - 0.05, t));
     preroll = false;
-    base = t;
-    perfBase = performance.now();
+    ck.set(t);
     if (audioOK) {
       try { audio.currentTime = t; } catch { /* metadata not in yet */ }
     }
@@ -107,7 +96,7 @@ export function initOst() {
     combo = 0;
     if (ended) hideEnd();
     hud(t, false);
-    if (!playing) r.draw(t);
+    if (!ck.playing) r.draw(t);
   }
 
   function start(muted: boolean, from = 0) {
@@ -126,9 +115,8 @@ export function initOst() {
       play();
     } else {
       preroll = true;
-      base = reduced ? -0.3 : -PREROLL;
-      perfBase = performance.now();
-      playing = true;
+      ck.set(reduced ? -0.3 : -PREROLL);
+      ck.playing = true;
       root!.dataset.state = 'play';
     }
     // the jacket lifts away
@@ -163,8 +151,19 @@ export function initOst() {
     b.addEventListener('focus', warm);
     b.addEventListener('pointerdown', warm);
   }
-  $('gate-play').addEventListener('click', () => start(false));
-  $('gate-muted').addEventListener('click', () => start(true));
+  // ?t=<sec> — arriving from the homepage mini-player, which hands over the
+  // moment it stopped at so the song carries on instead of starting over.
+  const resumeAt = (() => {
+    const v = Number(new URLSearchParams(location.search).get('t'));
+    return Number.isFinite(v) && v > 0 && v < duration - 1 ? v : 0;
+  })();
+  if (resumeAt > 0) {
+    const m = Math.floor(resumeAt / 60);
+    const sec = String(Math.floor(resumeAt % 60)).padStart(2, '0');
+    loadLbl.textContent = `RESUME FROM ${m}:${sec}`;
+  }
+  $('gate-play').addEventListener('click', () => start(false, resumeAt));
+  $('gate-muted').addEventListener('click', () => start(true, resumeAt));
 
   if (!reduced) {
     gsap.timeline({ delay: 0.15 })
@@ -389,8 +388,8 @@ export function initOst() {
   // ------------------------------------------------------------------ end
   function showEnd() {
     ended = true;
-    playing = false;
-    base = duration;
+    ck.playing = false;
+    ck.set(duration);
     root!.dataset.state = 'end';
     endCard.hidden = false;
     if (!reduced) {
@@ -402,7 +401,7 @@ export function initOst() {
     ended = false;
     endCard.hidden = true;
   }
-  audio.addEventListener('ended', () => { if (playing) showEnd(); });
+  audio.addEventListener('ended', () => { if (ck.playing) showEnd(); });
   $('ost-replay').addEventListener('click', () => {
     hideEnd();
     seek(0);
@@ -432,7 +431,7 @@ export function initOst() {
       }
       if (!started) return start(false, t);
       seek(t);
-      if (!playing) play();
+      if (!ck.playing) play();
     });
   });
 
@@ -471,8 +470,8 @@ export function initOst() {
     let t = clock();
     if (preroll && t >= 0) {
       preroll = false;
-      base = 0;
-      perfBase = now;
+      ck.base = 0;
+      ck.perfBase = now;
       t = 0;
       if (audioOK) {
         try { audio.currentTime = 0; } catch { /* not seekable yet */ }
@@ -482,14 +481,14 @@ export function initOst() {
     }
     follow();
     t = clock();
-    if (playing && t >= duration) {
+    if (ck.playing && t >= duration) {
       showEnd();
       t = duration;
     }
-    if (playing) drums(t);
+    if (ck.playing) drums(t);
     if (visible) {
       r.draw(t);
-      hud(t, playing);
+      hud(t, ck.playing);
     }
     meters(now);
   });

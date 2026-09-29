@@ -3,6 +3,7 @@ import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
+import NowPlaying from '../components/NowPlaying.astro';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
@@ -59,23 +60,11 @@ cacheShell(Astro);
       <div class="rgb-line" aria-hidden="true"></div>
     </header>
 
-    {/* ============ OST BAND ============
-        One slim ticker between the masthead and the shelf: the way in to /ost,
-        the book's main theme played as a moving score. Thin on purpose — the
-        shelf still comes first, this only has to be noticed. */}
-    <a class="ost-band" href="/ost" aria-label="OST — 扉の向こう Main Theme">
-      <span class="ost-band__tag">NOW PLAYING <i aria-hidden="true"></i></span>
-      <span class="ost-band__track" aria-hidden="true">
-        <span class="ost-band__run">
-          {[0, 1].map(() => (
-            <span>♪ <b>扉の向こう</b> MAIN THEME ━ 3:54 ━ PIANO × BAND × 8BIT ━ 流れる楽譜で聴く ━ WATCH THE SCORE PLAY ━&nbsp;</span>
-          ))}
-        </span>
-      </span>
-      <span class="ost-band__go">LISTEN ▶</span>
-    </a>
-
     <Showcase />
+
+    {/* The book's theme song as a moving score — the way in to /ost, and the
+        note-playing from the music videos brought onto the shelf. */}
+    <NowPlaying />
 
     {/* The shelf is a client:only island, so until it hydrates the fallback
         holds its place: aspect-locked blanks the size of real cards, which keeps
@@ -542,56 +531,4 @@ cacheShell(Astro);
   }
   @keyframes shelf-skel { to { opacity: 0.45; } }
 
-  /* --- OST band: a ticker, not a section ----------------------------------- */
-  .ost-band {
-    position: relative;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: stretch;
-    height: 44px;
-    background: #e8a31a;
-    color: #0d0d0e;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
-    overflow: hidden;
-    border-block: 1.5px solid #0d0d0e;
-  }
-  .ost-band__tag,
-  .ost-band__go {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0 var(--pad);
-    background: #0d0d0e;
-    color: #e8a31a;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  .ost-band__tag i {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #e8a31a;
-    animation: ost-band-rec 1.1s steps(2) infinite;
-  }
-  .ost-band__go { background: #2742f0; color: #fff; transition: background 0.3s var(--ease); }
-  .ost-band:hover .ost-band__go { background: #0d0d0e; }
-  .ost-band__track { overflow: hidden; display: flex; align-items: center; }
-  .ost-band__run {
-    display: flex;
-    white-space: nowrap;
-    animation: ost-band-run 26s linear infinite;
-  }
-  .ost-band__run b { font-weight: 700; letter-spacing: 0.08em; }
-  .ost-band:hover .ost-band__run { animation-duration: 12s; }
-  @keyframes ost-band-run { to { transform: translateX(-50%); } }
-  @keyframes ost-band-rec { 50% { opacity: 0.2; } }
-  @media (max-width: 560px) {
-    .ost-band__tag { display: none; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .ost-band__run, .ost-band__tag i { animation: none; }
-  }
 </style>

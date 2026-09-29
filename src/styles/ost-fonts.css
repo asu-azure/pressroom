@@ -1,5 +1,5 @@
 /* /ost faces — loaded only by pages that import this file (/ost and the
-   homepage's OST ticker), and only fetched when a glyph actually needs them.
+   homepage's NOW PLAYING band), and only fetched when a glyph needs them.
 
    'OST JP'  Noto Sans JP, subset to the characters /ost and the ticker use.
              Deliberately a separate family from the site-wide 'Noto Sans JP'
