@@ -13,6 +13,8 @@
   const reduced =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarse =
+    typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
   interface CardData {
     work: Work;
@@ -105,6 +107,19 @@
 <LangBar />
 
 <section class="lib">
+  <!-- Shelf head: a proof-sheet slug line, so the books arrive as a section
+       rather than straight after the music band. -->
+  <header class="lib__head">
+    <span class="mono lib__k">01 — {i18n.t('lib.shelf')}</span>
+    <span class="lib__rule" aria-hidden="true"></span>
+    {#if cards?.length}
+      <span class="mono lib__n">{i18n.t('lib.count').replace('{n}', String(cards.length).padStart(2, '0'))}</span>
+    {/if}
+  </header>
+  {#if cards?.length && !reduced}
+    <p class="mono lib__hint">{i18n.t(coarse ? 'lib.hintTouch' : 'lib.hint')}</p>
+  {/if}
+
   {#if error}
     <p class="mono lib__status">{i18n.t('lib.offline')} — {error}</p>
   {:else if cards === null}
@@ -129,15 +144,68 @@
 
 <style>
   .lib {
-    padding: 0 var(--pad) clamp(3rem, 8vh, 5rem);
+    --gap-x: clamp(1.25rem, 5vw, 4.5rem);
+    padding: clamp(2.5rem, 7vh, 4.5rem) var(--pad) clamp(3rem, 8vh, 5rem);
+    overflow-x: clip;
+  }
+  .lib__head {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .lib__k,
+  .lib__n {
+    font-size: 0.62rem;
+    letter-spacing: 0.18em;
+    white-space: nowrap;
+  }
+  .lib__k { color: var(--accent); }
+  .lib__n { color: var(--fg-dim); }
+  /* ruler ticks along the slug line */
+  .lib__rule {
+    flex: 1;
+    height: 7px;
+    border-bottom: 1px solid var(--line-strong);
+    background: repeating-linear-gradient(90deg, var(--line-strong) 0 1px, transparent 1px 12px) bottom / 100% 4px no-repeat;
+  }
+  .lib__hint {
+    margin-top: 0.7rem;
+    font-size: 0.55rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-faint);
   }
   .lib__status {
     padding: 3rem 0;
   }
+  /* Books stand on planks. Each book carries its own length of plank that
+     reaches half a gap either side, so a row reads as one continuous shelf; the
+     last book's plank runs on to the edge and fades — room for the next one. */
   .lib__grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 42vw), 1fr));
-    gap: clamp(1rem, 2.5vw, 2rem);
+    grid-template-columns: repeat(auto-fill, minmax(min(14rem, 40vw), 19rem));
+    column-gap: var(--gap-x);
+    row-gap: clamp(3rem, 8vh, 5rem);
+    margin-top: clamp(2rem, 5vh, 3rem);
+  }
+  .lib__grid > :global(div) { position: relative; }
+  .lib__grid :global(.book-card__label::before) {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: calc(var(--gap-x) / -2);
+    right: calc(var(--gap-x) / -2);
+    height: 6px;
+    background: linear-gradient(180deg, #2a2a2e, #161618);
+    border-top: 1px solid rgba(244, 241, 234, 0.18);
+    box-shadow: 0 10px 18px -8px rgba(0, 0, 0, 0.8);
+  }
+  .lib__grid > :global(div:first-child .book-card__label::before) { left: calc(var(--pad) * -1); }
+  .lib__grid > :global(div:last-child .book-card__label::before) {
+    right: -100vw;
+    mask-image: linear-gradient(90deg, #000 calc(100% - 100vw), transparent calc(100% - 100vw + 60vw));
+  }
+  @media (max-width: 640px) {
+    .lib__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
 </style>

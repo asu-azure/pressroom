@@ -126,7 +126,7 @@ text. See `src/lib/richtext.ts` and its tests.
   Opaque, same on ink and paper, height published as `--topbar-h`. Pages that own their whole
   screen pass `topbar={false}` (`/ost`, Studio) or `chromeless` (reader). Fixed page chrome that sat
   at the very top (LangBar, `/asu` language bar, the overview back chip) reads `--chrome-top`.
-- Cards and tiles: hairline border, 12px radius, the whole card lifts 4px and takes an accent frame
+- Cards and tiles (the shelf's works are 3D books instead — see below): hairline border, 12px radius, the whole card lifts 4px and takes an accent frame
   on hover. **The picture never zooms**, so artwork is never recropped. Buttons are `.btn` pills.
 - Motion: Lenis (0.8 s) + GSAP wired in `src/layouts/Base.astro`. Scroll entrances must be
   reversible (`toggleActions: 'play none none reverse'` or scrub — never `once: true`). Ease:
@@ -157,6 +157,45 @@ reduced motion. Continuous effects (bloom, grain, letterbox, shimmer) stay in th
 - The page transition opens with a 110 ms stepped cut (jitter + channel split) before the wipe.
   Opening the reader uses `html[data-vt='reader']`: a plain punch-in, because reading is a change
   of scene.
+
+### The press run + loupe (`src/scripts/press.ts`, homepage hero only)
+
+The site is a pressroom, so the shelf hero's art is *printed*: one WebGL canvas separates it into
+C, M, Y, K plates that print in order, each sliding in from off-register (~0.9 s, the hero's whole
+entrance). The shader also draws the scrim that `.lib-hero__art::after` used to, so the CSS scrim
+is dropped while the canvas is live (`.is-pressed`).
+
+- **Loupe** (fine pointers only): ×3 glass under the pointer showing the real halftone (C 15°,
+  M 75°, Y 0°, K 45° → rosettes) plus a densitometer readout of the ink under the crosshair (read
+  from a 240 px CPU copy). This is **not** the retired custom cursor: it sits exactly on the pointer
+  every frame (no easing, nothing trails), the system cursor stays, and it lives *under* the type.
+  Keep all three true if you touch it.
+- Fast scrolling knocks the plates out of register; they spring back.
+- `html[data-press="pending"]` is set by an inline script **before first paint** so the photo is
+  hidden and the plates print from blank. A 2.5 s failsafe removes it, and every failure path
+  (no WebGL, shader error, lost context, undecodable image) removes it too — the `<img>` is always
+  the real picture. Reduced motion never sets it.
+- No frame loop at rest; paused off-screen; DPR capped at 1.5. This is the site's only WebGL
+  context — don't add one to `/asu` (see below).
+
+### The shelf's books (`WorkCard.svelte` + `src/scripts/book3d.ts`)
+
+Each work is a CSS 3D box — front, back, spine, fore-edge, head, tail — **depth from the page
+count** (about double true scale). Authors upload the whole wraparound as the cover page and crop
+the front, so the leftover is the **back cover** and a sliver at the crop edge wraps the spine.
+With no crop, the back is plain stock. Binding side comes from the wraparound, else RTL → right.
+
+- At rest the fore-edge faces out (the leaves make the depth legible). Hover turns the book to
+  the pointer on a damped spring; **drag turns it over** (release keeps angular velocity, lands on
+  the nearer cover); click swings the front board open on its hinge for 300 ms, then navigates.
+  `pageshow` (bfcache) closes it again.
+- **The hit area never moves** — the link and `.book-card__stage` are fixed; only `[data-book]`
+  rotates. That is what keeps this on the right side of the "magnetic hover" rule.
+- Vertical touch movement is a scroll (`touch-action: pan-y`); only a horizontal drag spins.
+- Titles live on the label **under** the book, never over the cover: the covers carry their own
+  lettering and the old overlay collided with it. Books stand on planks drawn per item (±½ gap);
+  the last one runs on and fades — room for the next book.
+- Reduced motion: the resting pose, a plain link, no hint line.
 
 ### Removed on purpose — do not reintroduce
 
