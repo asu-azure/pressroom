@@ -187,8 +187,17 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
 
 - At rest the fore-edge faces out (the leaves make the depth legible). Hover turns the book to
   the pointer on a damped spring; **drag turns it over** (release keeps angular velocity, lands on
-  the nearer cover); click swings the front board open on its hinge for 300 ms, then navigates.
-  `pageshow` (bfcache) closes it again.
+  the nearer cover). **Click navigates natively** (no preventDefault, no timer) and the motion plays
+  while the next page loads: on wide screens the cover **flies into the overview hero** (below);
+  elsewhere the front board swings open on its hinge. `pageshow` (bfcache) resets it.
+- **The flight** is a named cross-document view transition, `book-cover`: at click a flat copy of
+  the front face takes the name; on `/w/[slug]` the shell server-renders a **ghost cover** in the
+  hero's exact place with the same name (the island is `client:only` and fetches first, so without
+  the ghost there'd be nothing to land on). Both snapshots are framed on the front cover
+  (`--vt-cover-x` from `cover_crop`), so the morph starts on what the shelf showed and unfolds
+  into the full wraparound jacket. The ghost fades once the island's cover has loaded. It copies
+  the overview hero's layout numbers — change them together. Off below 821 px (the stacked
+  hero can't be predicted). Headless Chromium never runs the reveal side; check it in real Chrome.
 - **The hit area never moves** — the link and `.book-card__stage` are fixed; only `[data-book]`
   rotates. That is what keeps this on the right side of the "magnetic hover" rule.
 - Vertical touch movement is a scroll (`touch-action: pan-y`); only a horizontal drag spins.
@@ -511,6 +520,10 @@ Animated WebP cannot be paused with
 CSS, so each placement uses `<picture>` with the still frame under `prefers-reduced-motion`.
 
 ## Gotchas
+
+- **Never start a navigation from a timer** (`setTimeout(() => location.assign(…))`): Chrome skips
+  the cross-document view transition for it, so the page wipe silently disappears. Let the link
+  navigate and animate during the load. (The book click did this for a while.)
 
 - **The sanitizer keeps `class` on `<span>` for the highlight spans only** (`hl`, `hl--v`,
   `hl--g-*`). It used to allow `class` on `<figure>` alone, which silently stripped the gradient

@@ -1646,6 +1646,18 @@ html[data-vt='back']::view-transition-new(root) { animation-name: mk-vt-in-back;
 @keyframes mk-vt-in  { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
 @keyframes mk-vt-out-back { to { opacity: 0.4; translate: 0 2%; } }
 @keyframes mk-vt-in-back  { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+/* The shelf book's cover flying into the overview hero (book3d.ts → the ghost
+   in /w/[slug].astro). Both snapshots keep their aspect and are framed on the
+   front cover (--vt-cover-x, set by the overview), so the morph starts on what
+   the shelf showed and unfolds into the full jacket. */
+::view-transition-group(book-cover) { animation-duration: 0.62s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); z-index: 50; }
+::view-transition-old(book-cover),
+::view-transition-new(book-cover) {
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--vt-cover-x, 50%) 50%;
+  animation-duration: 0.62s;
+}
 
 /* ---- Buttons: pill, hairline, accent fill on hover ---- */
 .btn {

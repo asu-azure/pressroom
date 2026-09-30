@@ -9,8 +9,9 @@
  *   - drag    : grab it and turn it over, the way you check the back of a book
  *               in a shop. Release keeps the spin (angular velocity) and friction
  *               settles it on the nearer cover, front or back.
- *   - click   : the front board swings open on its hinge, then we navigate. The
- *               swing is 300 ms and the page transition takes over from there.
+ *   - click   : the link navigates natively; meanwhile the cover flies into the
+ *               overview hero as a named view transition (wide screens), or the
+ *               front board swings open on its hinge while the page loads.
  *
  * The hit area never moves: the link and its stage stay put and only the box
  * inside them rotates (see "magnetic hover" in CLAUDE.md — targets that move are
@@ -21,7 +22,7 @@
 export interface BookOptions {
   /** Binding edge as seen on the front cover. Right = Japanese/Thai manga (RTL). */
   bindingRight: boolean;
-  /** A link: click swings the board open, then navigates here. */
+  /** A link: the click navigates here (natively), with the flight or the board swing. */
   href?: string;
   /** Not a link (the /ost jewel case): click calls this instead, and the lid is
       driven from outside through the returned `setOpen()`. */
@@ -233,6 +234,7 @@ export function book(stage: HTMLElement, opts: BookOptions): BookHandle {
 
   // --- click to open -----------------------------------------------------
   let navigating = false;
+  let flight: HTMLElement | null = null;
   const onClick = (e: MouseEvent) => {
     if (suppressClick) {
       e.preventDefault();
@@ -250,24 +252,46 @@ export function book(stage: HTMLElement, opts: BookOptions): BookHandle {
       e.preventDefault();
       return;
     }
-    e.preventDefault();
     navigating = true;
     opts.onOpen?.();
-    // Face the front before the board swings, so the hinge is on the spine side.
+    // The link navigates natively — no preventDefault, no timer. Chrome skips a
+    // cross-document view transition when the navigation is started from a
+    // setTimeout, which is how an earlier version lost the page wipe entirely.
+    // The old page keeps rendering until the new one is ready, so whatever
+    // motion starts here plays out during the load.
+
+    // Where the overview can receive it (a ghost cover in /w/[slug].astro, wide
+    // layouts only), a flat copy of the cover takes the view-transition name and
+    // flies into the overview hero, unfolding into the full jacket.
+    const front = box.querySelector<HTMLElement>('.book__front');
+    if (front?.style.backgroundImage && 'onpagereveal' in window && window.matchMedia('(min-width: 821px)').matches) {
+      const r = front.getBoundingClientRect();
+      flight?.remove();
+      flight = document.createElement('div');
+      flight.setAttribute('aria-hidden', 'true');
+      flight.style.cssText =
+        front.style.cssText +
+        `;position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;` +
+        'z-index:60;pointer-events:none;view-transition-name:book-cover;border-radius:2px;';
+      document.body.append(flight);
+      return;
+    }
+
+    // Elsewhere the board swings open on its hinge while the next page loads.
     face = 0;
     ry.target = rest * 0.55;
     rx.target = REST_RX;
     lift.target = 1.2;
     open.target = 1;
     kick();
-    const href = opts.href;
-    setTimeout(() => window.location.assign(href), 300);
   };
 
   // Back/forward cache restores the page with the board still open.
   const onShow = (e: PageTransitionEvent) => {
     if (!e.persisted) return;
     navigating = false;
+    flight?.remove();
+    flight = null;
     face = 0;
     hovering = false;
     open.x = open.target = 0;
