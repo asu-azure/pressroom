@@ -17,16 +17,11 @@ const { slug } = Astro.params;
 let title: string | undefined;
 let description: string | undefined;
 let image: string | undefined;
-// The cover as a first-paint "ghost" in the hero's exact place, so the book
-// clicked on the shelf can morph into it (a named view transition, see
-// book3d.ts). The island paints the real hero after its fetch; the ghost
-// steps aside once that cover has loaded.
-let ghost: { url: string; w: number; h: number; x: string } | null = null;
 
 try {
   const { data: work } = await supabaseServer
     .from('works')
-    .select('title, description, cover_page_id, cover_crop')
+    .select('title, description, cover_page_id')
     .eq('slug', slug!)
     .eq('published', true)
     .maybeSingle();
@@ -41,17 +36,10 @@ try {
     if (work.cover_page_id) {
       const { data: cover } = await supabaseServer
         .from('pages')
-        .select('med_path, width, height')
+        .select('med_path')
         .eq('id', work.cover_page_id)
         .maybeSingle();
-      if (cover?.med_path) {
-        image = publicUrl(cover.med_path);
-        // object-position that frames the shelf's cropped front, so the morph
-        // starts on exactly what the book showed and then unfolds the jacket
-        const c = work.cover_crop as { x: number; w: number } | null;
-        const x = c && c.w < 1 ? (c.x / (1 - c.w)) * 100 : 50;
-        if (cover.width && cover.height) ghost = { url: image, w: cover.width, h: cover.height, x: `${x.toFixed(2)}%` };
-      }
+      if (cover?.med_path) image = publicUrl(cover.med_path);
     }
   }
 } catch {
@@ -63,90 +51,13 @@ cacheShell(Astro);
 
 <Base title={title} description={description} image={image}>
   <main class="ov-shell">
-    {ghost && (
-      <div class="ov-ghost" aria-hidden="true" data-ov-ghost>
-        <div class="ov-ghost__inner">
-          <figure class="ov-ghost__cover">
-            <img src={ghost.url} alt="" style={`aspect-ratio: ${ghost.w} / ${ghost.h}`} />
-          </figure>
-        </div>
-        <style set:html={`:root{--vt-cover-x:${ghost.x}}`} />
-      </div>
-    )}
     <BookOverview client:only="svelte" slug={slug!} />
   </main>
 </Base>
-
-<script>
-  // Hand over from the ghost to the island's own cover once it has painted.
-  const ghost = document.querySelector<HTMLElement>('[data-ov-ghost]');
-  if (ghost) {
-    const retire = () => {
-      ghost.classList.add('is-out');
-      setTimeout(() => ghost.remove(), 700);
-    };
-    const check = () => {
-      const img = document.querySelector<HTMLImageElement>('.ov-hero__cover img');
-      if (img) {
-        mo.disconnect();
-        if (img.complete) retire();
-        else img.addEventListener('load', retire, { once: true });
-      } else if (document.querySelector('.ov-status a')) {
-        mo.disconnect();
-        retire(); // missing work: nothing to hand over to
-      }
-    };
-    const mo = new MutationObserver(check);
-    mo.observe(document.querySelector('.ov-shell')!, { childList: true, subtree: true });
-    setTimeout(() => ghost.isConnected && retire(), 8000);
-  }
-</script>
 
 <style>
   .ov-shell {
     position: relative;
     z-index: 1;
-  }
-  /* A copy of the overview hero's layout (.ov-hero / __inner / __cover in
-     BookOverview.svelte) — keep the numbers in step with it, or the hand-over
-     jumps. */
-  .ov-ghost {
-    position: absolute;
-    inset: 0 0 auto;
-    z-index: 5;
-    min-height: 100svh;
-    display: flex;
-    align-items: center;
-    pointer-events: none;
-    transition: opacity 0.6s var(--ease);
-  }
-  .ov-ghost.is-out { opacity: 0; }
-  .ov-ghost__inner {
-    display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-    gap: clamp(2rem, 5vw, 4rem);
-    align-items: center;
-    width: 100%;
-    padding: clamp(5rem, 12vh, 7rem) var(--pad) clamp(3rem, 8vh, 5rem);
-    max-width: 1200px;
-    margin: 0 auto;
-  }
-  .ov-ghost__cover {
-    margin: 0;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-soft);
-    max-width: min(100%, 24rem);
-    justify-self: center;
-  }
-  .ov-ghost__cover img {
-    display: block;
-    width: 100%;
-    height: auto;
-    view-transition-name: book-cover;
-  }
-  /* One column: the island stacks the title under the cover, which the ghost
-     can't know the height of — so no morph there, just the page wipe. */
-  @media (max-width: 820px) {
-    .ov-ghost { display: none; }
   }
 </style>
