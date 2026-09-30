@@ -58,6 +58,11 @@
   .kc-card__label {
     position: relative;
     display: grid;
+    align-content: start;
+    /* a fixed height, shared with the placeholders (styles/shelf-ph.css), so a
+       title that wraps can't move the page when the shelf arrives */
+    box-sizing: border-box;
+    min-height: var(--shelf-label-h, 7rem);
     gap: 0.3rem;
     margin-top: 0.2rem;
     padding-top: 1.2rem;

@@ -12,7 +12,15 @@
   import type { KeychainData } from '../../lib/keychain';
 
   /** The soundtrack keychain, when music is on (index.astro builds its art and QR). */
-  let { ost = null }: { ost?: { data: KeychainData; length: string; movements: number } | null } = $props();
+  let {
+    ost = null,
+    expect = 3,
+  }: {
+    ost?: { data: KeychainData; length: string; movements: number } | null;
+    /** How many stages to hold while loading (index.astro counts them on the
+        server), so the shelf opens at its final height — see styles/shelf-ph.css. */
+    expect?: number;
+  } = $props();
 
   gsap.registerPlugin(ScrollTrigger);
   const reduced =
@@ -121,14 +129,24 @@
       <span class="mono lib__n">{i18n.t('lib.count').replace('{n}', String(cards.length).padStart(2, '0'))}</span>
     {/if}
   </header>
-  {#if cards?.length && !reduced}
-    <p class="mono lib__hint">{i18n.t(coarse ? 'lib.hintTouch' : 'lib.hint')}</p>
+  {#if !reduced && (cards === null || cards.length)}
+    <!-- kept (hidden) while loading, so the line's height is already there -->
+    <p class="mono lib__hint" style:visibility={cards ? 'visible' : 'hidden'}>
+      {i18n.t(coarse ? 'lib.hintTouch' : 'lib.hint')}
+    </p>
   {/if}
 
   {#if error}
     <p class="mono lib__status">{i18n.t('lib.offline')} — {error}</p>
   {:else if cards === null}
-    <p class="mono lib__status"><span class="mk-loader" aria-hidden="true"></span> {i18n.t('lib.loading')}</p>
+    <!-- Placeholder stages the size of the real ones (styles/shelf-ph.css):
+         the page below must not move when the books arrive. -->
+    <p class="lib__sr">{i18n.t('lib.loading')}</p>
+    <div class="lib__grid" aria-hidden="true">
+      {#each Array.from({ length: expect }) as _, i (i)}
+        <div><span class="shelf-ph__stage"><span></span></span><span class="shelf-ph__label"></span></div>
+      {/each}
+    </div>
   {:else if cards.length === 0}
     <p class="mono lib__status">{i18n.t('lib.empty')}</p>
   {:else}
@@ -187,6 +205,13 @@
   }
   .lib__status {
     padding: 3rem 0;
+  }
+  .lib__sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
   /* Books stand on planks. Each book carries its own length of plank that
      reaches half a gap either side, so a row reads as one continuous shelf; the

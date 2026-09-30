@@ -566,15 +566,14 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   `resolveSheets()` joins them in every layout mode.
 - Storage paths are immutable (`works/{work_id}/{page_id}/…`, `cacheControl` 1 year) —
   reordering pages never touches storage.
-- **The shelf's book grid is still `client:only`**, so the cards are not server-rendered. Until it
-  hydrates, its `fallback` slot in `index.astro` shows six aspect-locked blank cards, so the page
-  below doesn't jump when the books arrive. That is a
-  known deferral, not an oversight: `Library.svelte` registers ScrollTrigger at module scope and
-  would need auditing before it could SSR. The hero, showcase strip and artist teaser around it are
-  static HTML, so the page is no longer content-empty on first paint.
-
-## Reader extras and the motion kit
-
+- **The shelf's book grid is still `client:only`, and must open at its final height.** The fallback
+  (`index.astro`, before hydration) and Library's own loading state render the same placeholders
+  (`src/styles/shelf-ph.css`): the shelf head, the hidden hint line, and one stage + label per
+  item, counted on the server (`library_cards()` + the keychain). Book and keychain labels have a
+  fixed `--shelf-label-h`. Measured: fallback, loading and real shelf are the same height (745 px
+  desktop, 952 px at 390) — this used to be a ~480 px jump (CLS 0.09), the stutter on entry.
+  Change the numbers in `shelf-ph.css` with Library's. `Library.svelte` still registers
+  ScrollTrigger at module scope, which is why it isn't SSR'd.
 - **`src/styles/motion-kit.css`** holds small class-triggered motions adapted from
   `yui540/css-animations` (MIT — keep the licence header). Used for the library/reader/uploader loaders
   (`.mk-loader`), the lock gate (`.mk-brake` on a wrong password, `.mk-rollup` on unlock), and the card

@@ -8,6 +8,8 @@ import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
 import { cacheShell } from '../lib/cache';
+import { supabaseServer } from '../lib/supabaseServer';
+import '../styles/shelf-ph.css';
 import song from '../data/ost/starfall.json';
 import { soundtrackKeychain, songLength } from '../lib/keychainServer';
 
@@ -26,6 +28,17 @@ cacheShell(Astro);
 const ost = MUSIC
   ? { data: await soundtrackKeychain(Astro.site, 480), length: songLength(), movements: song.movements.length }
   : null;
+
+// How many stages the shelf will hold, so its placeholder is already the final
+// height (no jump when the books arrive). A count only; a failure keeps 2.
+let bookCount = 2;
+try {
+  const { data } = await supabaseServer.rpc('library_cards');
+  if (Array.isArray(data)) bookCount = data.length;
+} catch {
+  /* the placeholder is a guess, never a blocker */
+}
+const shelfCount = bookCount + (ost ? 1 : 0);
 ---
 
 <Base>
@@ -90,9 +103,15 @@ const ost = MUSIC
         holds its place: book-shaped blanks on a plank, the size of the real
         stages, which keeps the teaser below from jumping when the books arrive. */}
     <div id="shelf">
-      <Library client:only="svelte" ost={ost}>
-        <div slot="fallback" class="shelf-skel" aria-hidden="true">
-          {Array.from({ length: 2 }, () => <span class="shelf-skel__card"><span /></span>)}
+      <Library client:only="svelte" ost={ost} expect={shelfCount}>
+        <div slot="fallback" class="shelf-ph" aria-hidden="true">
+          <div class="shelf-ph__head"><span class="mono shelf-ph__k">01 — 本棚</span><span class="shelf-ph__rule"></span></div>
+          <p class="mono shelf-ph__hint">.</p>
+          <div class="shelf-ph__grid">
+            {Array.from({ length: shelfCount }, () => (
+              <div><span class="shelf-ph__stage"><span /></span><span class="shelf-ph__label" /></div>
+            ))}
+          </div>
         </div>
       </Library>
     </div>
@@ -278,13 +297,21 @@ const ost = MUSIC
     // height actually changes.
     const shelf = document.querySelector('.lib-shell');
     if (shelf && 'ResizeObserver' in window) {
-      let last = 0;
+      // Coalesced: one refresh per frame at most, and only for a real change —
+      // each refresh re-measures every trigger (forced layout), and the shelf
+      // used to fire several as its placeholder, cards and images settled.
+      let last = shelf.getBoundingClientRect().height;
+      let queued = 0;
       const ro = new ResizeObserver(() => {
-        const h = shelf.getBoundingClientRect().height;
-        if (Math.abs(h - last) < 1) return;
-        last = h;
-        ScrollTrigger.refresh();
-        ScrollTrigger.update();
+        if (queued) return;
+        queued = requestAnimationFrame(() => {
+          queued = 0;
+          const h = shelf.getBoundingClientRect().height;
+          if (Math.abs(h - last) < 4) return;
+          last = h;
+          ScrollTrigger.refresh();
+          ScrollTrigger.update();
+        });
       });
       ro.observe(shelf);
     }
@@ -607,34 +634,6 @@ const ost = MUSIC
 </style>
 
 <style>
-  /* --- shelf placeholder (matches .lib / .lib__grid in Library.svelte) ----- */
-  .shelf-skel {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(14rem, 40vw), 19rem));
-    column-gap: clamp(1.25rem, 5vw, 4.5rem);
-    /* head + hint + grid margin of the real shelf */
-    padding: calc(clamp(2.5rem, 7vh, 4.5rem) + 2.6rem + clamp(2rem, 5vh, 3rem)) var(--pad)
-      clamp(3rem, 8vh, 5rem);
-  }
-  @media (max-width: 640px) {
-    .shelf-skel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-  .shelf-skel__card {
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
-    aspect-ratio: 0.74;
-    margin-bottom: 7rem;
-    border-bottom: 6px solid #1c1c1f;
-  }
-  .shelf-skel__card > span {
-    width: 84%;
-    aspect-ratio: 182 / 257;
-    margin-bottom: 0.3rem;
-    border-radius: 2px;
-    background: var(--bg-soft);
-    animation: shelf-skel 1.4s ease-in-out infinite alternate;
-  }
-  @keyframes shelf-skel { to { opacity: 0.45; } }
+  /* shelf placeholder: styles/shelf-ph.css (shared with Library.svelte's loading state) */
 
 </style>

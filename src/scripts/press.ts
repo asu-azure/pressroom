@@ -166,47 +166,53 @@ export function initPress(hero: HTMLElement) {
     release();
   };
 
-  const compile = (type: number, src: string) => {
+  // Compile and link now, but ask for the result only once the image is ready:
+  // querying the status straight away would block the main thread on the
+  // driver; by then the compile has finished in parallel (KHR_parallel_shader_compile).
+  gl.getExtension('KHR_parallel_shader_compile');
+  const shader = (type: number, src: string) => {
     const s = gl.createShader(type)!;
     gl.shaderSource(s, src);
     gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s) ?? 'shader');
     return s;
   };
-  let prog: WebGLProgram;
-  try {
-    prog = gl.createProgram()!;
-    gl.attachShader(prog, compile(gl.VERTEX_SHADER, VERT));
-    gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FRAG));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog) ?? 'link');
-  } catch (e) {
-    console.warn('[press]', e);
-    release();
-    return;
-  }
-  gl.useProgram(prog);
-  const buf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(prog, 'a');
-  gl.enableVertexAttribArray(loc);
-  gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = (n: string) => gl.getUniformLocation(prog, n);
-  const u = {
-    res: U('u_res'),
-    dpr: U('u_dpr'),
-    rect: U('u_rect'),
-    size: U('u_size'),
-    off: U('u_off'),
-    ink: U('u_ink'),
-    lens: U('u_lens'),
-    lensOn: U('u_lensOn'),
-    mag: U('u_mag'),
-    cell: U('u_cell'),
+  const vs = shader(gl.VERTEX_SHADER, VERT);
+  const fs = shader(gl.FRAGMENT_SHADER, FRAG);
+  const prog = gl.createProgram()!;
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  const linked = () => {
+    if (gl.getProgramParameter(prog, gl.LINK_STATUS)) return true;
+    console.warn('[press]', gl.getShaderInfoLog(fs) || gl.getProgramInfoLog(prog));
+    return false;
   };
-  gl.uniform1f(u.mag, MAG);
-  gl.uniform1f(u.cell, CELL);
+  const U = (n: string) => gl.getUniformLocation(prog, n);
+  let u = {} as Record<'res' | 'dpr' | 'rect' | 'size' | 'off' | 'ink' | 'lens' | 'lensOn' | 'mag' | 'cell', WebGLUniformLocation | null>;
+  /** Everything that needs the linked program — run once the image is ready. */
+  const setup = () => {
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, 'a');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    u = {
+      res: U('u_res'),
+      dpr: U('u_dpr'),
+      rect: U('u_rect'),
+      size: U('u_size'),
+      off: U('u_off'),
+      ink: U('u_ink'),
+      lens: U('u_lens'),
+      lensOn: U('u_lensOn'),
+      mag: U('u_mag'),
+      cell: U('u_cell'),
+    };
+    gl.uniform1f(u.mag, MAG);
+    gl.uniform1f(u.cell, CELL);
+  };
 
   // --- loupe overlay: reticle + densitometer readout (fine pointers only) ----
   const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -355,6 +361,25 @@ export function initPress(hero: HTMLElement) {
       /* already decoded, or broken — the size check below decides */
     }
     if (!photo.naturalWidth) return fail();
+    // Decode + scale off the main thread: the hero is ~400 px tall, so a
+    // 1280-wide texture is plenty, and uploading the full photo cost ~100 ms.
+    let source: TexImageSource = photo;
+    if ('createImageBitmap' in window) {
+      try {
+        const w = Math.min(1280, photo.naturalWidth);
+        source = await createImageBitmap(photo, {
+          resizeWidth: w,
+          resizeHeight: Math.round((w * photo.naturalHeight) / photo.naturalWidth),
+          resizeQuality: 'medium',
+        });
+      } catch {
+        source = photo;
+      }
+    }
+    // let the first frames of the page paint before the press takes a turn
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    if (!linked()) return fail();
+    setup();
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -362,7 +387,7 @@ export function initPress(hero: HTMLElement) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     try {
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, photo);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, source);
     } catch (e) {
       console.warn('[press]', e);
       return fail();
@@ -376,7 +401,7 @@ export function initPress(hero: HTMLElement) {
         c2.width = pw;
         c2.height = ph;
         const ctx = c2.getContext('2d', { willReadFrequently: true })!;
-        ctx.drawImage(photo, 0, 0, pw, ph);
+        ctx.drawImage(source as CanvasImageSource, 0, 0, pw, ph);
         probe = { data: ctx.getImageData(0, 0, pw, ph).data, w: pw, h: ph };
       } catch {
         probe = null;
