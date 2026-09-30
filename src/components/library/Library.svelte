@@ -6,8 +6,13 @@
   import { i18n } from '../../lib/i18n.svelte';
   import { assemble } from '../../scripts/text';
   import WorkCard from './WorkCard.svelte';
+  import CdCase from './CdCase.svelte';
   import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
+  import type { JewelArt } from '../../lib/jewel';
+
+  /** The soundtrack CD, when music is on (index.astro builds the images). */
+  let { ost = null }: { ost?: { art: JewelArt; tracks: string[]; length: string } | null } = $props();
 
   gsap.registerPlugin(ScrollTrigger);
   const reduced =
@@ -133,6 +138,12 @@
           <WorkCard work={card.work} coverUrl={card.coverUrl} pageCount={card.pageCount} index={i} />
         </div>
       {/each}
+      {#if ost}
+        <!-- The soundtrack stands at the end of the shelf, after the books. -->
+        <div use:rise={cards.length}>
+          <CdCase art={ost.art} tracks={ost.tracks} length={ost.length} />
+        </div>
+      {/if}
 
       <!-- The author card that used to close this grid is gone: the artist
            teaser now sits directly below the shelf and says the same thing with

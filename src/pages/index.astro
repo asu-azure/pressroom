@@ -1,14 +1,16 @@
 ---
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
-import NowPlaying from '../components/NowPlaying.astro';
 import { MUSIC } from '../lib/features';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
 import { cacheShell } from '../lib/cache';
+import song from '../data/ost/starfall.json';
+import ostNight from '../assets/ost/starfall-night.jpg';
+import ostDay from '../assets/ost/starfall-day.jpg';
 
 // Was prerendered. The artist teaser below the shelf is now author-edited copy,
 // and a static build would freeze it until the next deploy — the author would
@@ -20,6 +22,23 @@ const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
 
 cacheShell(Astro);
+
+// The soundtrack CD at the end of the shelf (CdCase.svelte), when music is on.
+const ost = MUSIC
+  ? await (async () => {
+      const [front, back, disc] = await Promise.all([
+        getImage({ src: ostNight, width: 480, format: 'webp', quality: 78 }),
+        getImage({ src: ostDay, width: 420, format: 'webp', quality: 70 }),
+        getImage({ src: ostDay, width: 360, format: 'webp', quality: 72 }),
+      ]);
+      const d = song.duration;
+      return {
+        art: { front: front.src, back: back.src, disc: disc.src },
+        tracks: song.movements.map((m) => m.name),
+        length: `${Math.floor(d / 60)}:${String(Math.floor(d % 60)).padStart(2, '0')}`,
+      };
+    })()
+  : null;
 ---
 
 <Base>
@@ -80,15 +99,11 @@ cacheShell(Astro);
 
     <Showcase />
 
-    {/* The book's theme song as a moving score — the way in to /ost, and the
-        note-playing from the music videos brought onto the shelf. */}
-    {MUSIC && <NowPlaying />}
-
     {/* The shelf is a client:only island, so until it hydrates the fallback
         holds its place: book-shaped blanks on a plank, the size of the real
         stages, which keeps the teaser below from jumping when the books arrive. */}
     <div id="shelf">
-      <Library client:only="svelte">
+      <Library client:only="svelte" ost={ost}>
         <div slot="fallback" class="shelf-skel" aria-hidden="true">
           {Array.from({ length: 2 }, () => <span class="shelf-skel__card"><span /></span>)}
         </div>

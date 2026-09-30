@@ -405,90 +405,96 @@ act-character → craft → act-select → act-3d → act-grid → contact.
 
 ## Music features are behind a flag (`PUBLIC_MUSIC`)
 
-The song is still a placeholder, so **everything musical is off in production**: `/ost`, the NOW
-PLAYING band, the `OST ♪` links, the SOUND switch and the UI sounds. `src/lib/features.ts` exports
-`MUSIC` (`import.meta.env.PUBLIC_MUSIC === 'true'`); every entry point checks it.
+**Everything musical is off in production** until the owner launches it: `/ost`, `/ost/tobira`,
+the soundtrack CD on the shelf, the `OST ♪` links, the SOUND switch and the UI sounds.
+`src/lib/features.ts` exports `MUSIC` (`import.meta.env.PUBLIC_MUSIC === 'true'`); every entry point
+checks it.
 
-- **`/ost` lives in `src/routes/ost.astro`, not `src/pages/`.** `astro.config.mjs` injects the route
-  only when the flag is on, so with it off `/ost` is a real 404. Don't move it back into `pages/`.
-- With the flag off, the build also deletes `ost/` (the placeholder MP3 in `public/ost/`) from the
-  output, so the file is not deployed at all.
-- Local work: `PUBLIC_MUSIC=true` in `.env`. Going live: set `PUBLIC_MUSIC=true` in the Vercel
-  project env and redeploy — no code change.
+- **The song pages live in `src/routes/`, not `src/pages/`.** `astro.config.mjs` injects `/ost` and
+  `/ost/tobira` only when the flag is on, so with it off they are real 404s. Don't move them.
+- With the flag off, the build also deletes `ost/` (the MP3s in `public/ost/`) from the output.
+- Local work: `PUBLIC_MUSIC=true` in `.env`. Going live: set it in the Vercel project env and
+  redeploy — no code change.
 
-## `/ost` — the main theme as a moving score
+## `/ost` — 「ดาวตก · Starfall Nocturne」 as a CD single
 
-「扉の向こう」 Main Theme, the book's song, played as a grand staff that scrolls past a playhead
-in time with the MP3. **It is its own theme and leaves the rest of the site alone.** It opens as
-a Shibuya-style CD-single jacket (obi, vertical title, a barcode drawn from the score's
-density). From there the scene follows the song: paper for most of it, ink for the Beethoven
-section, Akihabara neon/CRT for the 8-bit duet, a night stage for the final chorus, and paper
-again for the coda. `MODE_BY_SECTION` in `src/scripts/ost/main.ts` is the switch. Prerendered,
-with no database. Only exists when `PUBLIC_MUSIC=true` (see above).
+The soundtrack page is **a record you hold, not a score you read** — the owner found a five-line
+staff out of place for shelf visitors. `src/routes/ost.astro` + `src/scripts/ost/starfall.ts`:
 
-- **Sync comes from the data, not from animation timing.** `src/data/ost/perd-pratu.json` was
-  exported from the same source that rendered `public/ost/perd-pratu.mp3`. A notehead is centred
-  on its onset, so it touches the line exactly when it sounds. The clock (`ScoreClock` in
-  `src/scripts/ost/clock.ts`, shared with the homepage player) runs on `performance.now()` and
-  eases toward `audio.currentTime` every frame. If the audio fails, it keeps running silently.
-  See `src/data/ost/README.md` to swap in a new mix.
-- `audioLen` in `ost.astro` is the MP3's length (234 s), deliberately not `duration` from the
-  JSON (233.7 s): the last chord rings past the final note-off.
-- `?t=<sec>` resumes there ("RESUME FROM 0:52" on the gate). The homepage player links with it.
-- `score.ts` turns MIDI into notation: staff, step, spelling against four flats, accidentals held
-  to the end of the bar, chords, stems, beams. `render.ts` is one canvas using SMuFL glyphs. All
-  its metrics are in staff spaces, taken from Bravura's metadata.
-- **Sound is opt-in.** Nothing plays until a gate button is pressed. That press unlocks the
-  element, then a 1.6 s pre-roll lets the first notes scroll in before t = 0.
-- **The MP3 (4.7 MB) is `preload="metadata"`.** The full download starts when a visitor reaches
-  for a gate button (pointerenter / focus / pointerdown), so a visitor who only looks at the jacket
-  never pays for it.
-- Page-only faces are declared in `src/styles/ost-fonts.css`: `'OST JP'`, `'OST Dot'` and
-  `'OST Notation'`. The JP face is a **separate subset** from the site-wide Noto, so adding
-  Japanese to `/ost` means re-subsetting that file, not the global one. The notation font is
-  Bravura (OFL, Reserved Font Name). The subset is therefore renamed, so never call it Bravura.
-- Reduced motion drops the pop, particles, glitch, wipe and banners. The score still scrolls,
-  because the moving score is the content.
-- Entry points: the `NOW PLAYING` band on the shelf, `OST ♪` in the footer and in the site header. `/ost` itself has no site header (`topbar={false}`); its own HUD
-  carries the way back.
+1. **Jewel case** (`src/styles/jewel.css`, markup from `src/lib/jewel.ts`, physics from `book3d.ts`
+   with `onPress` instead of `href`). Drag turns it over to the track list; PLAY opens the lid
+   (laid out flat to the left, `openDeg: 165` — at ~110° perspective blows it up toward the camera)
+   and the disc slides a third of the way out and spins while playing.
+2. **Transport**: PLAY/PAUSE, a scrubber with a tick per movement (pointer + arrow keys, Home/End),
+   Media Session metadata/handlers for the lock screen.
+3. **Now playing**: the movement (converge on change) and, in the choir sections, the lyric —
+   JA with ruby readings and a per-chunk karaoke wipe (`--k`), TH under it.
+4. **Liner notes** (cream booklet): all 16 movements, the current one lit with a progress rule;
+   clicking one seeks there and plays.
+5. **Music video**: a click-to-load YouTube facade (youtube-nocookie, no YouTube request until
+   clicked). `MV_YOUTUBE_ID` at the top of `ost.astro` — currently a **stand-in cut**; swap the id
+   for the final MV and update the `ost.mvKicker` copy. Starting either player pauses the other
+   (the iframe runs with `enablejsapi=1` for exactly that).
+6. **Credits** + back link. Credits are copy (`ost.credits`) and **alias-only**.
 
-### The homepage player (`src/components/NowPlaying.astro`)
+- **Sky per movement**: `MOODS` in `starfall.ts` sets `--sky-a/--sky-b`, which are registered
+  `@property` colours so the gradient glides. Stars are one 2D canvas, drawn only while playing;
+  accents (`hits`) brighten the sky, and in **XIV. Starfall** the strong ones launch falling stars.
+  Reduced motion keeps the sky still and drops the falling stars.
+- **Every word around the player is author copy** — the `ost` page group in `copyKeys.ts`
+  (jacket, one line per movement, MV label/note, credits), trilingual, previewable in the Studio.
+  So the page is `prerender = false` + `loadCopy()` + `cacheShell()`, like `/asu`.
+- Mini transport: a fixed pill appears once the jacket scrolls away while a song has been started.
+- **The MP3 (9.9 MB) is `preload="metadata"`**; the full download starts when a visitor reaches
+  for PLAY. `?t=<sec>` starts the page at that time.
 
-The first eight bars of the chorus (window read from the JSON at build) on a short ink band between
-the showcase and the shelf. Same renderer in its `mini` layout (grand staff sized to the band; no
-rehearsal boxes, stop hatching or quote brackets), same clock.
+### The data — `src/data/ost/starfall.json`
 
-- **Nothing heavy loads with the page.** `mini.ts` dynamically imports `score`, `render` and the
-  JSON when the band is within 200 px of the viewport or a visitor reaches for ▶; the notation font
-  is requested at the same moment. The MP3 is `preload="none"` until ▶. An inline SVG staff stands
-  in until the first frame, so first paint is complete without JS.
-- The song does not survive navigation (that needs an SPA router, which would break the module-scope
-  GSAP/Lenis setup and the islands). `FULL SCORE →` hands `/ost` the current time via `?t=`, and
-  `pagehide` pauses the element.
-- While it plays it dispatches `pr:music` (detail `true`/`false`) on `document`; the UI sounds duck.
+Imported, never hand-edited: `node scripts/import-ost.mjs [--audio]` reads the MV player's build
+(`../music/music/visualizer/player2/songs/starfall-mv/timeline.json` by default) and keeps only
+title, duration, movements, choir lyrics (chunks with kana), accent hits and the motif's right
+hand. `--audio` also copies the MP3 to `public/ost/starfall.mp3`. **The music project's notes name
+the composer personally — none of that may reach this repo;** the importer copies no credits.
+Cover art is `src/assets/ost/starfall-{night,day}.jpg` (3000², encoded through `astro:assets`).
+
+### The shelf CD (`src/components/library/CdCase.svelte`)
+
+The soundtrack stands at the end of the shelf after the books, on the same plank and physics;
+`index.astro` builds its images and passes them to `Library` as the `ost` prop (null when music is
+off). Sized at 142/182 of a book — a CD beside a B5. The NOW PLAYING staff band that used to sit
+between the showcase and the shelf is **gone** (and `NowPlaying.astro` / `mini.ts` with it).
+
+## `/ost/tobira` — 「扉の向こう」 as a moving score (unlisted)
+
+The previous soundtrack page, kept like `/lookbook`: nothing links to it. `src/routes/ost-tobira.astro`
+with `src/scripts/ost/{main,score,render}.ts` and `src/data/ost/perd-pratu.json`.
+
+- **Sync comes from the data.** A notehead is centred on its onset, so it touches the line exactly
+  when it sounds; `ScoreClock` (`clock.ts`, shared with `/ost`) eases toward `audio.currentTime`.
+- `score.ts` turns MIDI into notation (spelling against four flats, accidentals held to the bar,
+  stems, beams); `render.ts` draws SMuFL glyphs on one canvas, metrics in staff spaces.
+- Page-only faces in `src/styles/ost-fonts.css`: `'OST JP'` (its own subset — re-subset it when
+  adding Japanese here), `'OST Dot'`, `'OST Notation'` (a renamed Bravura subset; OFL Reserved Font
+  Name — never call it Bravura). See `src/data/ost/README.md`.
+- `audioLen` (234 s) is the MP3's length, not the JSON's `duration`: the last chord rings on.
 
 ## UI sounds — the theme song under the pointer (`src/scripts/sound.ts`)
 
-Notes of 「扉の向こう」 synthesised with Web Audio: triangle + a quiet sine an octave up, one lowpass,
-4 ms attack, short exponential decay. **No sample files.** Budget is a couple of KB.
+Notes of **Starfall's motif** (the G–A♭–G cell) synthesised with Web Audio: triangle + a quiet sine
+an octave up, one lowpass, 4 ms attack, short exponential decay. **No sample files.**
 
 - **Off by default.** The switch is SOUND in the site header, and a SOUND row in the reader's
-  settings panel (the reader has no header). The choice lives in `localStorage['pr:sound']` and is
-  read at module load, so an island and Base agree whichever script runs first.
-- The `AudioContext` is only created inside a gesture (the switch click). If sound was left on, the
-  first `pointerdown`/`keydown` resumes it; hovers before that are silent — browsers require it.
-  `navigator.audioSession.type = 'ambient'` where supported (iOS silent switch, no interrupting the
-  visitor's own music). Silent in a hidden tab; ducked while `pr:music` says a song is playing.
-  `/ost` (`data-no-sfx`) opts out entirely.
-- **Hooks are attributes**, delegated from Base, so Svelte islands need no imports:
-  `data-sfx="note"` (mouse hover → the next note of the hook; sweeping across the shelf plays it,
-  and it resets after 2.5 s of quiet), `data-sfx="open"` (press → D♭maj7), `data-sfx="tap"`
-  (click → one soft note). Space-separated: shelf cards are `data-sfx="note open"`. Direct calls:
-  the reader's page turn → `sfx.tick()` (thinned to 4/s in scroll mode), the ここすき burst →
-  `sfx.sparkle()`, a correct lock password → `sfx.chord('unlock')`.
+  settings panel. The choice lives in `localStorage['pr:sound']`, read at module load.
+- The `AudioContext` is only created inside a gesture. `navigator.audioSession.type = 'ambient'`
+  where supported. Silent in a hidden tab; ducked while `pr:music` says a song is playing.
+  Both song pages (`data-no-sfx`) opt out entirely.
+- **Hooks are attributes**, delegated from Base: `data-sfx="note"` (hover → the next note of the
+  hook), `data-sfx="open"` (press → A♭maj7), `data-sfx="tap"`. Direct calls: page turn →
+  `sfx.tick()`, ここすき → `sfx.sparkle()`, a correct lock password → `sfx.chord('unlock')`
+  (Cm(add9), where the hook lands).
 - `MOTIF` and `CHORDS` are hardcoded so no page needs the JSON to play a note.
-  **`src/scripts/ost/motif.test.ts` checks them against `perd-pratu.json`** — a remix that moves
-  the chorus fails the test instead of drifting silently.
+  **`src/scripts/ost/motif.test.ts` checks them against `starfall.json`** — a re-export that moves
+  the hook fails the test instead of drifting silently.
 
 ## The artist signature stamp
 

@@ -3,8 +3,9 @@
  *
  * No sample files: each note is a triangle wave plus a quiet sine an octave up,
  * through one gentle lowpass, with a 4 ms attack and a short exponential decay
- * (a soft, piano-ish pluck). The notes are the top line of the chorus of
- * 「扉の向こう」, so sweeping the pointer across the shelf plays the hook.
+ * (a soft, piano-ish pluck). The notes are the top line of the motif of
+ * 「ดาวตก — Starfall」 (the G–A♭–G cell), so sweeping the pointer across the
+ * shelf plays the hook.
  *
  * OFF by default, remembered in localStorage. The AudioContext is created only
  * inside a user gesture (browsers keep it suspended otherwise), UI sounds are
@@ -15,10 +16,10 @@
 
 import { MUSIC } from '../lib/features';
 
-/** Chorus top line, 46.2–53.6 s of perd-pratu.json `rh` (motif.test.ts keeps it honest). */
-export const MOTIF = [77, 75, 73, 72, 70, 79, 77, 75, 70, 72, 80, 79, 77, 75, 77, 75, 72, 68, 72, 68];
-/** The chords under it: D♭maj7 when a book opens, E♭ when a lock opens. */
-export const CHORDS = { open: [61, 65, 68, 72], unlock: [63, 67, 70, 75] } as const;
+/** Motif top line: the first two phrases of IV. Motif in starfall.json (motif.test.ts keeps it honest). */
+export const MOTIF = [79, 79, 79, 79, 80, 79, 72, 75, 74, 70, 79, 79, 79, 79, 80, 79, 72, 75, 74, 71];
+/** The hook's harmony: A♭maj7 when a book opens, Cm(add9) — where the hook lands — when a lock opens. */
+export const CHORDS = { open: [56, 60, 63, 67], unlock: [60, 63, 67, 74] } as const;
 
 const KEY = 'pr:sound';
 const MAX_VOICES = 6;

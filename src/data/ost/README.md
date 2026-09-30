@@ -1,5 +1,15 @@
 # /ost data
 
+## starfall.json — /ost (the CD single)
+
+Imported, never hand-edited: `node scripts/import-ost.mjs [--audio]` reads the MV player's
+build (`../music/music/visualizer/player2/songs/starfall-mv/timeline.json`) and keeps only title,
+duration, movements, choir lyrics (chunks with kana), accent hits and the motif's right hand
+(for `motif.test.ts`). `--audio` also copies the MP3 to `public/ost/starfall.mp3`. The importer
+copies no credits: the music project's notes use a personal name that must not reach this repo.
+
+## perd-pratu.json — /ost/tobira (the moving score, unlisted)
+
 `perd-pratu.json` is the timeline for 「扉の向こう」 Main Theme (v05.1). It was exported
 from the same Python source that rendered `public/ost/perd-pratu.mp3`, so each note's start
 time is the moment it sounds in the MP3. Don't hand-edit the note rows; re-export them instead

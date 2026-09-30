@@ -21,9 +21,23 @@
 export interface BookOptions {
   /** Binding edge as seen on the front cover. Right = Japanese/Thai manga (RTL). */
   bindingRight: boolean;
-  href: string;
+  /** A link: click swings the board open, then navigates here. */
+  href?: string;
+  /** Not a link (the /ost jewel case): click calls this instead, and the lid is
+      driven from outside through the returned `setOpen()`. */
+  onPress?: () => void;
   /** Called just before navigation (sound, analytics — nothing blocking). */
   onOpen?: () => void;
+  /** Resting yaw toward the fore-edge, degrees. Default 34. */
+  restYaw?: number;
+  /** How far the board swings when open, degrees. Default 158. */
+  openDeg?: number;
+}
+
+export interface BookHandle {
+  destroy(): void;
+  /** Open (1) or close (0) the board without navigating. */
+  setOpen(v: number): void;
 }
 
 const REST_RY = 34; // deg, fore-edge toward the viewer so the book reads as a box
@@ -56,10 +70,12 @@ class Spring {
   }
 }
 
-export function book(stage: HTMLElement, opts: BookOptions) {
+export function book(stage: HTMLElement, opts: BookOptions): BookHandle {
+  const noop: BookHandle = { destroy() {}, setOpen() {} };
   const box = stage.querySelector<HTMLElement>('[data-book]');
-  const link = stage.closest('a');
-  if (!box || !link) return {};
+  const link: HTMLElement | null = opts.href ? stage.closest('a') : stage;
+  if (!box || !link) return noop;
+  const OPEN = opts.openDeg ?? OPEN_DEG;
 
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -67,7 +83,7 @@ export function book(stage: HTMLElement, opts: BookOptions) {
   // The fore-edge turns toward the viewer, so the leaves show and the depth
   // reads as a page count: a right-hand binding yaws positive, a left one negative.
   const sign = opts.bindingRight ? 1 : -1;
-  const rest = REST_RY * sign;
+  const rest = (opts.restYaw ?? REST_RY) * sign;
 
   let face = 0; // 0 = front cover facing out, 180 = back cover
   const ry = new Spring(rest);
@@ -82,10 +98,19 @@ export function book(stage: HTMLElement, opts: BookOptions) {
     // Gloss band follows the yaw; the floor shadow shrinks as the book lifts.
     stage.style.setProperty('--sheen', `${(50 - (ry.x - face) * 2.4).toFixed(1)}%`);
     stage.style.setProperty('--lift', lift.x.toFixed(3));
-    stage.style.setProperty('--open', `${(open.x * OPEN_DEG * sign).toFixed(2)}deg`);
+    stage.style.setProperty('--open', `${(open.x * OPEN * sign).toFixed(2)}deg`);
+    stage.style.setProperty('--opened', open.x.toFixed(3));
   };
   render();
-  if (reduced) return {};
+  if (reduced) {
+    return {
+      destroy() {},
+      setOpen(v) {
+        open.x = open.target = v;
+        render();
+      },
+    };
+  }
 
   let raf = 0;
   let last = 0;
@@ -215,6 +240,10 @@ export function book(stage: HTMLElement, opts: BookOptions) {
       suppressClick = false;
       return;
     }
+    if (!opts.href) {
+      opts.onPress?.();
+      return;
+    }
     // Let the browser handle new-tab / download gestures untouched.
     if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     if (navigating) {
@@ -231,7 +260,8 @@ export function book(stage: HTMLElement, opts: BookOptions) {
     lift.target = 1.2;
     open.target = 1;
     kick();
-    setTimeout(() => window.location.assign(opts.href), 300);
+    const href = opts.href;
+    setTimeout(() => window.location.assign(href), 300);
   };
 
   // Back/forward cache restores the page with the board still open.
@@ -255,6 +285,15 @@ export function book(stage: HTMLElement, opts: BookOptions) {
   window.addEventListener('pageshow', onShow);
 
   return {
+    setOpen(v: number) {
+      open.target = v;
+      if (v > 0) {
+        face = 0;
+        ry.target = rest * 0.55;
+        rx.target = REST_RX;
+      } else settle();
+      kick();
+    },
     destroy() {
       cancelAnimationFrame(raf);
       stage.removeEventListener('pointerenter', onEnter);
