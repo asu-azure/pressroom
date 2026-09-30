@@ -235,3 +235,111 @@ export class Curl {
     this.root.remove();
   }
 }
+
+// --- the single-page door turn ------------------------------------------------
+//
+// One page on screen has no facing page for a fold to land on, and a fold that
+// lands in the dark margin reads as a loose sheet. So a single page turns like a
+// door on its spine edge instead — the same motion as a shelf book's board —
+// under perspective: the front darkens as it turns, a shadow falls on the page
+// below, and past 100° the leaf fades out, gone by DOOR_MAX. Going back, the
+// previous page swings in from the spine side and closes over the current one.
+
+export const DOOR_MAX = 160;
+
+/** Angle for a drag: `travel` px in the turning direction across a page `w` wide. */
+export function doorAngle(travel: number, w: number): number {
+  return Math.max(0, Math.min(1, travel / Math.max(1, w))) * DOOR_MAX;
+}
+
+/** Whether a released door completes: past 35° (or short of 125° coming back), or flung. */
+export function doorCommit(angle: number, forward: boolean, fling: boolean): boolean {
+  return fling || (forward ? angle > 35 : angle < DOOR_MAX - 35);
+}
+
+export interface DoorSetup {
+  host: HTMLElement;
+  leaf: Rect;
+  src: string;
+  /** the spine is the page's left edge (LTR) */
+  hingeLeft: boolean;
+  /** true: the current page swings away; false: the previous page swings back in */
+  forward: boolean;
+}
+
+export class Door {
+  private root: HTMLElement;
+  private leaf: HTMLElement;
+  private shade: HTMLElement;
+  private shadow: HTMLElement;
+  private s: DoorSetup;
+  angle: number;
+
+  constructor(s: DoorSetup) {
+    this.s = s;
+    this.angle = s.forward ? 0 : DOOR_MAX;
+    const { leaf: r } = s;
+    const el = (css: string) => {
+      const d = document.createElement('div');
+      d.style.cssText = css;
+      return d;
+    };
+    const box = `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;`;
+    const origin = s.hingeLeft ? 0 : 100;
+    this.root = el(
+      `position:absolute;inset:0;pointer-events:none;z-index:4;perspective:${Math.round(r.w * 4.5)}px;` +
+        `perspective-origin:${r.x + r.w * (origin / 100)}px ${r.y + r.h / 2}px;`,
+    );
+    this.shadow = el(`position:absolute;${box}opacity:0;`);
+    this.leaf = el(`position:absolute;${box}transform-style:preserve-3d;transform-origin:${origin}% 50%;`);
+    const img = `url("${s.src}") center/contain no-repeat`;
+    const front = el(`position:absolute;inset:0;backface-visibility:hidden;background:${img},#f1ece2;`);
+    this.shade = el('position:absolute;inset:0;opacity:0;');
+    front.append(this.shade);
+    // the reverse: paper, with the print showing through mirrored
+    const back = el('position:absolute;inset:0;backface-visibility:hidden;transform:rotateY(180deg);background:#f1ece2;');
+    const through = el(`position:absolute;inset:0;background:${img};opacity:.13;transform:scaleX(-1);`);
+    back.append(through);
+    this.leaf.append(front, back);
+    this.root.append(this.shadow, this.leaf);
+    s.host.append(this.root);
+    this.render();
+  }
+
+  set(angle: number) {
+    this.angle = Math.max(0, Math.min(DOOR_MAX, angle));
+    this.render();
+  }
+
+  private render() {
+    const a = this.angle;
+    const sign = this.s.hingeLeft ? -1 : 1;
+    this.leaf.style.transform = `rotateY(${(a * sign).toFixed(2)}deg)`;
+    this.leaf.style.opacity = String(a > 100 ? Math.max(0, 1 - (a - 100) / (DOOR_MAX - 100)) : 1);
+    const k = Math.sin((Math.min(a, 90) * Math.PI) / 180);
+    this.shade.style.opacity = String(k);
+    this.shade.style.background = `linear-gradient(${this.s.hingeLeft ? 90 : 270}deg, rgba(0,0,0,.08), rgba(0,0,0,.42))`;
+    // the shadow the lifted leaf throws on the page below, strongest near the spine
+    this.shadow.style.opacity = String(Math.sin((a * Math.PI) / 180) * (a > 100 ? 1 - (a - 100) / (DOOR_MAX - 100) : 1));
+    this.shadow.style.background = `linear-gradient(${this.s.hingeLeft ? 90 : 270}deg, rgba(0,0,0,.45), rgba(0,0,0,.12) 35%, transparent 70%)`;
+  }
+
+  run(to: number, ms: number): Promise<void> {
+    const from = this.angle;
+    const t0 = performance.now();
+    return new Promise((resolve) => {
+      const step = (now: number) => {
+        const t = Math.min(1, (now - t0) / ms);
+        const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // ease in-out
+        this.set(from + (to - from) * e);
+        if (t < 1) requestAnimationFrame(step);
+        else resolve();
+      };
+      requestAnimationFrame(step);
+    });
+  }
+
+  destroy() {
+    this.root.remove();
+  }
+}

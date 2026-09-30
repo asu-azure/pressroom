@@ -576,6 +576,11 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   The real `.si` boxes and their iOS width calc are never touched. Falls back to the slide for
   jumps, zoom > 1, reduced motion, unloaded images, or the PAGE CURL setting off
   (`settings.curl`, default on). The long-press guard is unchanged.
+- **A single page turns like a door, not a fold** (`Door` in `curl.ts`): with one page on screen
+  a fold has no facing page to land on and ends as a loose sheet in the dark margin — the owner
+  found that strange. So the leaf rotates on its spine edge (left for LTR, right for RTL) under
+  perspective, front darkening, a shadow on the page below, fading out past 100°; going back, the
+  previous page swings in from the spine. Spreads keep the fold. `doorAngle`/`doorCommit` tested.
   **Test on a real iPhone before trusting it** — the harness is desktop Chromium.
 - Reader harness (scratchpad, not in the repo): Playwright `page.route` serves a fake unlocked
   6-page book (works/pages/chapters REST + generated page images) — never the real DB, never a

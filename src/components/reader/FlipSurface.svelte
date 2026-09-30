@@ -2,7 +2,7 @@
   import { gsap } from 'gsap';
   import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
-  import { Curl } from '../../scripts/curl';
+  import { Curl, Door, DOOR_MAX, doorAngle, doorCommit } from '../../scripts/curl';
 
   let {
     sheets,
@@ -190,11 +190,15 @@
   }
 
   // --- Page curl (scripts/curl.ts) --------------------------------------------
-  // A one-sheet turn at 1x is drawn as a paper fold over the real page rects:
-  // the track jumps to the target underneath, overlays of the current page fold
-  // away on top. Anything else (jumps, zoom, reduced motion, the setting off,
-  // images not loaded yet) keeps the slide.
+  // A one-sheet turn at 1x is drawn over the real page rects with overlays: a
+  // paper fold when the current sheet is a spread, a door turn on the spine when
+  // it is a single page (a fold has no facing page to land on there). The track
+  // jumps to the target underneath; anything else (jumps, zoom, reduced motion,
+  // the setting off, images not loaded yet) keeps the slide.
   let curlFx: Curl | null = null;
+  let doorFx: Door | null = null;
+  let doorForward = true;
+  let doorW = 1;
   let curlTarget = -1;
   let curlBusy = false;
 
@@ -210,12 +214,36 @@
   }
 
   function beginCurl(target: number, from: { x: number; y: number } | null): boolean {
-    if (!curl || reduced || scale !== 1 || curlBusy || curlFx) return false;
+    if (!curl || reduced || scale !== 1 || curlBusy || curlFx || doorFx) return false;
     if (target < 0 || target >= sheets.length || Math.abs(target - cur) !== 1) return false;
     const forward = target > cur;
     const turningRight = forward !== (direction === 'rtl');
     const now = pageEls(cur);
     if (!now.length) return false;
+    const h0 = stage.getBoundingClientRect();
+    const rel0 = (r: DOMRect, dx = 0) => ({ x: r.left - h0.left + dx, y: r.top - h0.top, w: r.width, h: r.height });
+
+    // One page on screen: the door turn.
+    if (now.length === 1) {
+      const hingeLeft = direction === 'ltr';
+      if (forward) {
+        if (!now[0].src) return false;
+        gsap.killTweensOf(track);
+        gsap.set(track, { x: -target * width * s });
+        doorFx = new Door({ host: stage, leaf: rel0(now[0].r), src: now[0].src, hingeLeft, forward: true });
+        doorW = now[0].r.width;
+      } else {
+        const prev = pageEls(target);
+        if (prev.length !== 1 || !prev[0].src) return false;
+        // the previous sheet sits one screen over on the track: bring its rect on-screen
+        const shift = -(target - cur) * width * s;
+        doorFx = new Door({ host: stage, leaf: rel0(prev[0].r, shift), src: prev[0].src, hingeLeft, forward: false });
+        doorW = prev[0].r.width;
+      }
+      doorForward = forward;
+      curlTarget = target;
+      return true;
+    }
     const leaf = turningRight ? now[now.length - 1] : now[0];
     const still = now.length > 1 ? (turningRight ? now[0] : now[now.length - 1]) : null;
     if (!leaf.src) return false;
@@ -241,6 +269,24 @@
     });
     curlTarget = target;
     return true;
+  }
+
+  async function endDoor(commit: boolean, ms: number) {
+    const fx = doorFx;
+    if (!fx) return;
+    curlBusy = true;
+    const done = doorForward ? DOOR_MAX : 0;
+    const undone = doorForward ? 0 : DOOR_MAX;
+    await fx.run(commit ? done : undone, ms);
+    if (commit) {
+      if (!doorForward) gsap.set(track, { x: -curlTarget * width * s });
+      onNavigate(curlTarget);
+    } else if (doorForward) gsap.set(track, { x: targetX });
+    requestAnimationFrame(() => {
+      fx.destroy();
+      if (doorFx === fx) doorFx = null;
+      curlBusy = false;
+    });
   }
 
   async function endCurl(commit: boolean, ms: number, lift = 0) {
@@ -341,6 +387,13 @@
       } else gesture = panRange(1).y > 0 ? 'pany' : 'none';
     }
 
+    if (gesture === 'curl' && doorFx) {
+      // forward: the finger travels toward the spine; back: away from it
+      const dx = e.clientX - startX;
+      const towardSpine = direction === 'ltr' ? -dx : dx;
+      doorFx.set(doorForward ? doorAngle(towardSpine, doorW) : DOOR_MAX - doorAngle(-towardSpine, doorW));
+      return;
+    }
     if (gesture === 'curl' && curlFx) {
       const c = curlFx.corner;
       curlFx.set({ x: c.x + (e.clientX - startX), y: c.y + (e.clientY - startY) });
@@ -387,6 +440,15 @@
 
     if (g === 'pan' || g === 'pany') {
       settleZoom();
+      return;
+    }
+    if (g === 'curl' && doorFx) {
+      const dx = e.clientX - startX;
+      const v = dx / Math.max(1, performance.now() - startT);
+      const towardSpine = direction === 'ltr' ? -v : v;
+      const fling = (doorForward ? towardSpine : -towardSpine) > 0.5;
+      const commit = doorCommit(doorFx.angle, doorForward, fling);
+      void endDoor(commit, commit ? 420 : 300);
       return;
     }
     if (g === 'curl') {
@@ -468,8 +530,8 @@
     const clamped = Math.max(0, Math.min(sheets.length - 1, index));
     // Taps and the ‹ › buttons curl too: lifted from the bottom corner, in an arc.
     if (!forceTween && clamped !== cur && beginCurl(clamped, null)) {
-      const leafH = pagesEls[cur]?.offsetHeight ?? 0;
-      void endCurl(true, 560, leafH * 0.16);
+      if (doorFx) void endDoor(true, 560);
+      else void endCurl(true, 560, (pagesEls[cur]?.offsetHeight ?? 0) * 0.16);
       return;
     }
     if (clamped !== cur) {

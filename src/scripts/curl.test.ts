@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clipHalfPlane, reflectMatrix, reachable, fold, type Pt } from './curl';
+import { clipHalfPlane, reflectMatrix, reachable, fold, doorAngle, doorCommit, DOOR_MAX, type Pt } from './curl';
 
 const apply = (m: number[], p: Pt): Pt => ({ x: m[0] * p.x + m[2] * p.y + m[4], y: m[1] * p.x + m[3] * p.y + m[5] });
 const close = (a: Pt, b: Pt) => {
@@ -54,5 +54,22 @@ describe('curl geometry', () => {
   it('works mirrored for a left-hand (RTL) leaf', () => {
     const f = fold(10, 14, 0, 0, { x: 6, y: 1 });
     close(apply(f.matrix, { x: 0, y: 0 }), { x: 6, y: 1 });
+  });
+});
+
+describe('door turn', () => {
+  it('maps a drag across the page to the turning angle, clamped', () => {
+    expect(doorAngle(0, 400)).toBe(0);
+    expect(doorAngle(200, 400)).toBeCloseTo(DOOR_MAX / 2);
+    expect(doorAngle(900, 400)).toBe(DOOR_MAX);
+    expect(doorAngle(-50, 400)).toBe(0);
+  });
+
+  it('commits past 35° forward, short of the far side coming back, or on a fling', () => {
+    expect(doorCommit(20, true, false)).toBe(false);
+    expect(doorCommit(40, true, false)).toBe(true);
+    expect(doorCommit(DOOR_MAX - 20, false, false)).toBe(false);
+    expect(doorCommit(DOOR_MAX - 40, false, false)).toBe(true);
+    expect(doorCommit(5, true, true)).toBe(true);
   });
 });
