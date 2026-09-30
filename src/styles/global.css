@@ -1417,6 +1417,41 @@ body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top
   user-select: none;
   -webkit-user-drag: none;
 }
+/* Loupe over the artwork (lightbox.ts): fine pointers only, never on touch. */
+.lb__loupe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background-color: #f1ece2;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 0 0 1px rgba(244, 241, 234, 0.85),
+    0 0 0 6px rgba(12, 12, 13, 0.35),
+    0 0 0 7px rgba(244, 241, 234, 0.25),
+    0 18px 40px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s linear;
+  will-change: transform;
+}
+.lb__loupe.is-on { opacity: 1; }
+.lb__loupeK {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 14px);
+  translate: -50% 0;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  background: rgba(12, 12, 13, 0.8);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  white-space: nowrap;
+}
 .lb__hud {
   position: absolute;
   z-index: 2;

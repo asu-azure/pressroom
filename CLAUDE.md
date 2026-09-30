@@ -251,6 +251,9 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
   grid, so indexing the manifest by `sort_key` would make the counter disagree with the number
   printed on the tile that opened it.
 - `featured` is exclusive — the page leads with that piece and the toggle unsets the others.
+- **The lightbox has a loupe** (`lightbox.ts`, fine pointers, motion allowed): ×2.5 glass drawn from
+  the full-size image with `background-position` — plain CSS, because /asu stays WebGL-free. It is
+  exactly on the pointer, never takes pointer events, and hides on navigation and close.
 - Two separate commission switches: `commissions_open` picks WHICH line shows,
   `commissions_show` picks whether commissions are mentioned at all. Hiding takes the hero line
   and the whole craft-section panel together.

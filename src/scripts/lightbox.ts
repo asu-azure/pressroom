@@ -3,6 +3,11 @@
 // prev/next with keyboard (←/→/Esc) and touch swipe. Scroll (Lenis) is stopped
 // while open. Reduced-motion → instant show/hide, no flourishes.
 //
+// Loupe (fine pointers, motion allowed): a ×2.5 glass under the pointer, drawn
+// from the full-size image with background-position — plain CSS, no canvas or
+// WebGL on /asu. It sits exactly on the pointer (no easing), the real cursor
+// stays, and it never takes pointer events, so swipes and buttons are unchanged.
+//
 // Ported from the sibling art site. Self-contained: builds its own DOM and uses
 // the `.lb__*` styles already in global.css (shared with the showcase lightbox —
 // different [data-*] hooks, so the two never cross-wire).
@@ -17,6 +22,9 @@ export interface LightboxItem {
 }
 
 interface LenisLike { stop(): void; start(): void }
+
+const LOUPE_MAG = 2.5;
+const LOUPE_R = 95;
 
 export function initLightbox(items: LightboxItem[], opts: { reduced?: boolean } = {}) {
   const { reduced = false } = opts;
@@ -42,6 +50,7 @@ export function initLightbox(items: LightboxItem[], opts: { reduced?: boolean } 
     <button type="button" class="lb__btn lb__close mono" data-lb-close aria-label="Close">✕</button>
     <button type="button" class="lb__btn lb__prev mono" aria-label="Previous">←</button>
     <button type="button" class="lb__btn lb__next mono" aria-label="Next">→</button>
+    <div class="lb__loupe" aria-hidden="true"><span class="lb__loupeK mono">LOUPE ×${LOUPE_MAG}</span></div>
   `;
   document.body.appendChild(root);
 
@@ -49,6 +58,30 @@ export function initLightbox(items: LightboxItem[], opts: { reduced?: boolean } 
   const counter = root.querySelector<HTMLElement>('.lb__counter')!;
   const medium = root.querySelector<HTMLElement>('.lb__medium')!;
   const stage = root.querySelector<HTMLElement>('.lb__stage')!;
+
+  // --- loupe ------------------------------------------------------------------
+  const loupe = root.querySelector<HTMLElement>('.lb__loupe')!;
+  const canLoupe = !reduced && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+  const hideLoupe = () => loupe.classList.remove('is-on');
+  if (canLoupe) {
+    img.addEventListener('pointermove', (e) => {
+      if (e.pointerType !== 'mouse' || !img.complete) return;
+      const r = img.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const src = img.currentSrc || img.src;
+      if (loupe.dataset.src !== src) {
+        loupe.style.backgroundImage = `url("${src}")`;
+        loupe.dataset.src = src;
+      }
+      loupe.style.backgroundSize = `${r.width * LOUPE_MAG}px ${r.height * LOUPE_MAG}px`;
+      loupe.style.backgroundPosition = `${LOUPE_R - x * LOUPE_MAG}px ${LOUPE_R - y * LOUPE_MAG}px`;
+      loupe.style.transform = `translate3d(${e.clientX - LOUPE_R}px, ${e.clientY - LOUPE_R}px, 0)`;
+      loupe.classList.add('is-on');
+    });
+    img.addEventListener('pointerleave', hideLoupe);
+    img.addEventListener('pointerdown', hideLoupe);
+  }
 
   let idx = 0;
   let isOpen = false;
@@ -61,6 +94,7 @@ export function initLightbox(items: LightboxItem[], opts: { reduced?: boolean } 
   };
 
   const show = (i: number, dir = 0) => {
+    hideLoupe();
     idx = (i + items.length) % items.length;
     const it = items[idx];
     img.src = it.src;
@@ -99,6 +133,7 @@ export function initLightbox(items: LightboxItem[], opts: { reduced?: boolean } 
   const close = () => {
     if (!isOpen) return;
     isOpen = false;
+    hideLoupe();
     window.removeEventListener('keydown', onKey);
     const done = () => {
       root.hidden = true;
