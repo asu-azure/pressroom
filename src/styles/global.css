@@ -1417,6 +1417,18 @@ body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top
   user-select: none;
   -webkit-user-drag: none;
 }
+/* The picture flying between its print and the lightbox (lightbox.ts). */
+.lb__fly {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 401;
+  object-fit: cover;
+  transform-origin: 50% 50%;
+  box-shadow: 0 30px 90px -30px rgba(0,0,0,0.9);
+  pointer-events: none;
+  will-change: transform;
+}
 /* Loupe over the artwork (lightbox.ts): fine pointers only, never on touch. */
 .lb__loupe {
   position: fixed;

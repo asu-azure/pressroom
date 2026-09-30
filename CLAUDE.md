@@ -236,7 +236,22 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
   already use ~71 MB; at ~370 KB per artwork there is room for well over a thousand pieces.
 - Unlike work deletion, **deleting an artwork also deletes its three storage objects.** A gallery
   churns far more than a published book, and the paths are known without listing the bucket.
-- **The gallery is a masonry grid** (CSS columns), not the drag strip it started as: nineteen
+- **The gallery is a studio wall by default, with the masonry as GRID** (one set of buttons, two
+  views; `data-view` on `.wall`, choice in `localStorage['pr:gallery']`, picked by an inline script
+  before paint; no JS = grid). Layout `src/lib/wallLayout.ts` (pure, tested: hash-jittered prints,
+  shortest-row packing, lead spans two rows, no overlaps) runs on the server into per-tile CSS vars in
+  world units; `--u = 100cqh / --wh` makes the rows fill the wall's height. Camera `src/scripts/wall.ts`:
+  drag + inertia + rubber band, ctrl/⌘ wheel & pinch zoom, − ＋ FIT ALL, keys, minimap, sway from pan
+  speed (CSS transitions), pin-up entrance, hover lifts the paper (`.asu__print`) not the button. Click
+  flies the print into the lightbox and back (`originOf` in `lightbox.ts`). Plaster tile:
+  `node scripts/wall-tiles.mjs`. Not the retired strip: 2-D, ~2½ screens at rest, FIT/ALL, map, GRID.
+  **WIP (2026-09-30, stopped mid-measure):** headed Chrome on the prod build (UHD 610): scroll/fling/
+  zoom/zoomed-pan all ≤ 34 ms frames, CLS 0.0005; open items — a ~50–67 ms frame at pan start (seen
+  with sway disabled too, so not the sway transitions; next suspect: `is-grabbing` class restyle /
+  will-change toggle), two ~400 ms frames at load not yet compared against GRID view (run
+  `VIEW=grid` in the scratchpad's wallperf2.js), verify the lightbox flight in real Chrome, then
+  report to the owner.
+- (Before the wall) **the gallery was a masonry grid** (CSS columns), not the drag strip it started as: nineteen
   pieces in one horizontal track meant hundreds of rem of dragging, and an illustrator's work runs
   0.36 to 1.34 aspect, so nothing is cropped. `.tile--natural` is the modifier that undoes the
   base `.tile`'s 4/5 crop — don't change `.tile` itself, the library cards borrow from it.

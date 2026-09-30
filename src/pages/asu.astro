@@ -30,6 +30,7 @@ import { resolveScenes } from '../lib/scenes';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
 import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
 import { cacheShell } from '../lib/cache';
+import { layoutWall, wallRows, type WallPrint } from '../lib/wallLayout';
 
 export const prerender = false;
 
@@ -92,7 +93,26 @@ const lightboxItems = displayOrder.map((w) => ({
   src: w.fullUrl,
   alt: w.alt || w.title || 'Artwork by Asu Azure',
   medium: w.medium || '',
+  w: w.width,
+  h: w.height,
 }));
+
+// The studio wall (scripts/wall.ts): hung here, so the wall is whole before any
+// script runs. Rows for a wide screen; a narrow one re-hangs with one more row
+// before the wall scrolls into view (the wall's height never depends on it).
+const aspectOf = (w: ArtworkRec) => (w.width && w.height ? w.width / w.height : 1);
+const wall = layoutWall(
+  displayOrder.map((w, i) => ({ id: w.id, aspect: aspectOf(w), lead: !!featured && i === 0 })),
+  wallRows(displayOrder.length),
+);
+const wallAt = new Map(displayOrder.map((w, i) => [w.id, wall.prints[i]]));
+// CSS reads these per print (world units; scaled by the wall's height in CSS)
+const printVars = (p: WallPrint) =>
+  `--px:${p.x};--py:${p.y};--pw:${p.w};--ph:${p.h};--pb:${p.b};--pbb:${p.bb};--pr:${p.r};--ptr:${p.tr};--pk:${p.k}`;
+// a first guess at each picture's width on a ~720 px wall; wall.ts refines it
+const wallSizes = (p: WallPrint) => `${Math.ceil(((p.w - 2 * p.b) * 720) / wall.height)}px`;
+const GRID_SIZES = '(max-width: 640px) 92vw, (max-width: 1100px) 44vw, 23vw';
+const LEAD_SIZES = '(max-width: 760px) 100vw, 60vw';
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
 // The scenery photographs and the six acts they backed moved to
@@ -162,7 +182,21 @@ cacheShell(Astro);
         <h2 class="serif asu__h2" data-mv-converge>
           <span class="reveal-mask"><span data-line data-i18n="works.title">{t['works.title']}</span></span>
         </h2>
-        <span class="mono asu__count">{pad2(works.length)} PCS</span>
+        <div class="asu__galMeta">
+          <span class="mono asu__count">{pad2(works.length)} PCS</span>
+          {works.length > 0 && (
+            <div class="asu__views mono" role="group" aria-label="Gallery view">
+              <button type="button" class="asu__view" data-view-btn="wall" aria-pressed="true">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="3" width="5" height="6" rx=".5" transform="rotate(-6 3.5 6)" /><rect x="7.5" y="2" width="7" height="5" rx=".5" transform="rotate(4 11 4.5)" /><rect x="8" y="9" width="4" height="5.5" rx=".5" transform="rotate(-3 10 11.7)" /><rect x="1.5" y="10.5" width="5" height="4" rx=".5" transform="rotate(5 4 12.5)" /></svg>
+                <span data-i18n="works.viewWall">{t['works.viewWall']}</span>
+              </button>
+              <button type="button" class="asu__view" data-view-btn="grid" aria-pressed="false">
+                <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="1.5" width="5.5" height="7" rx=".5" /><rect x="9" y="1.5" width="5.5" height="4.5" rx=".5" /><rect x="1.5" y="10.5" width="5.5" height="4" rx=".5" /><rect x="9" y="8" width="5.5" height="6.5" rx=".5" /></svg>
+                <span data-i18n="works.viewGrid">{t['works.viewGrid']}</span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {works.length === 0 ? (
@@ -185,56 +219,91 @@ cacheShell(Astro);
               a portfolio — every piece should be visible at a glance. Column
               layout also means nothing is cropped, which matters when the work
               runs from 0.36 to 1.34 aspect. */}
-          <div class="asu__grid">
-            {featured && (
-              <button
-                type="button"
-                class="tile tile--natural asu__tile asu__tile--lead"
-                data-sfx="note"
-                data-medium={featured.medium}
-                data-lb-open={lbIndex.get(featured.id)}
-                aria-label={`${featured.title || 'Untitled'} — open larger`}
+          {/* One set of buttons, two views. WALL (scripts/wall.ts): prints taped
+              and pinned to a studio wall you pan and zoom — each tile's CSS vars
+              place it. GRID: the masonry, for anyone who'd rather scroll. The
+              inline script picks the stored view before first paint; with no
+              script at all it stays the grid. */}
+          <div class="wall" data-wall data-view="grid">
+            <script is:inline>
+              (() => {
+                let v = 'wall';
+                try { if (localStorage.getItem('pr:gallery') === 'grid') v = 'grid'; } catch {}
+                document.currentScript.parentElement.dataset.view = v;
+              })();
+            </script>
+            <div class="wall__vp" data-wall-vp role="region" aria-label="Studio wall — drag to look around, ctrl or ⌘ plus scroll to zoom">
+              <div
+                class="asu__grid"
+                data-wall-world
+                data-ww={wall.width}
+                data-wh={wall.height}
+                data-rows={wall.rows}
+                style={`--ww:${wall.width};--wh:${wall.height}`}
               >
-                <img
-                  src={featured.medUrl}
-                  srcset={`${featured.medUrl} 900w, ${featured.fullUrl} 1600w`}
-                  sizes="(max-width: 760px) 100vw, 60vw"
-                  alt={featured.alt || featured.title}
-                  width={featured.width}
-                  height={featured.height}
-                  loading="eager"
-                  decoding="async"
-                />
-                <span class="tile__num mono">01</span>
-                {featured.medium && <span class="tile__tag mono">{featured.medium}</span>}
-              </button>
-            )}
-            {rest.map((w, i) => (
-              <button
-                type="button"
-                class="tile tile--natural asu__tile"
-                data-sfx="note"
-                data-medium={w.medium}
-                data-lb-open={lbIndex.get(w.id)}
-                aria-label={`${w.title || 'Untitled'} — open larger`}
-              >
-                <img
-                  src={w.medUrl}
-                  srcset={`${w.thumbUrl} 320w, ${w.medUrl} 900w`}
-                  sizes="(max-width: 640px) 92vw, (max-width: 1100px) 44vw, 23vw"
-                  alt={w.alt || w.title}
-                  width={w.width}
-                  height={w.height}
-                  loading="lazy"
-                  decoding="async"
-                />
-                <span class="tile__num mono">{pad2(i + 2)}</span>
-                {w.medium && <span class="tile__tag mono">{w.medium}</span>}
-              </button>
-            ))}
+                {displayOrder.map((w, i) => {
+                  const p = wallAt.get(w.id)!;
+                  const lead = !!featured && i === 0;
+                  return (
+                    <button
+                      type="button"
+                      class:list={['tile tile--natural asu__tile', { 'asu__tile--lead': lead }]}
+                      data-sfx="note"
+                      data-medium={w.medium}
+                      data-lb-open={lbIndex.get(w.id)}
+                      data-wall-id={w.id}
+                      data-aspect={aspectOf(w).toFixed(4)}
+                      data-lead={lead ? '' : undefined}
+                      data-hold={p.hold}
+                      data-pin={p.hold === 'pin' ? p.tr : undefined}
+                      style={printVars(p)}
+                      aria-label={`${w.title || 'Untitled'} — open larger`}
+                    >
+                      <i class="asu__hold" aria-hidden="true"></i>
+                      <span class="asu__print">
+                        <img
+                          src={lead ? w.medUrl : w.thumbUrl}
+                          srcset={lead ? `${w.medUrl} 900w, ${w.fullUrl} 1600w` : `${w.thumbUrl} 320w, ${w.medUrl} 900w`}
+                          sizes={wallSizes(p)}
+                          data-grid-sizes={lead ? LEAD_SIZES : GRID_SIZES}
+                          alt={w.alt || w.title}
+                          width={w.width}
+                          height={w.height}
+                          loading={lead ? 'eager' : 'lazy'}
+                          decoding="async"
+                          draggable="false"
+                        />
+                        <span class="tile__num mono">{pad2(i + 1)}</span>
+                        {w.medium && <span class="tile__tag mono">{w.medium}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div class="wall__light" aria-hidden="true"></div>
+              <div class="wall__ruler" data-wall-ruler aria-hidden="true"></div>
+              <div class="wall__hud" data-wall-hud>
+                <p class="wall__tag mono" aria-hidden="true">
+                  <span>STUDIO WALL</span>
+                  <span>{pad2(works.length)} PCS · R{wall.rows}</span>
+                  <b data-wall-zoom>×1.00</b>
+                </p>
+                <div class="wall__map" data-wall-map aria-hidden="true" style={`aspect-ratio:${wall.width} / ${wall.height}`}>
+                  <span class="wall__mapDots" data-wall-mapdots></span>
+                  <span class="wall__mapView" data-wall-mapview></span>
+                </div>
+                <div class="wall__zoom mono">
+                  <button type="button" data-wall-out aria-label="Zoom out">−</button>
+                  <button type="button" data-wall-in aria-label="Zoom in">＋</button>
+                  <button type="button" data-wall-fit aria-label="Fit the rows">FIT</button>
+                  <button type="button" data-wall-all aria-label="Show the whole wall">ALL</button>
+                </div>
+              </div>
+            </div>
           </div>
           <p class="mono asu__hint">
-            <span data-i18n="works.archiveTag">{t['works.archiveTag']}</span>
+            <span class="asu__hint--wall" data-i18n="works.wallHint">{t['works.wallHint']}</span>
+            <span class="asu__hint--grid" data-i18n="works.archiveTag">{t['works.archiveTag']}</span>
           </p>
         </>
       )}
@@ -385,6 +454,7 @@ cacheShell(Astro);
   import { gsap } from 'gsap';
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
+  import { initWall } from '../scripts/wall';
   import { decode } from '../scripts/text';
   import { slideIn, punch } from '../scripts/mv';
   import { initDraw } from '../scripts/draw';
@@ -490,8 +560,18 @@ cacheShell(Astro);
   } catch {
     items = [];
   }
+  // --- studio wall ----------------------------------------------------------
+  const wallRoot = document.querySelector<HTMLElement>('[data-wall]');
+  const wall = wallRoot
+    ? initWall(wallRoot, {
+        reduced,
+        // the grid is much taller than the wall: everything below it moved
+        onView: () => ScrollTrigger.refresh(),
+      })
+    : null;
+
   if (items.length) {
-    const lb = initLightbox(items, { reduced });
+    const lb = initLightbox(items, { reduced, originOf: (i) => wall?.originOf(i) ?? null });
     // Delegated, so tiles added or filtered after mount need no rewiring.
     document.addEventListener('click', (e) => {
       const el = (e.target as Element | null)?.closest<HTMLElement>('[data-lb-open]');
@@ -514,8 +594,9 @@ cacheShell(Astro);
       tiles.forEach((t) => {
         t.hidden = !(want === 'all' || t.dataset.medium === want);
       });
-      // The drag track measures its own width — tell it the content changed.
-      window.dispatchEvent(new Event('resize'));
+      // the wall re-hangs what is left; the grid just reflows
+      wall?.relayout();
+      ScrollTrigger.refresh();
     });
   });
 
@@ -804,7 +885,6 @@ cacheShell(Astro);
      cropping or leaving holes. Reading order runs DOWN each column, which is
      the usual bargain for masonry and fine for a gallery. */
   .asu__grid {
-    margin-top: clamp(2rem, 5vh, 3rem);
     columns: 4;
     column-gap: clamp(0.6rem, 1.4vw, 1rem);
   }
@@ -867,6 +947,415 @@ cacheShell(Astro);
     margin-top: 1.2rem;
     color: var(--fg-faint);
     font-size: 0.58rem;
+  }
+  .wall[data-view='wall'] ~ .asu__hint .asu__hint--grid,
+  .wall[data-view='grid'] ~ .asu__hint .asu__hint--wall {
+    display: none;
+  }
+
+  /* ---------- WALL / GRID switch ---------- */
+  .asu__galMeta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem 1.2rem;
+    margin-top: 0.5rem;
+  }
+  .asu__galMeta .asu__count {
+    margin-top: 0;
+  }
+  .asu__views {
+    display: inline-flex;
+    padding: 3px;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+  }
+  .asu__view {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55em;
+    padding: 0.6em 1.1em;
+    border: 0;
+    border-radius: 999px;
+    background: none;
+    color: var(--fg-dim);
+    font-family: var(--font-mono);
+    font-size: 0.58rem;
+    letter-spacing: 0.14em;
+    cursor: pointer;
+    transition: background 0.25s var(--ease), color 0.25s var(--ease);
+  }
+  .asu__view svg {
+    width: 1.15em;
+    height: 1.15em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.2;
+  }
+  .asu__view:hover {
+    color: var(--fg);
+  }
+  .asu__view[aria-pressed='true'] {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ---------- the studio wall (scripts/wall.ts) ----------
+     Same buttons as the grid, other clothes. Every print carries its place in
+     world units (--px --py --pw --ph, the paper border --pb/--pbb, tilt --pr);
+     --u turns a unit into pixels so the rows fill the wall's height (cqh on the
+     viewport, a size container). The script only moves the world. */
+  .wall {
+    margin-top: clamp(2rem, 5vh, 3rem);
+  }
+  .wall[data-view='grid'] .wall__light,
+  .wall[data-view='grid'] .wall__ruler,
+  .wall[data-view='grid'] .wall__hud,
+  .wall[data-view='grid'] .asu__hold {
+    display: none;
+  }
+  .wall[data-view='grid'] .asu__print {
+    display: contents;
+  }
+
+  .wall[data-view='wall'] .wall__vp {
+    position: relative;
+    height: clamp(420px, 76svh, 860px);
+    margin-inline: calc(-1 * var(--pad));
+    container-type: size;
+    overflow: hidden;
+    overflow: clip;
+    background: #111014;
+    border-block: 1px solid var(--line);
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
+    outline: none;
+  }
+  /* zoomed in, a vertical drag pans the wall instead of the page */
+  .wall.is-zoomed .wall__vp {
+    touch-action: none;
+  }
+  .wall.is-grabbing .wall__vp {
+    cursor: grabbing;
+  }
+  .wall[data-view='wall'] .wall__vp:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  /* the wall itself: plaster, a faint pencil grid on the rows */
+  .wall[data-view='wall'] .asu__grid {
+    --u: calc(100cqh / var(--wh));
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+    columns: auto;
+    width: calc(var(--ww) * var(--u));
+    height: 100cqh;
+    transform-origin: 0 0;
+    background-color: #1a191e;
+    /* the one grain tile twice: fine grain, and blown up into soft mottling */
+    background-image:
+      url('/wall/plaster.png'),
+      url('/wall/plaster.png'),
+      linear-gradient(rgba(244, 241, 234, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(244, 241, 234, 0.05) 1px, transparent 1px),
+      linear-gradient(rgba(244, 241, 234, 0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(244, 241, 234, 0.022) 1px, transparent 1px);
+    background-size:
+      128px 128px,
+      700px 700px,
+      calc(100 * var(--u)) calc(100 * var(--u)),
+      calc(100 * var(--u)) calc(100 * var(--u)),
+      calc(20 * var(--u)) calc(20 * var(--u)),
+      calc(20 * var(--u)) calc(20 * var(--u));
+    background-position:
+      0 0,
+      0 0,
+      0 calc(24 * var(--u)),
+      calc(70 * var(--u)) 0,
+      0 calc(24 * var(--u)),
+      calc(70 * var(--u)) 0;
+  }
+
+  /* a print: the button is the hit area and never moves on hover; the paper
+     inside it (.asu__print) is what lifts */
+  .wall[data-view='wall'] .asu__tile {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: calc(var(--pw) * var(--u));
+    height: calc(var(--ph) * var(--u));
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    overflow: visible;
+    translate: calc(var(--px) * var(--u)) calc(var(--py) * var(--u));
+    rotate: calc((var(--pr) + var(--sway, 0) * var(--pk)) * 1deg);
+    transform-origin: 50% 0;
+    transition: rotate 1.2s cubic-bezier(0.25, 1.6, 0.5, 1);
+  }
+  .wall.is-relayout .asu__tile {
+    transition:
+      rotate 1.2s cubic-bezier(0.25, 1.6, 0.5, 1),
+      translate 0.7s var(--ease);
+  }
+  .wall[data-view='wall'] .asu__tile::after {
+    display: none;
+  }
+  .wall[data-view='wall'] .asu__print {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: calc(var(--pb) * var(--u)) calc(var(--pb) * var(--u)) calc(var(--pbb) * var(--u));
+    background:
+      linear-gradient(160deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, 0.05)),
+      #f1ede3;
+    box-shadow:
+      0 0 0 0.5px rgba(0, 0, 0, 0.4),
+      0 calc(1.2 * var(--u)) calc(1.6 * var(--u)) rgba(0, 0, 0, 0.35),
+      0 calc(5 * var(--u)) calc(10 * var(--u)) calc(-2 * var(--u)) rgba(0, 0, 0, 0.6);
+    transform-origin: 50% 0;
+    transition:
+      transform 0.5s var(--ease),
+      box-shadow 0.5s var(--ease);
+  }
+  .wall[data-view='wall'] .asu__print img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    -webkit-user-drag: none;
+  }
+  .wall[data-view='wall'] .tile__num,
+  .wall[data-view='wall'] .tile__tag {
+    top: auto;
+    bottom: calc(var(--pbb) * 0.3 * var(--u));
+    color: #45423b;
+    mix-blend-mode: normal;
+    font-size: calc(var(--pbb) * 0.36 * var(--u));
+    letter-spacing: 0.08em;
+    line-height: 1;
+  }
+  .wall[data-view='wall'] .tile__num {
+    left: calc(var(--pb) * var(--u));
+    right: auto;
+  }
+  .wall[data-view='wall'] .tile__num::before {
+    content: 'Nº ';
+  }
+  .wall[data-view='wall'] .tile__tag {
+    left: auto;
+    right: calc(var(--pb) * var(--u));
+  }
+  .wall[data-view='wall'] .asu__tile:focus-visible .asu__print {
+    outline: 2px solid var(--accent);
+    outline-offset: calc(2 * var(--u));
+  }
+  /* hover: the paper swings straight on its tape and lifts toward the pointer */
+  @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .wall[data-view='wall']:not(.is-grabbing) .asu__tile:hover .asu__print {
+      transform: perspective(900px) rotateX(calc(5deg + var(--ty, 0) * 4deg)) rotateY(calc(var(--tx, 0) * 7deg))
+        rotate(calc(var(--pr) * -0.8deg)) scale(1.035);
+      box-shadow:
+        0 0 0 0.5px rgba(0, 0, 0, 0.4),
+        0 calc(3 * var(--u)) calc(4 * var(--u)) rgba(0, 0, 0, 0.35),
+        0 calc(16 * var(--u)) calc(26 * var(--u)) calc(-4 * var(--u)) rgba(0, 0, 0, 0.75);
+    }
+  }
+
+  /* what holds it up: a strip of masking tape, two at the corners, or a push pin */
+  .wall[data-view='wall'] .asu__hold {
+    position: absolute;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .wall[data-view='wall'] [data-hold='tape'] .asu__hold,
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold::before,
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold::after {
+    background: linear-gradient(180deg, rgba(240, 231, 207, 0.82), rgba(222, 210, 180, 0.74));
+    clip-path: polygon(2% 0, 98% 0, 100% 18%, 97% 36%, 100% 55%, 97% 74%, 100% 92%, 98% 100%, 2% 100%, 0 84%, 3% 66%, 0 47%, 3% 28%, 0 10%);
+  }
+  .wall[data-view='wall'] [data-hold='tape'] .asu__hold {
+    left: 50%;
+    top: 0;
+    width: min(calc(30 * var(--u)), calc(var(--pw) * 0.75 * var(--u)));
+    height: calc(9 * var(--u));
+    translate: -50% -48%;
+    rotate: calc(var(--ptr) * 1deg);
+  }
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold {
+    inset: 0;
+  }
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold::before,
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    width: calc(max(22, var(--ph) * 0.15) * var(--u));
+    height: calc(max(8, var(--ph) * 0.05) * var(--u));
+  }
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold::before {
+    left: 0;
+    translate: -36% -10%;
+    rotate: -40deg;
+  }
+  .wall[data-view='wall'] [data-hold='tape2'] .asu__hold::after {
+    right: 0;
+    translate: 36% -10%;
+    rotate: 40deg;
+  }
+  .wall[data-view='wall'] [data-hold='pin'] .asu__hold {
+    --pin: #2742f0;
+    left: 50%;
+    top: calc(var(--pb) * 0.55 * var(--u));
+    width: calc(8 * var(--u));
+    height: calc(8 * var(--u));
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.85) 0 10%, var(--pin) 34%, color-mix(in srgb, var(--pin), #000 50%) 100%);
+    box-shadow: calc(1.6 * var(--u)) calc(2.4 * var(--u)) calc(2 * var(--u)) rgba(0, 0, 0, 0.55);
+  }
+  .wall[data-view='wall'] [data-pin='1'] .asu__hold {
+    --pin: #e8a31a;
+  }
+  .wall[data-view='wall'] [data-pin='2'] .asu__hold {
+    --pin: #e0452b;
+  }
+  /* waiting for the first look (wall.ts pins them up one by one) */
+  .wall.is-await[data-view='wall'] .asu__print,
+  .wall.is-await[data-view='wall'] .asu__hold {
+    opacity: 0;
+  }
+
+  /* studio lights from above, and the room falling off at the edges */
+  .wall__light {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 42% 72% at 24% -16%, rgba(255, 228, 182, 0.14), transparent 70%),
+      radial-gradient(ellipse 38% 64% at 76% -16%, rgba(255, 228, 182, 0.1), transparent 70%),
+      radial-gradient(ellipse 88% 96% at 50% 46%, transparent 58%, rgba(0, 0, 0, 0.45));
+  }
+  /* FUI: a ruler along the top that runs with the wall, a label, the map, zoom */
+  .wall__ruler {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 11px;
+    pointer-events: none;
+    background-image:
+      linear-gradient(90deg, rgba(244, 241, 234, 0.3) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(244, 241, 234, 0.6) 1px, transparent 1px);
+    background-repeat: repeat-x;
+    background-size: 17px 5px, 170px 11px;
+  }
+  .wall__hud {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .wall__tag {
+    position: absolute;
+    top: 18px;
+    left: max(12px, calc(var(--pad) * 0.5));
+    padding: 0.45em 0.7em;
+    background: rgba(12, 12, 13, 0.7);
+    display: flex;
+    gap: 1.2em;
+    align-items: baseline;
+    font-size: 0.55rem;
+    letter-spacing: 0.16em;
+    color: rgba(244, 241, 234, 0.6);
+  }
+  .wall__tag b {
+    color: #f4f1ea;
+    font-weight: 500;
+  }
+  .wall__map {
+    position: absolute;
+    left: max(16px, calc(var(--pad) * 0.5));
+    bottom: 16px;
+    width: clamp(120px, 15vw, 210px);
+    background: rgba(12, 12, 13, 0.75);
+    outline: 1px solid rgba(244, 241, 234, 0.28);
+    cursor: crosshair;
+    touch-action: none;
+    pointer-events: auto;
+  }
+  .wall__mapDots {
+    position: absolute;
+    inset: 0;
+  }
+  .wall__mapDots :global(i) {
+    position: absolute;
+    background: rgba(241, 237, 227, 0.55);
+  }
+  .wall__mapView {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border: 1.5px solid var(--accent);
+    background: rgba(39, 66, 240, 0.16);
+    pointer-events: none;
+  }
+  .wall__zoom {
+    position: absolute;
+    right: max(16px, calc(var(--pad) * 0.5));
+    bottom: 16px;
+    display: flex;
+    gap: 6px;
+    pointer-events: auto;
+  }
+  .wall__zoom button {
+    min-width: 2.4rem;
+    height: 2.4rem;
+    padding: 0 0.75em;
+    border: 1px solid rgba(244, 241, 234, 0.3);
+    border-radius: 999px;
+    background: rgba(12, 12, 13, 0.72);
+    color: #f4f1ea;
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition:
+      border-color 0.2s var(--ease),
+      background 0.2s var(--ease);
+  }
+  .wall__zoom button:hover,
+  .wall__zoom button:focus-visible {
+    border-color: var(--accent);
+    background: rgba(39, 66, 240, 0.32);
+    outline: none;
+  }
+  @media (max-width: 640px) {
+    .wall[data-view='wall'] .wall__vp {
+      height: clamp(380px, 70svh, 700px);
+    }
+    .wall__tag span:nth-child(2) {
+      display: none;
+    }
+    .wall__map {
+      width: 104px;
+    }
+    .wall__zoom button {
+      min-width: 2.2rem;
+      height: 2.2rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wall[data-view='wall'] .asu__tile,
+    .wall[data-view='wall'] .asu__print {
+      transition: none;
+    }
   }
 
   /* ---------- craft & commissions, inside the about spread ---------- */

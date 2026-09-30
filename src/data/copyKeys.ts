@@ -232,6 +232,24 @@ export const COPY_FIELDS: CopyField[] = [
     hint: 'The other chips are your artwork mediums, edited in GALLERY.',
     defaults: { en: 'ALL', th: 'ทั้งหมด', ja: 'すべて' },
   },
+  {
+    key: 'works.viewWall', section: 'works', label: 'View switch — "wall"', type: 'line',
+    hint: 'The studio wall: every piece taped up on one wall to wander over.',
+    defaults: { en: 'WALL', th: 'ผนัง', ja: '壁' },
+  },
+  {
+    key: 'works.viewGrid', section: 'works', label: 'View switch — "grid"', type: 'line',
+    defaults: { en: 'GRID', th: 'ตาราง', ja: '一覧' },
+  },
+  {
+    key: 'works.wallHint', section: 'works', label: 'Wall hint', type: 'line',
+    hint: 'The small line under the wall.',
+    defaults: {
+      en: 'DRAG TO LOOK AROUND · PINCH OR ⌘/CTRL + SCROLL TO ZOOM · TAP A PIECE',
+      th: 'ลากเพื่อเดินชม · ถ่างนิ้ว หรือ ⌘/Ctrl + เลื่อน เพื่อซูม · แตะเพื่อดูภาพเต็ม',
+      ja: 'ドラッグで見て回る · ピンチか ⌘/Ctrl＋スクロールでズーム · タップで拡大',
+    },
+  },
 
   // ---------------- Act II — Scatter ----------------
   {
