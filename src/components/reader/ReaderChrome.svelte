@@ -244,6 +244,15 @@
         <button class="mono rc-opt" class:is-on={settings.mode === 'scroll'} onclick={() => onSettings({ mode: 'scroll' })}>{i18n.t('rd.scroll')}</button>
       </div>
     </div>
+    {#if settings.mode === 'flip'}
+      <div class="rc-panel__group">
+        <span class="mono rc-panel__label">{i18n.t('rd.curl')}</span>
+        <div class="rc-panel__opts">
+          <button class="mono rc-opt" class:is-on={settings.curl} onclick={() => onSettings({ curl: true })}>{i18n.t('rd.on')}</button>
+          <button class="mono rc-opt" class:is-on={!settings.curl} onclick={() => onSettings({ curl: false })}>{i18n.t('rd.off')}</button>
+        </div>
+      </div>
+    {/if}
     {#if MUSIC}
       <div class="rc-panel__group">
         <span class="mono rc-panel__label">SOUND</span>

@@ -569,3 +569,16 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   ScrollSurface reads its start index only at mount, so a bare `setCur` did nothing there.
 - Chrome icons are inline SVG: the subset mono webfont has no ♥/▦ glyphs.
 - The chrome hides after 3 s idle; never while a panel is open or focus is inside it.
+- **Page curl** (`src/scripts/curl.ts`, geometry tested in `curl.test.ts`): in flip mode a one-sheet
+  turn at 1x — drag, tap or ‹ › — is drawn as a paper fold. **Only overlays move**: the track jumps
+  to the target sheet underneath, and absolutely-positioned copies of the current page rects fold
+  over it (front clipped at the fold, the folded part reflected across the fold line with a
+  drop shadow; on spread→spread the back is the target's facing page, pre-mirrored so it lands
+  the right way round; otherwise it is the paper's reverse with the print showing through).
+  The real `.si` boxes and their iOS width calc are never touched. Falls back to the slide for
+  jumps, zoom > 1, reduced motion, unloaded images, or the PAGE CURL setting off
+  (`settings.curl`, default on). The long-press guard is unchanged.
+  **Test on a real iPhone before trusting it** — the harness is desktop Chromium.
+- Reader harness (scratchpad, not in the repo): Playwright `page.route` serves a fake unlocked
+  6-page book (works/pages/chapters REST + generated page images) — never the real DB, never a
+  password.

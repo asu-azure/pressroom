@@ -133,6 +133,8 @@ export interface ReaderSettings {
   mode: Mode;
   fit: FitMode;
   translate: boolean;
+  /** Flip mode turns pages with a paper curl (scripts/curl.ts). */
+  curl: boolean;
 }
 
 /** A chapter's entry point in the resolved sheet list (reader TOC). */

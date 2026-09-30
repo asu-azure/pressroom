@@ -2,6 +2,7 @@
   import { gsap } from 'gsap';
   import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
+  import { Curl } from '../../scripts/curl';
 
   let {
     sheets,
@@ -11,6 +12,7 @@
     pageNumberOf,
     onNavigate,
     translateOn = false,
+    curl = true,
     characters = [],
     highlightId = null,
     onHighlight,
@@ -22,6 +24,7 @@
     pageNumberOf: (pageId: string) => number;
     onNavigate: (index: number) => void;
     translateOn?: boolean;
+    curl?: boolean;
     characters?: Character[];
     highlightId?: string | null;
     onHighlight?: (id: string | null) => void;
@@ -86,8 +89,9 @@
   // Every active pointer, keyed by id, so multi-touch never reads as a drag.
   const pointers = new Map<number, { x: number; y: number }>();
 
-  // Single-finger gesture: 'pending' until the axis is known, then turn/pan/pany.
-  type Gesture = 'none' | 'pending' | 'turn' | 'pan' | 'pany';
+  // Single-finger gesture: 'pending' until the axis is known, then turn/pan/pany
+  // (or 'curl' when the turn is drawn as a paper fold).
+  type Gesture = 'none' | 'pending' | 'turn' | 'curl' | 'pan' | 'pany';
   let gesture: Gesture = 'none';
   let startX = 0;
   let startY = 0;
@@ -185,8 +189,78 @@
     ty = panRange(1).y;
   }
 
+  // --- Page curl (scripts/curl.ts) --------------------------------------------
+  // A one-sheet turn at 1x is drawn as a paper fold over the real page rects:
+  // the track jumps to the target underneath, overlays of the current page fold
+  // away on top. Anything else (jumps, zoom, reduced motion, the setting off,
+  // images not loaded yet) keeps the slide.
+  let curlFx: Curl | null = null;
+  let curlTarget = -1;
+  let curlBusy = false;
+
+  function pageEls(index: number) {
+    const host = pagesEls[index];
+    if (!host) return [];
+    return [...host.querySelectorAll<HTMLElement>('.si')]
+      .map((el) => {
+        const img = el.querySelector('img');
+        return { r: el.getBoundingClientRect(), src: img?.complete ? img.currentSrc || img.src : '' };
+      })
+      .sort((a, b) => a.r.left - b.r.left);
+  }
+
+  function beginCurl(target: number, from: { x: number; y: number } | null): boolean {
+    if (!curl || reduced || scale !== 1 || curlBusy || curlFx) return false;
+    if (target < 0 || target >= sheets.length || Math.abs(target - cur) !== 1) return false;
+    const forward = target > cur;
+    const turningRight = forward !== (direction === 'rtl');
+    const now = pageEls(cur);
+    if (!now.length) return false;
+    const leaf = turningRight ? now[now.length - 1] : now[0];
+    const still = now.length > 1 ? (turningRight ? now[0] : now[now.length - 1]) : null;
+    if (!leaf.src) return false;
+
+    gsap.killTweensOf(track);
+    gsap.set(track, { x: -target * width * s });
+    const next = pageEls(target);
+    // The leaf only lands on a facing page when both sheets are spreads; from
+    // the cover into the first spread (different sizes) it leaves the book as paper.
+    const back = still && next.length > 1 ? (turningRight ? next[0] : next[next.length - 1]) : null;
+
+    const h = stage.getBoundingClientRect();
+    const rel = (r: DOMRect) => ({ x: r.left - h.left, y: r.top - h.top, w: r.width, h: r.height });
+    curlFx = new Curl({
+      host: stage,
+      leaf: rel(leaf.r),
+      leafSrc: leaf.src,
+      turningRight,
+      cornerTop: from ? from.y < leaf.r.top + leaf.r.height / 2 : false,
+      staticRect: still ? rel(still.r) : undefined,
+      staticSrc: still?.src || undefined,
+      backSrc: back?.src || undefined,
+    });
+    curlTarget = target;
+    return true;
+  }
+
+  async function endCurl(commit: boolean, ms: number, lift = 0) {
+    const fx = curlFx;
+    if (!fx) return;
+    curlBusy = true;
+    await fx.run(commit ? fx.landing : fx.corner, ms, lift);
+    if (commit) onNavigate(curlTarget);
+    else gsap.set(track, { x: targetX });
+    // one frame later, so the real pages are painted before the overlay goes
+    requestAnimationFrame(() => {
+      fx.destroy();
+      if (curlFx === fx) curlFx = null;
+      curlBusy = false;
+    });
+  }
+
   function onPointerDown(e: PointerEvent) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (curlBusy) return;
     // Nav buttons own their own taps.
     if ((e.target as HTMLElement).closest('[data-nav]')) return;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -261,8 +335,16 @@
       if (Math.hypot(dx, dy) < 8) return; // wait for a decisive direction
       // Horizontal turns the page; vertical scrolls a tall page, else no-op
       // (so a stray vertical swipe on a page that fits can't flip it).
-      if (Math.abs(dx) >= Math.abs(dy)) gesture = 'turn';
-      else gesture = panRange(1).y > 0 ? 'pany' : 'none';
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        gesture = 'turn';
+        if (beginCurl(cur - Math.sign(dx * s), { x: startX, y: startY })) gesture = 'curl';
+      } else gesture = panRange(1).y > 0 ? 'pany' : 'none';
+    }
+
+    if (gesture === 'curl' && curlFx) {
+      const c = curlFx.corner;
+      curlFx.set({ x: c.x + (e.clientX - startX), y: c.y + (e.clientY - startY) });
+      return;
     }
 
     if (gesture === 'turn') {
@@ -305,6 +387,14 @@
 
     if (g === 'pan' || g === 'pany') {
       settleZoom();
+      return;
+    }
+    if (g === 'curl') {
+      const dx = e.clientX - startX;
+      const velocity = dx / Math.max(1, performance.now() - startT);
+      const toward = curlTarget > cur ? -s : s; // the finger's direction for this turn
+      const commit = (curlFx?.progress ?? 0) > 0.12 || velocity * toward > 0.5;
+      void endCurl(commit, commit ? 380 : 260);
       return;
     }
     if (g === 'turn') {
@@ -376,6 +466,12 @@
 
   function go(index: number, forceTween = false) {
     const clamped = Math.max(0, Math.min(sheets.length - 1, index));
+    // Taps and the ‹ › buttons curl too: lifted from the bottom corner, in an arc.
+    if (!forceTween && clamped !== cur && beginCurl(clamped, null)) {
+      const leafH = pagesEls[cur]?.offsetHeight ?? 0;
+      void endCurl(true, 560, leafH * 0.16);
+      return;
+    }
     if (clamped !== cur) {
       onNavigate(clamped);
     } else if (forceTween) {

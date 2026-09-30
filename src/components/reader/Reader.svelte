@@ -23,7 +23,7 @@
   let pages = $state<PageRec[]>([]);
   let chapters = $state<Chapter[]>([]);
   let status = $state<'loading' | 'ready' | 'missing'>('loading');
-  let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height', translate: false });
+  let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height', translate: false, curl: true });
   let cur = $state(0);
   let chrome = $state<ReaderChrome | null>(null);
   let highlightId = $state<string | null>(null);
@@ -101,6 +101,7 @@
       mode: work.default_mode,
       fit: work.default_mode === 'flip' ? 'height' : 'width',
       translate: false,
+      curl: true,
     });
 
     let [{ data: rows }, { data: chRows }] = await Promise.all([
@@ -378,6 +379,7 @@
           {pageNumberOf}
           onCurrent={setCur}
           translateOn={settings.translate}
+          curl={settings.curl}
           {characters}
           {highlightId}
           onHighlight={(id) => (highlightId = id)}
