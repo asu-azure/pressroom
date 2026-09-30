@@ -111,7 +111,8 @@ export const SECTIONS: CopySection[] = [
   { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
 
   // --- /lookbook — the six acts, in their own scroll order
-  { id: 'ostHero',    page: 'ost', label: 'Jacket', note: 'Beside the CD case at the top of the page.' },
+  { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
+  { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
   { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the player.' },
   { id: 'ostMv',      page: 'ost', label: 'Music video', note: 'The label and note on the video block.' },
   { id: 'ostCredits', page: 'ost', label: 'Credits', note: 'The closing lines of the page.' },
@@ -472,6 +473,33 @@ export const COPY_FIELDS: CopyField[] = [
       th: 'บทเพลงราตรีสิบหกท่อน ตั้งแต่บ่ายวันฟ้าใสจนถึงคืนที่ดาวร่วง',
       ja: '晴れた午後から、星が降る夜までの十六の楽章。',
     },
+  },
+  {
+    key: 'ost.scan', section: 'ostHero', label: 'Scan button', type: 'line',
+    defaults: { en: 'SCAN', th: 'สแกน', ja: 'スキャン' },
+  },
+  {
+    key: 'ost.scanHint', section: 'ostHero', label: 'Hint under the button', type: 'line',
+    defaults: {
+      en: 'Tap the sound wave on the keychain to open the playlist.',
+      th: 'แตะคลื่นเสียงบนพวงกุญแจ เพื่อเปิดเพลย์ลิสต์',
+      ja: 'キーホルダーの音の波をタップすると、プレイリストが開きます。',
+    },
+  },
+  {
+    key: 'ost.playlist', section: 'ostList', label: 'Small label', type: 'line',
+    hint: 'Above the title in the player.',
+    defaults: { en: 'PLAYLIST', th: 'เพลย์ลิสต์', ja: 'プレイリスト' },
+  },
+  {
+    key: 'ost.scanned', section: 'ostList', label: 'After a scan', type: 'line',
+    hint: 'Flashes briefly when the playlist opens from the QR or a scan.',
+    defaults: { en: 'SCANNED', th: 'สแกนแล้ว', ja: 'スキャン完了' },
+  },
+  {
+    key: 'ost.keychain', section: 'ostList', label: 'Back to the keychain', type: 'line',
+    hint: 'The arrow is added automatically.',
+    defaults: { en: 'KEYCHAIN', th: 'พวงกุญแจ', ja: 'キーホルダー' },
   },
   {
     key: 'ost.notesKicker', section: 'ostNotes', label: 'Booklet heading', type: 'line',

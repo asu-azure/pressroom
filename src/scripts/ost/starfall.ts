@@ -1,19 +1,23 @@
 /**
- * /ost — the Starfall CD single (routes/ost.astro).
+ * /ost — ナガレボシ / STARFALL: the keychain, the scan, the playlist
+ * (routes/ost.astro).
  *
- * One clock (ScoreClock, shared with /ost/tobira) follows the MP3 and drives
- * everything else from the imported timeline: the movement on show, the liner
- * notes entry that is lit, the choir line and its karaoke wipe, the sky colour,
- * and the stars — which, in XIV. Starfall, fall on the accents of the mix.
+ * KEY view: the acrylic keychain hangs on scripts/dangle.ts. Tapping its sound
+ * wave (or SCAN) runs the scan — a viewfinder closes on the code, a line reads
+ * it, the bars light — and a same-document view transition opens the LIST view
+ * out of the scanned point, the art and title flying to the playlist header.
+ * The view is in the URL (?scan=1), so Back returns to the keychain and the QR
+ * on the real keychain lands straight on the playlist.
  *
- * Pressing play opens the jewel case and slides the disc out; the case keeps
- * the shelf's physics (drag to turn it over and read the track list).
- * Nothing plays until the visitor asks. If the audio fails, the clock runs on
- * silently so the page still moves in time.
+ * LIST view: one clock (ScoreClock, shared with /ost/tobira) follows the MP3 and
+ * drives everything from the imported timeline — the movement on show, the lit
+ * liner-notes entry, the choir line and its karaoke wipe, the sky colour, and
+ * the stars, which in XIV. Starfall fall on the accents of the mix.
+ * Nothing plays until the visitor asks; if the audio fails the clock runs on.
  */
 import song from '../../data/ost/starfall.json';
 import { ScoreClock } from './clock';
-import { book } from '../book3d';
+import { dangle } from '../dangle';
 import { punch } from '../mv';
 import { applyCopy, readCopyPayload } from '../../lib/siteCopyClient';
 import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../../lib/lang';
@@ -48,6 +52,7 @@ const MOODS: [string, string][] = [
   ['#1c2030', '#0c0c0d'], // XVI  Epilogue
 ];
 const STARFALL = 13; // XIV
+const NIGHT: [string, string] = ['#121a33', '#07080f']; // the KEY view's sky
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 
 export function initStarfall() {
@@ -64,7 +69,7 @@ export function initStarfall() {
   };
 
   const audio = q<HTMLAudioElement>('[data-audio]');
-  const stage = q('[data-jc-stage]');
+  const kcStage = q('[data-kc-stage]');
   const playBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-play]')];
   const playLabel = q('[data-play-label]');
   const timeEl = q('[data-time]');
@@ -78,7 +83,9 @@ export function initStarfall() {
   const mini = q('[data-mini]');
   const miniName = q('[data-mini-name]');
   const miniTime = q('[data-mini-time]');
-  const hero = q('.ost__hero');
+  const hero = q('.ost__plHead');
+  const finder = document.querySelector<HTMLElement>('[data-finder]')!;
+  const listView = () => root.dataset.state === 'list';
 
   const clock = new ScoreClock(0);
   let audioOK = true;
@@ -117,8 +124,13 @@ export function initStarfall() {
     });
   }
 
-  // --- the jewel case ----------------------------------------------------------
-  const jewel = book(stage, { bindingRight: false, onPress: () => toggle(), restYaw: 22, openDeg: 165 });
+  // --- the keychain: tap the wave to scan, anywhere else to give it a push ------
+  const kc = dangle(kcStage, {
+    onPress: (e) => {
+      if ((e.target as Element | null)?.closest('[data-kc-wave]')) void scan();
+      else kc.nudge(e.clientX < kcStage.getBoundingClientRect().left + kcStage.clientWidth / 2 ? 60 : -60, 90);
+    },
+  });
 
   // --- stars -------------------------------------------------------------------
   const canvas = q<HTMLCanvasElement>('.ost__stars');
@@ -134,10 +146,9 @@ export function initStarfall() {
   let glow = 0; // flashes on accents
 
   const sizeSky = () => {
-    const r = hero.getBoundingClientRect();
     dpr = Math.min(2, window.devicePixelRatio || 1);
-    W = r.width;
-    H = r.height;
+    W = window.innerWidth;
+    H = window.innerHeight;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     drawSky(clock.now());
@@ -147,7 +158,7 @@ export function initStarfall() {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    const night = cur >= 5 && cur !== 8 && cur !== 14 ? 1 : 0.45;
+    const night = !listView() || (cur >= 5 && cur !== 8 && cur !== 14) ? 1 : 0.45;
     for (const s of stars) {
       const tw = reduced ? 0.7 : 0.55 + 0.45 * Math.sin(t * 1.3 + s.p);
       ctx.globalAlpha = Math.min(1, (0.25 + tw * 0.6) * night + glow * 0.35);
@@ -199,8 +210,13 @@ export function initStarfall() {
       nowName.classList.add('is-in');
     }
     entries.forEach((e, k) => e.classList.toggle('is-now', k === i));
-    root.style.setProperty('--sky-a', MOODS[i][0]);
-    root.style.setProperty('--sky-b', MOODS[i][1]);
+    paintSky();
+  };
+  // the playlist follows the song's moods; the keychain hangs in the night
+  const paintSky = () => {
+    const [a, b] = listView() && cur >= 0 ? MOODS[cur] : NIGHT;
+    root.style.setProperty('--sky-a', a);
+    root.style.setProperty('--sky-b', b);
   };
 
   const renderLine = (k: number) => {
@@ -268,7 +284,6 @@ export function initStarfall() {
   const setPlaying = (on: boolean) => {
     playBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
     playLabel.textContent = on ? 'PAUSE' : 'PLAY';
-    stage.classList.toggle('is-playing', on);
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = on ? 'playing' : 'paused';
   };
 
@@ -322,7 +337,6 @@ export function initStarfall() {
     pauseVideo();
     clock.start();
     syncHits(clock.now());
-    jewel.setOpen(1);
     setPlaying(true);
     playBtns.forEach((b) => punch(b));
     kick();
@@ -395,12 +409,12 @@ export function initStarfall() {
     e.preventDefault();
   });
 
-  // mini transport once the jacket is out of view
+  // mini transport once the player is out of view (or on the keychain view)
   new IntersectionObserver(([en]) => {
     mini.hidden = en.isIntersecting || !started;
   }).observe(hero);
   const showMini = () => {
-    if (hero.getBoundingClientRect().bottom < 0) mini.hidden = false;
+    if (!listView() || hero.getBoundingClientRect().bottom < 0) mini.hidden = false;
   };
   audio.addEventListener('play', showMini);
 
@@ -408,7 +422,7 @@ export function initStarfall() {
   if ('mediaSession' in navigator) {
     const art = root.dataset.art;
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: 'ดาวตก — Starfall Nocturne',
+      title: `${song.title.ja} — ${song.title.en}`,
       artist: 'Asu Azure',
       album: '扉の向こうはヒマワリ畑 OST',
       artwork: art ? [{ src: new URL(art, location.href).href, sizes: '1000x1000', type: 'image/webp' }] : [],
@@ -432,6 +446,116 @@ export function initStarfall() {
     iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
     iframe.allowFullscreen = true;
     frameBox.replaceChildren(iframe);
+  });
+
+  // --- the scan and the two views -----------------------------------------------
+  let scanning = false;
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const setView = (v: 'key' | 'list') => {
+    root.dataset.state = v;
+    delete root.dataset.fresh;
+    const lenis = (window as unknown as { __lenis?: { scrollTo(y: number, o: object): void } }).__lenis;
+    if (lenis) lenis.scrollTo(0, { immediate: true });
+    else window.scrollTo(0, 0);
+    paintSky();
+    drawSky(clock.now());
+    showMini();
+  };
+
+  /** Run a view change as a same-document view transition where there is one. */
+  const transition = (kind: 'scan' | 'unscan', change: () => void) => {
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+    if (!doc.startViewTransition || reduced) {
+      change();
+      return Promise.resolve();
+    }
+    document.documentElement.dataset.vt = kind;
+    return doc
+      .startViewTransition(change)
+      .finished.catch(() => {})
+      .finally(() => delete document.documentElement.dataset.vt);
+  };
+
+  // A soft two-note chime for a good read — only if the visitor has SOUND on.
+  const chime = () => {
+    try {
+      if (localStorage.getItem('pr:sound') !== '1') return;
+      const ac = new AudioContext();
+      [1318.5, 1975.5].forEach((f, i) => {
+        const o = ac.createOscillator();
+        const g = ac.createGain();
+        o.type = 'sine';
+        o.frequency.value = f;
+        const t0 = ac.currentTime + i * 0.09;
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.08, t0 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+        o.connect(g).connect(ac.destination);
+        o.start(t0);
+        o.stop(t0 + 0.4);
+      });
+      setTimeout(() => ac.close(), 800);
+    } catch {
+      /* no audio: the read is still shown */
+    }
+  };
+
+  async function scan() {
+    if (scanning || listView()) return;
+    scanning = true;
+    const code = document.querySelector<HTMLElement>('#ost .kc__front [data-kc-wave]');
+    const art = document.querySelector<HTMLElement>('#ost .kc__front .kc__art');
+    const r = code?.getBoundingClientRect();
+    if (r && !reduced) {
+      // the viewfinder closes on the code, then a line reads it and the bars light
+      finder.style.setProperty('--fx', `${r.left}px`);
+      finder.style.setProperty('--fy', `${r.top}px`);
+      finder.style.setProperty('--fw', `${r.width}px`);
+      finder.style.setProperty('--fh', `${r.height}px`);
+      finder.classList.add('is-on');
+      await wait(320);
+      finder.classList.add('is-reading');
+      code!.classList.add('is-scanning');
+      await wait(520);
+      chime();
+      await wait(140);
+    }
+    if (r) {
+      document.documentElement.style.setProperty('--scan-x', `${r.left + r.width / 2}px`);
+      document.documentElement.style.setProperty('--scan-y', `${r.top + r.height / 2}px`);
+    }
+    // the printed art becomes the playlist's cover in the transition
+    if (art) art.style.viewTransitionName = 'ost-art';
+    finder.classList.remove('is-on', 'is-reading');
+    history.pushState({ ost: 'list' }, '', '?scan=1');
+    await transition('scan', () => {
+      if (art) art.style.viewTransitionName = '';
+      setView('list');
+      document.getElementById('ost')!.dataset.fresh = ''; // flash SCANNED
+    });
+    code?.classList.remove('is-scanning');
+    scanning = false;
+  }
+
+  const toKey = () =>
+    transition('unscan', () => {
+      setView('key');
+    });
+
+  q('[data-scan]').addEventListener('click', () => void scan());
+  q('[data-to-key]').addEventListener('click', () => {
+    // we pushed the playlist ourselves: step back, so history stays honest
+    if (history.state?.ost === 'list') history.back();
+    else {
+      history.replaceState(null, '', location.pathname);
+      void toKey();
+    }
+  });
+  window.addEventListener('popstate', () => {
+    const want = new URLSearchParams(location.search).has('scan') ? 'list' : 'key';
+    if (want === root.dataset.state) return;
+    void (want === 'list' ? transition('scan', () => setView('list')) : toKey());
   });
 
   // --- start ----------------------------------------------------------------------

@@ -23,7 +23,7 @@ export interface BookOptions {
   bindingRight: boolean;
   /** A link: the click swings the board open, then navigates here. */
   href?: string;
-  /** Not a link (the /ost jewel case): click calls this instead, and the lid is
+  /** Not a link: click calls this instead, and the lid is
       driven from outside through the returned `setOpen()`. */
   onPress?: () => void;
   /** Called just before navigation (sound, analytics — nothing blocking). */

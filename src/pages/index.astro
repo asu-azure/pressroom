@@ -1,5 +1,5 @@
 ---
-import { Image, getImage } from 'astro:assets';
+import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
@@ -9,8 +9,7 @@ import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
 import { cacheShell } from '../lib/cache';
 import song from '../data/ost/starfall.json';
-import ostNight from '../assets/ost/starfall-night.jpg';
-import ostDay from '../assets/ost/starfall-day.jpg';
+import { soundtrackKeychain, songLength } from '../lib/keychainServer';
 
 // Was prerendered. The artist teaser below the shelf is now author-edited copy,
 // and a static build would freeze it until the next deploy — the author would
@@ -23,21 +22,9 @@ const t = copy[DEFAULT_LANG];
 
 cacheShell(Astro);
 
-// The soundtrack CD at the end of the shelf (CdCase.svelte), when music is on.
+// The soundtrack keychain at the end of the shelf (KeyChain.svelte), when music is on.
 const ost = MUSIC
-  ? await (async () => {
-      const [front, back, disc] = await Promise.all([
-        getImage({ src: ostNight, width: 480, format: 'webp', quality: 78 }),
-        getImage({ src: ostDay, width: 420, format: 'webp', quality: 70 }),
-        getImage({ src: ostDay, width: 360, format: 'webp', quality: 72 }),
-      ]);
-      const d = song.duration;
-      return {
-        art: { front: front.src, back: back.src, disc: disc.src },
-        tracks: song.movements.map((m) => m.name),
-        length: `${Math.floor(d / 60)}:${String(Math.floor(d % 60)).padStart(2, '0')}`,
-      };
-    })()
+  ? { data: await soundtrackKeychain(Astro.site, 480), length: songLength(), movements: song.movements.length }
   : null;
 ---
 

@@ -4,7 +4,7 @@
  * No sample files: each note is a triangle wave plus a quiet sine an octave up,
  * through one gentle lowpass, with a 4 ms attack and a short exponential decay
  * (a soft, piano-ish pluck). The notes are the top line of the motif of
- * 「ดาวตก — Starfall」 (the G–A♭–G cell), so sweeping the pointer across the
+ * 「ナガレボシ — STARFALL」 (the G–A♭–G cell), so sweeping the pointer across the
  * shelf plays the hook.
  *
  * OFF by default, remembered in localStorage. The AudioContext is created only

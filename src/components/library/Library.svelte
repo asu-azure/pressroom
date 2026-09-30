@@ -6,13 +6,13 @@
   import { i18n } from '../../lib/i18n.svelte';
   import { assemble } from '../../scripts/text';
   import WorkCard from './WorkCard.svelte';
-  import CdCase from './CdCase.svelte';
+  import KeyChain from './KeyChain.svelte';
   import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
-  import type { JewelArt } from '../../lib/jewel';
+  import type { KeychainData } from '../../lib/keychain';
 
-  /** The soundtrack CD, when music is on (index.astro builds the images). */
-  let { ost = null }: { ost?: { art: JewelArt; tracks: string[]; length: string } | null } = $props();
+  /** The soundtrack keychain, when music is on (index.astro builds its art and QR). */
+  let { ost = null }: { ost?: { data: KeychainData; length: string; movements: number } | null } = $props();
 
   gsap.registerPlugin(ScrollTrigger);
   const reduced =
@@ -139,9 +139,9 @@
         </div>
       {/each}
       {#if ost}
-        <!-- The soundtrack stands at the end of the shelf, after the books. -->
+        <!-- The soundtrack hangs at the end of the shelf, after the books. -->
         <div use:rise={cards.length}>
-          <CdCase art={ost.art} tracks={ost.tracks} length={ost.length} />
+          <KeyChain data={ost.data} length={ost.length} movements={ost.movements} />
         </div>
       {/if}
 

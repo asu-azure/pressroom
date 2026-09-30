@@ -1,32 +1,32 @@
 ---
 /**
- * /ost — 「ดาวตก · Starfall Nocturne」 as a CD single.
+ * /ost — 「ナガレボシ · STARFALL」, the soundtrack, as a keychain you scan.
  *
- * The soundtrack page is a record you can hold, not a score you have to read:
- * a jewel case (the shelf's book physics, src/scripts/book3d.ts) that opens
- * when you press play, a disc that slides out and spins, the movement and the
- * choir line of the moment under it, then the liner-notes booklet, the music
- * video and the credits. The five-line staff is gone from here — the 扉の向こう
- * moving score lives on, unlisted, at /ost/tobira.
+ * Two views on one page:
+ *   KEY   an acrylic keychain hangs in the night (scripts/dangle.ts). Its sound
+ *         wave is a code: tap it (or SCAN) and a viewfinder reads it, then the
+ *         page opens out of the scanned point into —
+ *   LIST  the playlist: the player (movement, karaoke choir lines), the song
+ *         with its sixteen movements, the music video, the credits.
+ * The QR printed on the keychain's back is real and opens /ost?scan=1, which is
+ * the LIST view arriving "scanned" — so a printed keychain works the same way.
  *
- * Timing is data, not animation: src/data/ost/starfall.json is imported from
- * the MV player's build of the same mix (scripts/import-ost.mjs), so movement
- * changes and each syllable of the choir land where the MP3 says they do.
- *
- * Words around it are author copy (the 'ost' group in copyKeys.ts), so this is
- * server-rendered like /asu; cached at the edge like every public shell.
- * Only exists when PUBLIC_MUSIC=true (astro.config.mjs injects the route).
+ * Timing is data, not animation: src/data/ost/starfall.json is imported from the
+ * MV player's build of the mix (scripts/import-ost.mjs). Words around it are
+ * author copy (the 'ost' group in copyKeys.ts), so this is server-rendered like
+ * /asu. Only exists when PUBLIC_MUSIC=true (astro.config.mjs injects the route).
  */
 import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import song from '../data/ost/starfall.json';
 import nightArt from '../assets/ost/starfall-night.jpg';
 import dayArt from '../assets/ost/starfall-day.jpg';
-import { jewelHtml } from '../lib/jewel';
-import '../styles/jewel.css';
+import { keychainHtml } from '../lib/keychain';
+import { soundtrackKeychain, songLength } from '../lib/keychainServer';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
 import { cacheShell } from '../lib/cache';
+import '../styles/keychain.css';
 
 export const prerender = false;
 
@@ -37,6 +37,9 @@ const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
 cacheShell(Astro);
 
+// Arriving from the QR (or a shared playlist link) opens the playlist directly.
+const scanned = Astro.url.searchParams.has('scan');
+
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const movements = song.movements;
 const dur = song.duration;
@@ -44,24 +47,17 @@ const ends = movements.map((m, i) => movements[i + 1]?.t ?? dur);
 const roman = (name: string) => name.split('.')[0];
 const title = (name: string) => name.split('. ').slice(1).join('. ');
 
-const [front, back, disc, poster, og] = await Promise.all([
-  getImage({ src: nightArt, width: 1000, format: 'webp', quality: 80 }),
-  getImage({ src: dayArt, width: 800, format: 'webp', quality: 72 }),
-  getImage({ src: dayArt, width: 720, format: 'webp', quality: 76 }),
+const [kc, head, poster, og] = await Promise.all([
+  soundtrackKeychain(Astro.site, 900),
+  getImage({ src: nightArt, width: 560, format: 'webp', quality: 80 }),
   getImage({ src: dayArt, width: 1600, format: 'webp', quality: 74 }),
   getImage({ src: nightArt, width: 1200, format: 'jpg', quality: 82 }),
 ]);
-
-const jewel = jewelHtml(
-  { front: front.src, back: back.src, disc: disc.src },
-  movements.map((m) => m.name),
-  { withDisc: true },
-);
 const ogImage = new URL(og.src, Astro.site).href;
 ---
 
 <Base
-  title="ดาวตก — Starfall Nocturne · Pressroom OST"
+  title={`${song.title.ja} — ${song.title.en} · Pressroom OST`}
   description="The soundtrack of 扉の向こうはヒマワリ畑 — a nocturne in sixteen movements, by Asu Azure."
   image={ogImage}
 >
@@ -73,116 +69,160 @@ const ogImage = new URL(og.src, Astro.site).href;
     ))}
   </nav>
 
-  <main class="ost" id="ost" data-no-sfx data-art={front.src}>
-    <!-- ============ JACKET + PLAYER ============ -->
-    <section class="ost__hero" aria-label="Player">
-      <div class="ost__sky" aria-hidden="true"></div>
-      <canvas class="ost__stars" aria-hidden="true"></canvas>
+  <main class="ost" id="ost" data-no-sfx data-art={head.src} data-state={scanned ? 'list' : 'key'} data-fresh={scanned ? '' : undefined}>
+    <div class="ost__sky" aria-hidden="true"></div>
+    <canvas class="ost__stars" aria-hidden="true"></canvas>
 
-      <div class="ost__heroGrid">
-        <div class="jc__stage ost__stage" data-jc-stage>
-          <div class="jc__floor" aria-hidden="true"></div>
-          <div class="jc" data-book aria-hidden="true" set:html={jewel} />
+    <!-- ============ KEY: the keychain ============ -->
+    <section class="ost__key" data-view="key" aria-label="Keychain">
+      <div class="ost__keyGrid">
+        <div class="kc__stage ost__kcStage" data-kc-stage>
+          <span class="kc__hook" aria-hidden="true"></span>
+          <div class="kc" data-kc aria-hidden="true" set:html={keychainHtml(kc)} />
         </div>
 
-        <div class="ost__info">
+        <div class="ost__keyInfo">
           <p class="mono ost__kicker" data-i18n="ost.kicker">{t['ost.kicker']}</p>
-          <h1 class="ost__title">
-            <span class="ost__titleTh" data-mv-converge>ดาวตก</span>
-            <span class="mono ost__titleEn">STARFALL NOCTURNE</span>
+          <h1 class="ost__title" data-title>
+            <span class="ost__titleJa" data-mv-converge>{song.title.ja}</span>
+            <span class="mono ost__titleEn">{song.title.en}</span>
           </h1>
           <p class="ost__lede" data-i18n="ost.lede">{t['ost.lede']}</p>
+          <button class="ost__scanBtn mono" type="button" data-scan>
+            <span class="ost__scanIcon" aria-hidden="true"></span>
+            <span data-i18n="ost.scan">{t['ost.scan']}</span>
+          </button>
+          <p class="mono ost__scanHint" data-i18n="ost.scanHint">{t['ost.scanHint']}</p>
+        </div>
+      </div>
+    </section>
 
-          <div class="ost__transport">
-            <button class="ost__play mono" type="button" data-play aria-pressed="false">
-              <span class="ost__playIcon" aria-hidden="true"></span>
-              <span data-play-label>PLAY</span>
-            </button>
-            <span class="mono ost__time"><span data-time>0:00</span> / {fmt(dur)}</span>
-          </div>
+    <!-- the viewfinder that reads the code -->
+    <div class="ost__finder" data-finder aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+      <i class="ost__finderLine"></i>
+    </div>
 
-          <div
-            class="ost__scrub"
-            data-scrub
-            role="slider"
-            tabindex="0"
-            aria-label="Position"
-            aria-valuemin="0"
-            aria-valuemax={Math.round(dur)}
-            aria-valuenow="0"
-            aria-valuetext="0:00"
-          >
-            <span class="ost__scrubFill" data-fill></span>
-            {movements.map((m) => (
-              <span class="ost__tick" style={`left:${((m.t / dur) * 100).toFixed(3)}%`} title={m.name}></span>
-            ))}
-            <span class="ost__knob" data-knob></span>
-          </div>
+    <!-- ============ LIST: the playlist ============ -->
+    <div class="ost__pl" data-view="list">
+      <section class="ost__plHead" aria-label="Player">
+        <div class="ost__plTop">
+          <button class="mono ost__toKey" type="button" data-to-key>
+            <span aria-hidden="true">←</span> <span data-i18n="ost.keychain">{t['ost.keychain']}</span>
+          </button>
+          <p class="mono ost__scanned"><span aria-hidden="true">✓</span> <span data-i18n="ost.scanned">{t['ost.scanned']}</span></p>
+        </div>
 
-          <div class="ost__now" aria-live="polite">
-            <p class="mono ost__nowK"><span data-now-num>{roman(movements[0].name)}</span> / XVI</p>
-            <p class="ost__nowName" data-now-name>{title(movements[0].name)}</p>
-            <div class="ost__lyric" data-lyric hidden>
-              <p class="ost__lyricJa authored" data-lyric-ja lang="ja"></p>
-              <p class="ost__lyricTh" data-lyric-th lang="th"></p>
+        <div class="ost__plGrid">
+          <img class="ost__plArt" src={head.src} alt="" width="560" height="560" />
+          <div class="ost__plInfo">
+            <p class="mono ost__kicker" data-i18n="ost.playlist">{t['ost.playlist']}</p>
+            <h2 class="ost__title ost__title--list" data-title>
+              <span class="ost__titleJa">{song.title.ja}</span>
+              <span class="mono ost__titleEn">{song.title.en}</span>
+            </h2>
+
+            <div class="ost__transport">
+              <button class="ost__play mono" type="button" data-play aria-pressed="false">
+                <span class="ost__playIcon" aria-hidden="true"></span>
+                <span data-play-label>PLAY</span>
+              </button>
+              <span class="mono ost__time"><span data-time>0:00</span> / {fmt(dur)}</span>
+            </div>
+
+            <div
+              class="ost__scrub"
+              data-scrub
+              role="slider"
+              tabindex="0"
+              aria-label="Position"
+              aria-valuemin="0"
+              aria-valuemax={Math.round(dur)}
+              aria-valuenow="0"
+              aria-valuetext="0:00"
+            >
+              <span class="ost__scrubFill" data-fill></span>
+              {movements.map((m) => (
+                <span class="ost__tick" style={`left:${((m.t / dur) * 100).toFixed(3)}%`} title={m.name}></span>
+              ))}
+              <span class="ost__knob" data-knob></span>
+            </div>
+
+            <div class="ost__now" aria-live="polite">
+              <p class="mono ost__nowK"><span data-now-num>{roman(movements[0].name)}</span> / XVI</p>
+              <p class="ost__nowName" data-now-name>{title(movements[0].name)}</p>
+              <div class="ost__lyric" data-lyric hidden>
+                <p class="ost__lyricJa authored" data-lyric-ja lang="ja"></p>
+                <p class="ost__lyricTh" data-lyric-th lang="th"></p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </section>
+        <div class="ost__choirSlot" data-choir-slot></div>
+      </section>
 
-    <!-- ============ LINER NOTES (paper) ============ -->
-    <section class="spread spread--paper ost__notes" aria-labelledby="ost-notes-h">
-      <div class="paper-grid" aria-hidden="true"></div>
-      <span class="crop crop--tl" aria-hidden="true"></span>
-      <span class="crop crop--br" aria-hidden="true"></span>
-      <header class="ost__notesHead">
-        <h2 class="mono ost__notesK" id="ost-notes-h" data-i18n="ost.notesKicker">{t['ost.notesKicker']}</h2>
-        <p class="mono ost__notesHint" data-i18n="ost.notesHint">{t['ost.notesHint']}</p>
-      </header>
-      <ol class="ost__list">
-        {movements.map((m, i) => (
-          <li>
-            <button class="ost__mv" type="button" data-seek={m.t} data-mv={i}>
-              <span class="ost__mvNum serif">{roman(m.name)}</span>
-              <span class="ost__mvBody">
-                <span class="ost__mvName">
-                  {title(m.name)}
-                  {'sub' in m && m.sub && <em class="ost__mvSub">{m.sub}</em>}
-                </span>
-                <span class="ost__mvNote" data-i18n={`ost.m${i + 1}`}>{t[`ost.m${i + 1}`]}</span>
-              </span>
-              <span class="mono ost__mvTime">{fmt(m.t)}–{fmt(ends[i])}</span>
-              <span class="ost__mvBar" aria-hidden="true"></span>
-            </button>
+      <!-- the song list — one song for now; each opens onto its movements -->
+      <section class="spread spread--paper ost__notes" aria-labelledby="ost-notes-h">
+        <div class="paper-grid" aria-hidden="true"></div>
+        <span class="crop crop--tl" aria-hidden="true"></span>
+        <span class="crop crop--br" aria-hidden="true"></span>
+        <header class="ost__notesHead">
+          <h2 class="mono ost__notesK" id="ost-notes-h" data-i18n="ost.notesKicker">{t['ost.notesKicker']}</h2>
+          <p class="mono ost__notesHint" data-i18n="ost.notesHint">{t['ost.notesHint']}</p>
+        </header>
+        <ol class="ost__songs">
+          <li class="ost__song">
+            <div class="ost__songRow">
+              <span class="mono ost__songNo">01</span>
+              <img class="ost__songArt" src={head.src} alt="" width="56" height="56" loading="lazy" />
+              <span class="ost__songTitle"><b>{song.title.ja}</b> <span class="mono">{song.title.en}</span></span>
+              <span class="mono ost__songLen">{songLength()}</span>
+            </div>
+            <ol class="ost__list">
+              {movements.map((m, i) => (
+                <li>
+                  <button class="ost__mv" type="button" data-seek={m.t} data-mv={i}>
+                    <span class="ost__mvNum serif">{roman(m.name)}</span>
+                    <span class="ost__mvBody">
+                      <span class="ost__mvName">
+                        {title(m.name)}
+                        {'sub' in m && m.sub && <em class="ost__mvSub">{m.sub}</em>}
+                      </span>
+                      <span class="ost__mvNote" data-i18n={`ost.m${i + 1}`}>{t[`ost.m${i + 1}`]}</span>
+                    </span>
+                    <span class="mono ost__mvTime">{fmt(m.t)}–{fmt(ends[i])}</span>
+                    <span class="ost__mvBar" aria-hidden="true"></span>
+                  </button>
+                </li>
+              ))}
+            </ol>
           </li>
-        ))}
-      </ol>
-    </section>
+        </ol>
+      </section>
 
-    <!-- ============ MUSIC VIDEO ============ -->
-    <section class="ost__mvid" aria-labelledby="ost-mv-h">
-      <h2 class="mono ost__mvidK" id="ost-mv-h" data-i18n="ost.mvKicker">{t['ost.mvKicker']}</h2>
-      <p class="ost__mvidNote" data-i18n="ost.mvNote">{t['ost.mvNote']}</p>
-      {/* Click-to-load: no YouTube script, cookie or request until the visitor
-          asks for the video. Privacy-enhanced domain; the JS API is on only so
-          the page can pause the video when its own player starts. */}
-      <div class="ost__frame" data-yt={MV_YOUTUBE_ID}>
-        <button class="ost__poster" type="button" data-yt-play aria-label="Play the music video">
-          <img src={poster.src} alt="" loading="lazy" decoding="async" />
-          <span class="ost__posterPlay" aria-hidden="true"></span>
-          <span class="mono ost__posterK">MV ▶ YOUTUBE</span>
-        </button>
-      </div>
-    </section>
+      <!-- ============ MUSIC VIDEO ============ -->
+      <section class="ost__mvid" aria-labelledby="ost-mv-h">
+        <h2 class="mono ost__mvidK" id="ost-mv-h" data-i18n="ost.mvKicker">{t['ost.mvKicker']}</h2>
+        <p class="ost__mvidNote" data-i18n="ost.mvNote">{t['ost.mvNote']}</p>
+        {/* Click-to-load: no YouTube script, cookie or request until the visitor
+            asks for the video. Privacy-enhanced domain; the JS API is on only so
+            the page can pause the video when its own player starts. */}
+        <div class="ost__frame" data-yt={MV_YOUTUBE_ID}>
+          <button class="ost__poster" type="button" data-yt-play aria-label="Play the music video">
+            <img src={poster.src} alt="" loading="lazy" decoding="async" />
+            <span class="ost__posterPlay" aria-hidden="true"></span>
+            <span class="mono ost__posterK">MV ▶ YOUTUBE</span>
+          </button>
+        </div>
+      </section>
 
-    <!-- ============ CREDITS ============ -->
-    <footer class="ost__credits">
-      <p class="mono" data-i18n="ost.credits">{t['ost.credits']}</p>
-      <a class="mono ost__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.back">{t['ost.back']}</span></a>
-    </footer>
+      <footer class="ost__credits">
+        <p class="mono" data-i18n="ost.credits">{t['ost.credits']}</p>
+        <a class="mono ost__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.back">{t['ost.back']}</span></a>
+      </footer>
+    </div>
 
-    <!-- Mini transport: appears once the jacket scrolls away while a song is going. -->
+    <!-- Mini transport: appears once the player is out of view while a song is going. -->
     <div class="ost__mini" data-mini hidden>
       <button class="ost__miniBtn" type="button" data-play aria-pressed="false" aria-label="Play / pause">
         <span class="ost__playIcon" aria-hidden="true"></span>
@@ -202,18 +242,43 @@ const ogImage = new URL(og.src, Astro.site).href;
   initStarfall();
 </script>
 
+<style is:global>
+  /* ---- the scan → playlist transition (same-document view transition) ----
+     The playlist opens out of the scanned code in a widening circle; the art
+     and the title fly from the keychain to the playlist header. --scan-x/y are
+     set on <html> by starfall.ts just before the transition. */
+  html[data-vt='scan']::view-transition-old(root) { animation: ost-vt-out 0.8s cubic-bezier(0.7, 0, 0.3, 1) both; }
+  html[data-vt='scan']::view-transition-new(root) { animation: ost-vt-in 0.8s cubic-bezier(0.7, 0, 0.3, 1) both; }
+  html[data-vt='unscan']::view-transition-old(root) { animation: ost-vt-shut 0.6s cubic-bezier(0.7, 0, 0.3, 1) both; z-index: 2; }
+  html[data-vt='unscan']::view-transition-new(root) { animation: none; }
+  ::view-transition-group(ost-art),
+  ::view-transition-group(ost-title) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  @keyframes ost-vt-out { to { opacity: 0.35; scale: 0.97; } }
+  @keyframes ost-vt-in {
+    from { clip-path: circle(0 at var(--scan-x, 50%) var(--scan-y, 50%)); }
+    to { clip-path: circle(150vmax at var(--scan-x, 50%) var(--scan-y, 50%)); }
+  }
+  @keyframes ost-vt-shut {
+    from { clip-path: circle(150vmax at 50% 50%); }
+    to { clip-path: circle(0 at var(--scan-x, 50%) var(--scan-y, 50%)); }
+  }
+</style>
+
 <style>
   /* Sky colours are registered so the gradient can glide between movements. */
   @property --sky-a { syntax: '<color>'; inherits: true; initial-value: #141820; }
   @property --sky-b { syntax: '<color>'; inherits: true; initial-value: #0c0c0d; }
 
   .ost {
-    --sky-a: #141820;
-    --sky-b: #0c0c0d;
+    --sky-a: #121a33;
+    --sky-b: #07080f;
     transition: --sky-a 2.4s var(--ease), --sky-b 2.4s var(--ease);
     position: relative;
     z-index: 1;
+    min-height: 100svh;
   }
+  .ost[data-state='key'] [data-view='list'],
+  .ost[data-state='list'] [data-view='key'] { display: none; }
 
   .ost__langs {
     position: fixed;
@@ -234,76 +299,177 @@ const ogImage = new URL(og.src, Astro.site).href;
   }
   .ost__langs button[aria-pressed='true'] { color: var(--fg); border-color: var(--accent); }
 
-  /* ---------------- hero ---------------- */
-  .ost__hero {
-    position: relative;
-    min-height: calc(100svh - var(--topbar-h, 0px));
-    display: grid;
-    align-items: center;
-    padding: clamp(3rem, 8vh, 5rem) var(--pad);
-    overflow: hidden;
-  }
+  /* the night behind both views */
   .ost__sky {
-    position: absolute;
+    position: fixed;
     inset: 0;
+    z-index: -1;
     background:
-      radial-gradient(120% 80% at 70% 0%, color-mix(in srgb, var(--sky-a) 100%, transparent), transparent 70%),
+      radial-gradient(120% 80% at 70% 0%, var(--sky-a), transparent 70%),
       linear-gradient(180deg, var(--sky-a), var(--sky-b));
   }
   .ost__stars {
-    position: absolute;
+    position: fixed;
     inset: 0;
-    width: 100%;
-    height: 100%;
+    z-index: -1;
+    width: 100vw;
+    height: 100vh;
     pointer-events: none;
   }
-  .ost__heroGrid {
-    position: relative;
-    z-index: 1;
+
+  /* ---------------- KEY ---------------- */
+  .ost__key {
+    min-height: 100svh;
     display: grid;
-    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    align-items: center;
+    padding: calc(var(--topbar-h, 3.6rem) + clamp(1rem, 4vh, 3rem)) var(--pad) clamp(2rem, 6vh, 4rem);
+  }
+  .ost__keyGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: clamp(2rem, 5vw, 5rem);
     align-items: center;
-    max-width: 1320px;
+    max-width: 1240px;
     width: 100%;
     margin: 0 auto;
   }
-  .ost__stage {
-    /* the case sits right of centre: the lid swings out to the left and the
-       disc slides a third of the way out to the right */
-    --jc-w: 46cqi;
-    --disc-out: 40%;
-    aspect-ratio: 1.12;
-    justify-content: flex-start;
+  .ost__kcStage {
+    --kc-w: 46cqi;
+    --kc-chain: 16cqi;
+    aspect-ratio: 0.92;
+    width: min(100%, 34rem);
+    justify-self: center;
   }
-  /* margin, not stage padding: padding would shrink the cqi the case is sized in */
-  .ost__stage :global(.jc) { margin-left: 46cqi; }
-  .ost__info { display: grid; gap: 1.1rem; }
-  .ost__kicker {
-    font-size: 0.62rem;
-    letter-spacing: 0.18em;
-    color: #8fb2ff;
-  }
-  .ost__title { display: grid; gap: 0.4rem; line-height: 1; }
-  .ost__titleTh {
-    font-family: var(--font-prompt);
-    font-weight: 400;
-    font-size: clamp(3.4rem, 8vw, 6.5rem);
-    line-height: 1.15;
+  .ost__keyInfo { display: grid; gap: 1.1rem; justify-items: start; }
+  .ost__kicker { font-size: 0.62rem; letter-spacing: 0.18em; color: #8fb2ff; }
+  .ost__title { display: grid; gap: 0.5rem; line-height: 1; view-transition-name: ost-title; }
+  .ost__titleJa {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(3rem, 7.5vw, 6.2rem);
+    letter-spacing: 0.02em;
+    line-height: 1.05;
     color: #f4f1ea;
     text-shadow: 0 0 40px rgba(143, 178, 255, 0.35);
   }
-  .ost__titleEn {
-    font-size: clamp(0.7rem, 1.2vw, 0.85rem);
-    letter-spacing: 0.5em;
-    color: var(--fg-dim);
+  .ost__titleEn { font-size: clamp(0.72rem, 1.2vw, 0.9rem); letter-spacing: 0.62em; color: var(--fg-dim); }
+  .ost__lede { max-width: 38ch; color: var(--fg-dim); font-size: clamp(0.95rem, 1.4vw, 1.08rem); line-height: 1.7; }
+  .ost__scanBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8em;
+    margin-top: 0.4rem;
+    padding: 0.9em 1.7em;
+    border: 1px solid rgba(143, 178, 255, 0.6);
+    border-radius: 999px;
+    background: rgba(39, 66, 240, 0.18);
+    color: #f4f1ea;
+    font-size: 0.74rem;
+    letter-spacing: 0.22em;
+    cursor: pointer;
+    transition: background 0.25s var(--ease), border-color 0.25s var(--ease);
   }
-  .ost__lede {
-    max-width: 38ch;
-    color: var(--fg-dim);
-    font-size: clamp(0.95rem, 1.4vw, 1.08rem);
-    line-height: 1.7;
+  .ost__scanBtn:hover { background: var(--accent); border-color: var(--accent); }
+  /* a tiny viewfinder glyph */
+  .ost__scanIcon {
+    width: 1.1em;
+    height: 1.1em;
+    background:
+      linear-gradient(currentColor, currentColor) 0 0 / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 0 / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 0 / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 0 / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 0 100% / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 100% / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 100% / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 100% / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 50% 50% / 100% 1px no-repeat;
   }
+  .ost__scanHint { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--fg-faint); }
+
+  /* the viewfinder: four corners that close on the code, and a reading line */
+  .ost__finder {
+    position: fixed;
+    left: var(--fx, 0);
+    top: var(--fy, 0);
+    width: var(--fw, 0);
+    height: var(--fh, 0);
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0;
+    scale: 1.8;
+    transition: opacity 0.18s linear, scale 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .ost__finder.is-on { opacity: 1; scale: 1; }
+  .ost__finder > span {
+    position: absolute;
+    width: 22%;
+    height: 45%;
+    border: 2px solid #8fb2ff;
+    filter: drop-shadow(0 0 6px rgba(143, 178, 255, 0.8));
+  }
+  .ost__finder > span:nth-child(1) { left: -8%; top: -30%; border-right: 0; border-bottom: 0; }
+  .ost__finder > span:nth-child(2) { right: -8%; top: -30%; border-left: 0; border-bottom: 0; }
+  .ost__finder > span:nth-child(3) { left: -8%; bottom: -30%; border-right: 0; border-top: 0; }
+  .ost__finder > span:nth-child(4) { right: -8%; bottom: -30%; border-left: 0; border-top: 0; }
+  .ost__finderLine {
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: 0;
+    width: 2px;
+    background: #8fb2ff;
+    box-shadow: 0 0 12px 3px rgba(143, 178, 255, 0.7);
+    opacity: 0;
+  }
+  .ost__finder.is-reading .ost__finderLine { animation: ost-read 0.5s cubic-bezier(0.45, 0, 0.55, 1) both; }
+  @keyframes ost-read {
+    0% { left: 0; opacity: 1; }
+    100% { left: 100%; opacity: 1; }
+  }
+
+  /* ---------------- LIST: player ---------------- */
+  .ost__plHead {
+    position: relative;
+    /* the site header is fixed over the page */
+    padding: calc(var(--topbar-h, 3.6rem) + clamp(1rem, 3vh, 2rem)) var(--pad) clamp(3rem, 8vh, 5rem);
+    max-width: calc(1240px + var(--pad) * 2);
+    margin: 0 auto;
+    min-height: calc(92svh - var(--topbar-h, 0px));
+  }
+  .ost__plTop { display: flex; align-items: center; gap: 1.2rem; margin-bottom: clamp(1.5rem, 4vh, 3rem); }
+  .ost__toKey {
+    padding: 0.55em 1em;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: none;
+    color: var(--fg-dim);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+  }
+  .ost__toKey:hover { color: var(--fg); border-color: var(--accent); }
+  .ost__scanned { font-size: 0.6rem; letter-spacing: 0.2em; color: #7be0a0; opacity: 0; }
+  .ost[data-fresh] .ost__scanned { animation: ost-scanned 2.4s ease both; }
+  @keyframes ost-scanned { 0%, 100% { opacity: 0; } 12%, 70% { opacity: 1; } }
+
+  .ost__plGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(1.5rem, 4vw, 4rem);
+    align-items: center;
+  }
+  .ost__plArt {
+    width: min(100%, 26rem);
+    height: auto;
+    aspect-ratio: 1;
+    justify-self: center;
+    border-radius: 14px;
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    view-transition-name: ost-art;
+  }
+  .ost__plInfo { display: grid; gap: 1rem; }
+  .ost__title--list .ost__titleJa { font-size: clamp(2.4rem, 5.5vw, 4.4rem); }
 
   .ost__transport { display: flex; align-items: center; gap: 1.1rem; margin-top: 0.4rem; }
   .ost__play {
@@ -333,13 +499,7 @@ const ogImage = new URL(og.src, Astro.site).href;
   }
   .ost__time { font-size: 0.7rem; letter-spacing: 0.12em; color: var(--fg-dim); }
 
-  .ost__scrub {
-    position: relative;
-    height: 26px;
-    cursor: pointer;
-    touch-action: none;
-    outline: none;
-  }
+  .ost__scrub { position: relative; height: 26px; cursor: pointer; touch-action: none; outline: none; }
   .ost__scrub::before {
     content: '';
     position: absolute;
@@ -359,13 +519,7 @@ const ogImage = new URL(og.src, Astro.site).href;
     transform-origin: 0 50%;
     transform: scaleX(var(--p, 0));
   }
-  .ost__tick {
-    position: absolute;
-    top: calc(50% - 5px);
-    width: 1px;
-    height: 10px;
-    background: rgba(244, 241, 234, 0.35);
-  }
+  .ost__tick { position: absolute; top: calc(50% - 5px); width: 1px; height: 10px; background: rgba(244, 241, 234, 0.35); }
   .ost__knob {
     position: absolute;
     top: calc(50% - 6px);
@@ -380,47 +534,41 @@ const ogImage = new URL(og.src, Astro.site).href;
 
   .ost__now { min-height: 8.5rem; }
   .ost__nowK { font-size: 0.6rem; letter-spacing: 0.2em; color: #e8a31a; }
-  .ost__nowName {
-    margin-top: 0.35rem;
-    font-family: var(--font-serif);
-    font-size: clamp(1.5rem, 2.8vw, 2.2rem);
-    line-height: 1.15;
-    color: #f4f1ea;
-  }
+  .ost__nowName { margin-top: 0.35rem; font-family: var(--font-serif); font-size: clamp(1.5rem, 2.8vw, 2.2rem); line-height: 1.15; color: #f4f1ea; }
   .ost__lyric { margin-top: 0.9rem; }
-  .ost__lyricJa {
-    font-size: clamp(1.1rem, 2vw, 1.45rem);
-    letter-spacing: 0.08em;
-    line-height: 2.1;
-  }
+  .ost__lyricJa { font-size: clamp(1.1rem, 2vw, 1.45rem); letter-spacing: 0.08em; line-height: 2.1; }
   .ost__lyricJa :global(span) {
-    /* karaoke wipe: sung part in amber, the rest dim */
     background: linear-gradient(90deg, #ffd27a calc(var(--k, 0) * 100%), rgba(244, 241, 234, 0.4) calc(var(--k, 0) * 100%));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
   }
-  .ost__lyricJa :global(rt) {
-    font-size: 0.5em;
-    letter-spacing: 0.1em;
-    color: rgba(244, 241, 234, 0.55);
-  }
+  .ost__lyricJa :global(rt) { font-size: 0.5em; letter-spacing: 0.1em; color: rgba(244, 241, 234, 0.55); }
   .ost__lyricTh { margin-top: 0.2rem; color: var(--fg-dim); font-size: 0.95rem; }
 
-  /* ---------------- liner notes ---------------- */
-  .ost__notes {
-    position: relative;
-    padding: clamp(3.5rem, 9vh, 6rem) var(--pad);
-  }
-  .ost__notesHead { position: relative; z-index: 1; max-width: 1320px; margin: 0 auto 2rem; display: grid; gap: 0.4rem; }
+  /* ---------------- LIST: songs + movements ---------------- */
+  .ost__notes { position: relative; padding: clamp(3.5rem, 9vh, 6rem) var(--pad); }
+  .ost__notesHead { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto 1.6rem; display: grid; gap: 0.4rem; }
   .ost__notesK { font-size: 0.7rem; letter-spacing: 0.22em; color: var(--accent); }
   .ost__notesHint { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--fg-dim); }
+  .ost__songs { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0; list-style: none; }
+  .ost__songRow {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 0.4rem;
+    border-top: 2px solid var(--fg);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .ost__songNo { font-size: 0.66rem; color: var(--accent); letter-spacing: 0.12em; }
+  .ost__songArt { width: 3.2rem; height: 3.2rem; border-radius: 6px; object-fit: cover; }
+  .ost__songTitle b { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; }
+  .ost__songTitle span { margin-left: 0.5em; font-size: 0.62rem; letter-spacing: 0.4em; color: var(--fg-dim); }
+  .ost__songLen { font-size: 0.66rem; color: var(--fg-dim); }
   .ost__list {
-    position: relative;
-    z-index: 1;
-    max-width: 1320px;
-    margin: 0 auto;
-    padding: 0;
+    margin: 0;
+    padding: 0 0 0 clamp(0rem, 4vw, 4.4rem);
     list-style: none;
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -467,7 +615,7 @@ const ogImage = new URL(og.src, Astro.site).href;
   /* ---------------- MV ---------------- */
   .ost__mvid {
     padding: clamp(3.5rem, 9vh, 6rem) var(--pad);
-    max-width: calc(1320px + var(--pad) * 2);
+    max-width: calc(1240px + var(--pad) * 2);
     margin: 0 auto;
     display: grid;
     gap: 0.6rem;
@@ -484,14 +632,7 @@ const ogImage = new URL(og.src, Astro.site).href;
     background: #000;
   }
   .ost__frame :global(iframe) { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .ost__poster {
-    position: absolute;
-    inset: 0;
-    padding: 0;
-    border: 0;
-    background: none;
-    cursor: pointer;
-  }
+  .ost__poster { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: pointer; }
   .ost__poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 38%; filter: brightness(0.75); transition: filter 0.4s var(--ease); }
   .ost__poster:hover img { filter: brightness(0.9); }
   .ost__posterPlay {
@@ -516,16 +657,8 @@ const ogImage = new URL(og.src, Astro.site).href;
     background: #f4f1ea;
     clip-path: polygon(0 0, 100% 50%, 0 100%);
   }
-  .ost__posterK {
-    position: absolute;
-    left: 1rem;
-    bottom: 0.9rem;
-    font-size: 0.6rem;
-    letter-spacing: 0.16em;
-    color: #f4f1ea;
-  }
+  .ost__posterK { position: absolute; left: 1rem; bottom: 0.9rem; font-size: 0.6rem; letter-spacing: 0.16em; color: #f4f1ea; }
 
-  /* ---------------- credits ---------------- */
   .ost__credits {
     display: flex;
     justify-content: space-between;
@@ -539,7 +672,6 @@ const ogImage = new URL(og.src, Astro.site).href;
   }
   .ost__back:hover { color: var(--accent); }
 
-  /* ---------------- mini transport ---------------- */
   .ost__mini {
     position: fixed;
     left: 50%;
@@ -558,31 +690,16 @@ const ogImage = new URL(og.src, Astro.site).href;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   }
   .ost__mini[hidden] { display: none; }
-  .ost__miniBtn {
-    display: grid;
-    place-items: center;
-    width: 2.2rem;
-    height: 2.2rem;
-    border: 0;
-    border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
-    cursor: pointer;
-  }
-  .ost__miniName {
-    font-family: var(--font-serif);
-    font-size: 0.95rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+  .ost__miniBtn { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%; background: var(--accent); color: #fff; cursor: pointer; }
+  .ost__miniName { font-family: var(--font-serif); font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ost__miniTime { font-size: 0.62rem; letter-spacing: 0.1em; color: var(--fg-dim); }
 
   @media (max-width: 900px) {
-    .ost__heroGrid { grid-template-columns: minmax(0, 1fr); }
-    .ost__stage { --jc-w: 62cqi; width: min(100%, 30rem); }
-    .ost__list { grid-template-columns: minmax(0, 1fr); }
-    .ost__langs { top: auto; bottom: 4.6rem; }
+    .ost__keyGrid,
+    .ost__plGrid { grid-template-columns: minmax(0, 1fr); }
+    .ost__kcStage { width: min(100%, 22rem); }
+    .ost__plArt { width: min(70%, 18rem); }
+    .ost__list { grid-template-columns: minmax(0, 1fr); padding-left: 0; }
   }
   @media (prefers-reduced-motion: reduce) {
     .ost { transition: none; }
