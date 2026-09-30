@@ -8,7 +8,7 @@
  * checkout). Reads that build's timeline.json and writes a trimmed copy to
  * src/data/ost/starfall.json — only what the page uses: length, the movements,
  * the choir lyrics, the accent hits, a 48-bar waveform for the keychain, each
- * choir voice's notes with the vowel sung (for the rabbits), and the top line of
+ * choir voice's notes with the vowel and kana sung (for the rabbits), and the top line of
  * the motif (so the UI-sound test can check sound.ts against it). The vowels
  * come from the vocal folder's choir_events.json, matched to the syllable
  * sounding at each timeline note's onset. The MV player's engraving, credits and song title never come
@@ -71,14 +71,16 @@ for (const seg of tl.choir) {
   for (const [, t0, t1, midi, voice] of seg.notes) {
     // the syllable sounding at this note's onset — a tied continuation keeps its vowel
     const hit = (events[voice] ?? []).find((e) => e.t0 <= t0 + 0.02 && e.t1 > t0 + 0.02);
-    // no syllable on this note: a hum
-    choir[voice]?.push([r3(t0), r3(t1), midi, (hit && kanaVowel(hit.kana)) || 'u']);
+    // no syllable on this note: a hum. The kana is given only where the
+    // syllable starts, so a tied continuation doesn't sing it twice.
+    const onset = hit && Math.abs(hit.t0 - t0) < 0.02;
+    choir[voice]?.push([r3(t0), r3(t1), midi, (hit && kanaVowel(hit.kana)) || 'u', onset ? hit.kana : hit ? '' : '~']);
   }
 }
 // the soprano descant fills S wherever S is silent
 for (const d of tl.descant ?? []) {
   const busy = choir.S.some(([a, b]) => a < d.t1 && b > d.t0);
-  if (!busy) choir.S.push([r3(d.t0), r3(d.t1), d.midi, kanaVowel(d.k) || 'a']);
+  if (!busy) choir.S.push([r3(d.t0), r3(d.t1), d.midi, kanaVowel(d.k) || 'a', d.k || '']);
 }
 for (const v of Object.keys(choir)) choir[v].sort((a, b) => a[0] - b[0]);
 

@@ -12,7 +12,7 @@
  *   .rb__mouth  one child per shape, [data-m="n|a|i|u|e|o"]; data-shape on the group
  *               picks the one shown
  *   .rb__book   the score book held in front (raised to sing; pivot: 50 120)
- *   .rb__emit   an empty point at the mouth: where the note particles start
+ *   .rb__emit   an empty point at the mouth: where the sung syllables float from
  * The viewBox is 0 0 100 170 for every voice; size differences are CSS scale.
  */
 const VOICES = [
@@ -29,6 +29,8 @@ const FUR = '#fbf8f2';
   <div class="choir__notes" data-choir-notes></div>
   {VOICES.map(({ v, name, color, scale }, i) => (
     <figure class="choir__rb" data-voice={v} style={`--c:${color};--s:${scale};--i:${i}`}>
+      {/* the syllable being sung, in a speech bubble (choir.ts fills it) */}
+      <span class="choir__say" data-say lang="ja"></span>
       <svg class="rb" viewBox="0 0 100 170" role="presentation">
         <g class="rb__all">
           <ellipse cx="38" cy="163" rx="10" ry="5" fill={FUR} stroke={INK} stroke-width="2.2" />
@@ -115,6 +117,7 @@ const FUR = '#fbf8f2';
   .rb__head { transform-origin: 50px 94px; }
   .rb__ears { transform-origin: 50px 48px; }
   .rb__eyes { transform-origin: 50px 66px; }
+  .rb__mouth { transform-origin: 50px 82px; }
   .rb__book { transform-origin: 50px 120px; }
   /* one mouth at a time: choir.ts sets data-shape (a i u e o n) */
   .rb__mouth > :global([data-m]) { display: none; }
@@ -135,7 +138,53 @@ const FUR = '#fbf8f2';
     background: linear-gradient(90deg, transparent, rgba(244, 241, 234, 0.3) 12%, rgba(244, 241, 234, 0.3) 88%, transparent);
   }
   .choir__notes { position: absolute; inset: -60% -10% 0; overflow: visible; }
-  .choir__notes :global(svg) { position: absolute; width: 20px; height: 20px; filter: drop-shadow(0 0 6px var(--glow, rgba(255, 255, 255, 0.6))); }
+  /* the syllables they sing, floating up in each voice's colour */
+  .choir__notes :global(.choir__float) {
+    position: absolute;
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(1rem, 1.6vw, 1.35rem);
+    line-height: 1;
+    text-shadow: 0 0 10px currentColor, 0 1px 0 rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .choir__rb { position: relative; }
+  .choir__say {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% - 0.4rem);
+    min-width: 2.1em;
+    padding: 0.28em 0.5em 0.32em;
+    border: 2px solid var(--c);
+    border-radius: 1em;
+    background: #fbf8f2;
+    color: #16140f;
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(0.85rem, 1.3vw, 1.05rem);
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    opacity: 0;
+    translate: -50% 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+  }
+  /* the tail, pointing at the mouth */
+  .choir__say::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    width: 8px;
+    height: 8px;
+    translate: -50% -4px;
+    rotate: 45deg;
+    background: #fbf8f2;
+    border-right: 2px solid var(--c);
+    border-bottom: 2px solid var(--c);
+  }
   @media (prefers-reduced-motion: reduce) {
     .choir__rb { transition: none; translate: none; }
   }

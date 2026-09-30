@@ -22,7 +22,7 @@ describe('kana → vowel', () => {
 });
 
 describe('imported choir', () => {
-  const choir = song.choir as Record<'S' | 'A' | 'T' | 'B', [number, number, number, string][]>;
+  const choir = song.choir as unknown as Record<'S' | 'A' | 'T' | 'B', [number, number, number, string, string][]>;
 
   it('has all four voices, in time order', () => {
     for (const v of ['S', 'A', 'T', 'B'] as const) {
@@ -37,6 +37,11 @@ describe('imported choir', () => {
     expect(t0).toBeCloseTo(140.585, 2);
     expect(vowel).toBe('o');
     expect(song.lyrics[0].t0).toBeCloseTo(t0, 2);
+  });
+
+  it('gives each syllable once (not on its tied continuation), and hums as ~', () => {
+    expect(choir.S.slice(0, 3).map((n) => n[4])).toEqual(['ほ', '', 'し']);
+    expect(choir.B[0][4]).toBe('~');
   });
 
   it('only uses mouth shapes the rabbits have', () => {
