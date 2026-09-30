@@ -1,12 +1,15 @@
 /* ============================================================
    The soundtrack keychain — a clear acrylic charm on a ball chain.
    Shared by the shelf (KeyChain.svelte) and /ost. Markup: src/lib/keychain.ts;
-   physics: src/scripts/dangle.ts, which publishes --kc-swing / --kc-twist (deg)
-   and --kc-hx / --kc-hy (0–100, where the foil catches the light) on the stage.
+   physics: src/scripts/dangle.ts — a verlet ball chain from the hook, the charm
+   a pendulum on the jump ring. The CSS lays out the resting pose (right before
+   any script runs); the physics only adds offsets, and publishes --kc-hx /
+   --kc-hy (0–100, where the foil catches the light) on the stage.
 
-   Built like the real thing: a 5 mm clear plate with a hole for the ring, the
-   art printed on a white underlay inside it, a holographic film over the front,
-   and the back printed with a QR that really scans.
+   Built like the real thing: a 5 mm clear plate with a hole, a jump ring that
+   passes through it (3D: half in front of the acrylic, half behind), a ball
+   chain, the art printed on a white underlay, a star holographic film, and the
+   back printed with a QR that really scans.
    ============================================================ */
 
 .kc__stage {
@@ -19,6 +22,17 @@
 }
 .kc__stage.is-dragging { cursor: grabbing; }
 
+/* the resting geometry, shared by the chain, the charm and the physics */
+.kc__stage {
+  --W: var(--kc-w, 58cqi);
+  --H: calc(var(--W) * 1.46);
+  --D: calc(var(--W) * 0.05);
+  --chain: var(--kc-chain, 20cqi);
+  --top: 3.6cqi; /* where the chain leaves the hook */
+  --ringD: calc(var(--W) * 0.18);
+  --bead: max(4px, 1.7cqi);
+}
+
 /* the hook it hangs from */
 .kc__hook {
   position: absolute;
@@ -30,53 +44,71 @@
   border-radius: 0 0 50% 50%;
   background: linear-gradient(180deg, #54534f, #2a2a2c);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+  z-index: 1;
 }
 
-/* the pivot: everything below swings and turns about the top of the chain */
-.kc {
-  --W: var(--kc-w, 58cqi);
-  --H: calc(var(--W) * 1.46);
-  --D: calc(var(--W) * 0.05);
-  --chain: var(--kc-chain, 20cqi);
+/* the ball chain: beads on a hairline, each placed by the physics (resting: a
+   straight drop from the hook to the ring) */
+.kc__chain {
   position: absolute;
-  top: 2.5cqi;
-  left: 50%;
+  inset: 0;
+  pointer-events: none;
+}
+.kc__links {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.kc__links polyline {
+  fill: none;
+  stroke: #9d9a93;
+  stroke-width: max(1px, 0.35cqi);
+}
+.kc__bead {
+  position: absolute;
+  top: calc(var(--top) + var(--chain) * var(--i) / 12 - var(--bead) / 2);
+  left: calc(50% - var(--bead) / 2);
+  width: var(--bead);
+  height: var(--bead);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fbfaf6 0 14%, #c8c5bd 34%, #7a7872 72%, #55534e);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* the charm: pivots on the top of the jump ring */
+.kc {
+  position: absolute;
+  top: calc(var(--top) + var(--chain));
+  left: calc(50% - var(--W) / 2);
   width: var(--W);
-  height: calc(var(--chain) + var(--H));
-  margin-left: calc(var(--W) / -2);
+  height: calc(var(--W) * 0.07 + var(--H));
   transform-origin: 50% 0;
   transform-style: preserve-3d;
-  transform: rotateZ(var(--kc-swing, 0deg)) rotateY(var(--kc-twist, 0deg));
   will-change: transform;
 }
 
-.kc__chain {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: max(4px, 1.6cqi);
-  height: calc(var(--chain) - var(--W) * 0.03);
-  translate: -50% 0;
-  background:
-    radial-gradient(circle at 40% 38%, #f4f2ec 0 18%, #b9b6ae 34%, #6d6b66 54%, transparent 58%) 50% 0 / 100% max(5px, 1.9cqi) repeat-y;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
-}
+/* the jump ring: a metal ring turned edge-on through the hole, so the plate
+   hides the half behind it — it is threaded, not stuck on */
 .kc__ring {
   position: absolute;
-  top: calc(var(--chain) - var(--W) * 0.075);
-  left: 50%;
-  width: calc(var(--W) * 0.15);
-  aspect-ratio: 1;
-  translate: -50% 0;
+  top: 0;
+  left: calc(50% - var(--ringD) / 2);
+  width: var(--ringD);
+  height: var(--ringD);
   border-radius: 50%;
-  border: max(2px, 0.9cqi) solid #c9c6be;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.5);
-  transform: translateZ(1px);
+  border: max(2px, calc(var(--W) * 0.024)) solid #cfccc4;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(0, 0, 0, 0.25),
+    inset 0 2px 1px rgba(255, 255, 255, 0.5);
+  transform: rotateY(58deg);
 }
 
 .kc__body {
   position: absolute;
-  top: var(--chain);
+  top: calc(var(--W) * 0.07);
   left: 0;
   width: var(--W);
   height: var(--H);
@@ -99,10 +131,11 @@
   inset: 0;
   border-radius: inherit;
   background: linear-gradient(140deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.06) 42%, rgba(255, 255, 255, 0.14));
+  /* hard rings only — a blurred inset glow was a costly first raster */
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.55),
     inset 0 0 0 3px rgba(255, 255, 255, 0.08),
-    inset 0 0 22px rgba(255, 255, 255, 0.14);
+    inset 0 0 0 6px rgba(255, 255, 255, 0.05);
 }
 .kc__hole {
   position: absolute;
@@ -198,7 +231,7 @@
   background: #fff;
   border-radius: calc(var(--W) * 0.02);
 }
-.kc__qr svg { display: block; width: 100%; height: 100%; }
+.kc__qr img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 .kc__scanme {
   position: relative;
   font-family: var(--font-mono);
@@ -207,28 +240,51 @@
   color: #16140f;
 }
 
-/* holographic film: a rainbow that slides as the charm turns, and a sparkle */
+/* star holographic film: two screens of tiny four-point stars, each lit by a
+   rainbow that slides and shifts hue as the charm turns and swings, over fine
+   diffraction lines — the grain a real holo acrylic has under light */
 .kc__holo {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  background:
-    linear-gradient(
-        115deg,
-        transparent 20%,
-        rgba(255, 90, 200, 0.55) 34%,
-        rgba(90, 220, 255, 0.55) 44%,
-        rgba(255, 240, 110, 0.5) 54%,
-        rgba(130, 255, 180, 0.45) 64%,
-        rgba(170, 120, 255, 0.45) 72%,
-        transparent 86%
-      )
-      calc(var(--kc-hx, 50) * 1%) calc(var(--kc-hy, 50) * 1%) / 280% 280%,
-    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.5) 0 0.6px, transparent 1.2px) 0 0 / 9px 11px,
-    radial-gradient(circle at 70% 60%, rgba(255, 255, 255, 0.4) 0 0.5px, transparent 1px) 0 0 / 13px 7px;
   mix-blend-mode: color-dodge;
-  opacity: 0.5;
+}
+.kc__holo > i {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.kc__stars {
+  background: linear-gradient(115deg, #ff5ac8, #5ad8ff, #ffe96e, #8affb4, #b68cff, #ff5ac8, #5ad8ff)
+    calc(var(--kc-hx, 50) * 1%) calc(var(--kc-hy, 50) * 1%) / 320% 320%;
+  /* PNG tiles (scripts/holo-tiles.mjs): an SVG mask is rasterised on the main
+     thread and cost the homepage a ~0.5 s frame when the keychain mounted */
+  -webkit-mask: url('/kc/stars-a.png') 0 0 / 36px 36px;
+  mask: url('/kc/stars-a.png') 0 0 / 36px 36px;
+  opacity: 0.95;
+}
+.kc__stars--b {
+  background: linear-gradient(65deg, #5ad8ff, #ffe96e, #ff5ac8, #b68cff, #8affb4, #5ad8ff)
+    calc(100% - var(--kc-hx, 50) * 1%) calc(var(--kc-hy, 50) * 1%) / 260% 260%;
+  -webkit-mask: url('/kc/stars-b.png') 11px 7px / 23px 23px;
+  mask: url('/kc/stars-b.png') 11px 7px / 23px 23px;
+  opacity: 0.8;
+}
+.kc__lines {
+  background:
+    repeating-linear-gradient(
+      100deg,
+      rgba(255, 110, 220, 0.2) 0 1px,
+      transparent 1px 3px,
+      rgba(110, 220, 255, 0.2) 3px 4px,
+      transparent 4px 6px,
+      rgba(255, 240, 120, 0.18) 6px 7px,
+      transparent 7px 9px
+    )
+    calc(var(--kc-hx, 50) * 0.4px) 0 / auto,
+    linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.35) calc(var(--kc-hx, 50) * 1%), transparent 75%);
+  opacity: 0.4;
 }
 .kc__spec {
   position: absolute;

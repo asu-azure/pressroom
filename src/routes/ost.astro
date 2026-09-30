@@ -77,10 +77,7 @@ const ogImage = new URL(og.src, Astro.site).href;
     <!-- ============ KEY: the keychain ============ -->
     <section class="ost__key" data-view="key" aria-label="Keychain">
       <div class="ost__keyGrid">
-        <div class="kc__stage ost__kcStage" data-kc-stage>
-          <span class="kc__hook" aria-hidden="true"></span>
-          <div class="kc" data-kc aria-hidden="true" set:html={keychainHtml(kc)} />
-        </div>
+        <div class="kc__stage ost__kcStage" data-kc-stage set:html={keychainHtml(kc)} />
 
         <div class="ost__keyInfo">
           <p class="mono ost__kicker" data-i18n="ost.kicker">{t['ost.kicker']}</p>

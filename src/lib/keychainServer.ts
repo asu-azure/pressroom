@@ -17,14 +17,17 @@ export const PLAYLIST_PATH = '/ost?scan=1';
 export async function soundtrackKeychain(site: URL | undefined, artWidth = 640): Promise<KeychainData> {
   const [img, qr] = await Promise.all([
     getImage({ src: art, width: artWidth, format: 'webp', quality: 80 }),
-    QRCode.toString(new URL(PLAYLIST_PATH, site ?? 'https://pressroom-omega.vercel.app').href, {
-      type: 'svg',
+    // A PNG, not inline SVG: an SVG is painted on the main thread, and on the
+    // keychain it was part of a ~0.5 s hitch. Small (one pixel per module ×4)
+    // and scaled with image-rendering: pixelated, so it stays sharp and scannable.
+    QRCode.toDataURL(new URL(PLAYLIST_PATH, site ?? 'https://pressroom-omega.vercel.app').href, {
       margin: 0,
+      scale: 4,
       errorCorrectionLevel: 'M',
       color: { dark: '#16140f', light: '#ffffff' },
     }),
   ]);
-  return { art: img.src, wave: song.wave, qr, title: song.title };
+  return { art: img.src, wave: song.wave, qr: `<img src="${qr}" alt="" width="132" height="132" decoding="async">`, title: song.title };
 }
 
 export function songLength(): string {

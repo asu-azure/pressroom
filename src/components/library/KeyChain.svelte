@@ -15,6 +15,45 @@
 
   const html = $derived(keychainHtml(data));
   const action = (node: HTMLElement) => dangle(node);
+
+  // The charm is many translucent, blended 3D layers; its first raster costs a
+  // weak integrated GPU ~0.4 s (measured cold on an Intel UHD 610, production
+  // build), which read as a stutter on entry. So it is hung when that can't be
+  // felt: after the page has loaded and settled, once the stage is in view, and
+  // not while the visitor is scrolling. The stage holds its place meanwhile.
+  let hung = $state(false);
+  let stageEl = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (!stageEl || hung) return;
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    let lastScroll = 0;
+    let seen = false;
+    let loaded = document.readyState === 'complete';
+    const onScroll = () => (lastScroll = performance.now());
+    const onLoad = () => (loaded = true);
+    const io = new IntersectionObserver(([en]) => (seen ||= en.isIntersecting), { rootMargin: '200px' });
+    io.observe(stageEl);
+    addEventListener('scroll', onScroll, { passive: true });
+    addEventListener('load', onLoad, { once: true });
+    const t0 = performance.now();
+    let timer = 0;
+    const tryHang = () => {
+      const now = performance.now();
+      if (loaded && seen && now - t0 > 1800 && now - lastScroll > 500) {
+        if (w.requestIdleCallback) w.requestIdleCallback(() => (hung = true), { timeout: 800 });
+        else hung = true;
+        return;
+      }
+      timer = window.setTimeout(tryHang, 250);
+    };
+    tryHang();
+    return () => {
+      clearTimeout(timer);
+      io.disconnect();
+      removeEventListener('scroll', onScroll);
+      removeEventListener('load', onLoad);
+    };
+  });
 </script>
 
 <a
@@ -26,10 +65,11 @@
   onpointerenter={() => prefetch('/ost')}
   onfocus={() => prefetch('/ost')}
 >
-  <div class="kc__stage kc-card__stage" use:action>
-    <span class="kc__hook" aria-hidden="true"></span>
-    <div class="kc" data-kc aria-hidden="true">{@html html}</div>
-  </div>
+  {#if hung}
+    <div class="kc__stage kc-card__stage" use:action>{@html html}</div>
+  {:else}
+    <div class="kc__stage kc-card__stage" bind:this={stageEl}></div>
+  {/if}
 
   <span class="book-card__label kc-card__label">
     <span class="kc-card__title"><b>{data.title.ja}</b> <span class="kc-card__en">{data.title.en}</span></span>

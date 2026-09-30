@@ -437,9 +437,15 @@ they know: an **acrylic keychain**. `src/routes/ost.astro` + `src/scripts/ost/st
 views on one page (`data-state` on `main`, mirrored in the URL):
 
 1. **KEY** — the keychain hangs in the night (`src/lib/keychain.ts` markup, `src/styles/keychain.css`,
-   physics `src/scripts/dangle.ts`: a pendulum swing + a twist on the chain, brushed by the
-   pointer, grabbed and flung, nudged by scrolling; nothing runs at rest). Clear 5 mm plate, art on
-   a white underlay, holographic film (`--kc-hx/--kc-hy` from the physics), a **waveform "sound
+   physics `src/scripts/dangle.ts`): a **verlet ball chain** (`src/lib/rope.ts`, tested — 12 links
+   pinned at the hook, folds when slack, straight when taut) with the charm a **pendulum on the
+   jump ring**, driven by the ring's acceleration and tugging it back; a twist spring shows the
+   back. Brushed by the pointer, held and flung, swayed by scrolling; nothing runs at rest. The
+   **jump ring passes through the plate's hole in 3D** (turned ~58° inside the charm's preserve-3d
+   context, so the acrylic depth-sorts it: threaded, not stuck on). The owner rejected a rigid
+   chain that "looked like a rod" and a ring that "looked pasted on". Clear 5 mm plate, art on
+   a white underlay, a **star holo** film — two screens of tiny four-point stars lit by rainbows
+   that slide with the tilt, over faint diffraction lines (`--kc-hx/--kc-hy` from the physics), a **waveform "sound
    code"** (48 bars of the mix's accent energy) and, on the back, a **real QR** (the `qrcode`
    package, server-side only — `src/lib/keychainServer.ts`) that opens `/ost?scan=1`. The design
    can go to print as it is.
@@ -467,13 +473,16 @@ views on one page (`data-state` on `main`, mirrored in the URL):
 ### The rabbit choir (`src/components/ost/Choir.astro` + `src/scripts/ost/choir.ts`)
 
 Four rabbits — S A T B, bass the biggest — stand in the player's corner and pop up on the first
-PLAY. Everything they do comes from `starfall.json` `choir` (every note of each voice with the
-vowel sung, from the mix's MV build + the vocal folder's syllables): each opens its mouth on its
-own notes in the shape of the vowel (a i u e o, closed 'n'; a hum where the part has no words),
-lifts its head with pitch within its range, breathes out a ♪ in its colour at each onset (pooled,
-≤ 24), raises its score about a bar before its part, sways with the mix's accents and blinks.
-Seeks re-find each voice's place instead of replaying notes. Reduced motion: mouths still change,
-nothing sways or floats.
+PLAY. Everything they do comes from `starfall.json` `choir` (every note of each voice as
+`[t0, t1, midi, vowel, kana]`; kana only where a syllable starts, `~` for a hum): each opens its
+mouth on its own notes in the vowel's shape (a i u e o, closed 'n'), staying open through
+breath-sized gaps; **a speech bubble shows the syllable it is singing** (♪ for a hum) and the
+syllable floats up in its colour (pooled, ≤ 20) — the owner couldn't tell what they sang before.
+Heads lift with pitch, scores rise a bar before the part, they sway with the accents and blink.
+**Every pose is eased per real frame time, never set outright** — setting values directly (beat
+spikes, head pops, the mouth snapping shut between syllables) made the first version judder.
+Seeks re-find each voice's place instead of replaying notes. Reduced motion: mouths and bubbles
+still change, nothing sways, lifts or floats.
 
 **The drawing is temporary SVG, made to be replaced by Asu's art.** The rig is the contract — keep
 the group classes and pivots listed at the top of `Choir.astro` (`.rb__all`, `.rb__head`,
@@ -490,6 +499,13 @@ rabbits — `scripts/kana-vowel.mjs`), and the motif's right hand. `--audio` cop
 `public/ost/starfall.mp3`. **The music project's notes name the composer personally — none of that
 may reach this repo;** the importer copies no credits and sets the title itself.
 Cover art is `src/assets/ost/starfall-{night,day}.jpg` (3000², encoded through `astro:assets`).
+
+**Performance, measured (production build, Intel UHD 610, cold):** the charm's first raster cost a
+~0.5 s frame. SVG images are rasterised on the main thread, so the star screens are **PNG mask
+tiles** (`public/kc/stars-{a,b}.png`, regenerate with `node scripts/holo-tiles.mjs`) and the QR is
+a **PNG** (`qrcode.toDataURL`, `image-rendering: pixelated`); no blurred inset shadows. What's left
+is the GPU's one-off cost for many translucent 3D layers, so the shelf hangs its keychain only when
+that can't be felt: after load, in view, ~1.8 s in, and not within 0.5 s of a scroll.
 
 ### The shelf keychain (`src/components/library/KeyChain.svelte`)
 
