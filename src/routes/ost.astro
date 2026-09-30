@@ -18,6 +18,7 @@
  */
 import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
+import Choir from '../components/ost/Choir.astro';
 import song from '../data/ost/starfall.json';
 import nightArt from '../assets/ost/starfall-night.jpg';
 import dayArt from '../assets/ost/starfall-day.jpg';
@@ -158,7 +159,7 @@ const ogImage = new URL(og.src, Astro.site).href;
             </div>
           </div>
         </div>
-        <div class="ost__choirSlot" data-choir-slot></div>
+        <div class="ost__choirSlot"><Choir /></div>
       </section>
 
       <!-- the song list — one song for now; each opens onto its movements -->

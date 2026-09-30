@@ -18,6 +18,7 @@
 import song from '../../data/ost/starfall.json';
 import { ScoreClock } from './clock';
 import { dangle } from '../dangle';
+import { initChoir } from './choir';
 import { punch } from '../mv';
 import { applyCopy, readCopyPayload } from '../../lib/siteCopyClient';
 import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../../lib/lang';
@@ -131,6 +132,9 @@ export function initStarfall() {
       else kc.nudge(e.clientX < kcStage.getBoundingClientRect().left + kcStage.clientWidth / 2 ? 60 : -60, 90);
     },
   });
+
+  // --- the rabbit choir (components/ost/Choir.astro) -------------------------------
+  const choir = initChoir(document.querySelector<HTMLElement>('[data-choir]'));
 
   // --- stars -------------------------------------------------------------------
   const canvas = q<HTMLCanvasElement>('.ost__stars');
@@ -311,6 +315,7 @@ export function initStarfall() {
     for (let i = falling.length - 1; i >= 0; i--) if (falling[i].life <= 0) falling.splice(i, 1);
 
     update(t, true);
+    choir.update(t, clock.playing);
     drawSky(t);
     if (clock.playing || falling.length) raf = requestAnimationFrame(frame);
   };
@@ -338,6 +343,7 @@ export function initStarfall() {
     clock.start();
     syncHits(clock.now());
     setPlaying(true);
+    choir.start();
     playBtns.forEach((b) => punch(b));
     kick();
   }
@@ -345,6 +351,7 @@ export function initStarfall() {
     clock.stop();
     audio.pause();
     setPlaying(false);
+    choir.update(clock.now(), false);
   }
   function toggle() {
     if (clock.playing) pause();
@@ -360,6 +367,7 @@ export function initStarfall() {
     }
     syncHits(t);
     update(t, true);
+    choir.update(t, clock.playing);
     drawSky(t);
   };
 

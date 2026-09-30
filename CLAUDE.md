@@ -464,6 +464,22 @@ views on one page (`data-state` on `main`, mirrored in the URL):
 - The MP3 (9.9 MB) is `preload="metadata"`; the full download starts when a visitor reaches for PLAY.
   `?t=<sec>` starts the clock there. Mini transport appears when the player is out of view.
 
+### The rabbit choir (`src/components/ost/Choir.astro` + `src/scripts/ost/choir.ts`)
+
+Four rabbits — S A T B, bass the biggest — stand in the player's corner and pop up on the first
+PLAY. Everything they do comes from `starfall.json` `choir` (every note of each voice with the
+vowel sung, from the mix's MV build + the vocal folder's syllables): each opens its mouth on its
+own notes in the shape of the vowel (a i u e o, closed 'n'; a hum where the part has no words),
+lifts its head with pitch within its range, breathes out a ♪ in its colour at each onset (pooled,
+≤ 24), raises its score about a bar before its part, sways with the mix's accents and blinks.
+Seeks re-find each voice's place instead of replaying notes. Reduced motion: mouths still change,
+nothing sways or floats.
+
+**The drawing is temporary SVG, made to be replaced by Asu's art.** The rig is the contract — keep
+the group classes and pivots listed at the top of `Choir.astro` (`.rb__all`, `.rb__head`,
+`.rb__ears`, `.rb__eyes`, `.rb__mouth` with one child per `data-m` shape, `.rb__book`,
+`.rb__emit`) and new art drops in with no script change.
+
 ### The data — `src/data/ost/starfall.json`
 
 Imported, never hand-edited: `node scripts/import-ost.mjs [--audio]` reads the MV player's build
