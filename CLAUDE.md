@@ -181,7 +181,7 @@ is dropped while the canvas is live (`.is-pressed`).
 ### The shelf's books (`WorkCard.svelte` + `src/scripts/book3d.ts`)
 
 Each work is a CSS 3D box — front, back, spine, fore-edge, head, tail — **depth from the page
-count** (about double true scale). Authors upload the whole wraparound as the cover page and crop
+count** (a touch over true scale — the owner found double scale too thick). Authors upload the whole wraparound as the cover page and crop
 the front, so the leftover is the **back cover** and a sliver at the crop edge wraps the spine.
 With no crop, the back is plain stock. Binding side comes from the wraparound, else RTL → right.
 

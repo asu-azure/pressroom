@@ -50,9 +50,9 @@
     natural ? (front.w * natural.w) / (front.h * natural.h) : 182 / 257,
   );
 
-  // Depth from the page count. A real 84-page B5 is ~5 mm on 182 — thin enough to
-  // read as a card — so this runs about double true scale, capped for epics.
-  const depth = $derived(Math.min(0.16, Math.max(0.045, 0.03 + pageCount * 0.0007)));
+  // Depth from the page count. A real 84-page B5 is ~5 mm on 182 mm (0.027); this
+  // runs a touch over true scale so the leaves still read, capped for epics.
+  const depth = $derived(Math.min(0.08, Math.max(0.022, 0.015 + pageCount * 0.00035)));
 
   const frontCss = $derived(coverUrl ? region(coverUrl, front.x, front.y, front.w, front.h) : '');
   const backCss = $derived(
