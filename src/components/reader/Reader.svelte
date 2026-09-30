@@ -14,6 +14,7 @@
   import NoteRail from './NoteRail.svelte';
   import HeartBurst from './HeartBurst.svelte';
   import { sfx } from '../../scripts/sound';
+  import { saveShelfmarks } from '../../lib/shelfmarks';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
@@ -65,6 +66,19 @@
       })
       .filter((m) => m.sheet >= 0),
   );
+  // Shelfmarks: the same progress and favourites, as positions the shelf can
+  // draw (付箋 and しおり on the 3D book — see lib/shelfmarks.ts).
+  $effect(() => {
+    if (!work || !pageOrder.length) return;
+    const first = sheets[cur]?.pages[0];
+    const at = first ? pageOrder.indexOf(first.id) : -1;
+    saveShelfmarks(work.id, {
+      total: pageOrder.length,
+      at: at >= 0 ? at : null,
+      favs: favorites.map((id) => pageOrder.indexOf(id)).filter((i) => i >= 0),
+    });
+  });
+
   const currentChapter = $derived(
     chapterMarks.filter((m) => m.sheet <= cur).at(-1)?.title ?? null,
   );

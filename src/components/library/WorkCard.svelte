@@ -2,6 +2,7 @@
   import { prefetch } from 'astro:prefetch';
   import { i18n } from '../../lib/i18n.svelte';
   import { book, region } from '../../scripts/book3d';
+  import { loadShelfmarks, layoutMarks, type Shelfmarks } from '../../lib/shelfmarks';
   import type { Work } from '../../lib/types';
 
   let {
@@ -53,6 +54,28 @@
   // Depth from the page count. A real 84-page B5 is ~5 mm on 182 mm (0.027); this
   // runs a touch over true scale so the leaves still read, capped for epics.
   const depth = $derived(Math.min(0.08, Math.max(0.022, 0.015 + pageCount * 0.00035)));
+
+  // --- 付箋 & しおり: this visitor's own reading, from lib/shelfmarks.ts ------
+  // Re-read when the page comes back from the reader (bfcache keeps the island
+  // alive) or another tab writes.
+  let marks = $state<Shelfmarks | null>(null);
+  $effect(() => {
+    const id = work.id;
+    const load = () => (marks = loadShelfmarks(id));
+    load();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key?.endsWith(id)) load();
+    };
+    window.addEventListener('pageshow', load);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('pageshow', load);
+      window.removeEventListener('storage', onStorage);
+    };
+  });
+  const laid = $derived(marks ? layoutMarks(marks) : null);
+  // keep marks off the covers themselves (no z-fighting with the boards)
+  const zOf = (depth: number) => `calc(var(--D) / 2 - ${(0.1 + depth * 0.8).toFixed(3)} * var(--D))`;
 
   const frontCss = $derived(coverUrl ? region(coverUrl, front.x, front.y, front.w, front.h) : '');
   const backCss = $derived(
@@ -121,6 +144,20 @@
       {/if}
 
       <div class="book__face book__spine" style={spineCss}></div>
+      {#if laid}
+        {#each laid.tabs as tab (tab.page)}
+          <span
+            class="book__tab"
+            style={`--z:${zOf(tab.depth)};--slot:${tab.slot};--tab:var(--tab-${tab.slot})`}
+            title={`♥ p.${tab.page}`}
+          ></span>
+        {/each}
+        {#if laid.bookmark}
+          <span class="book__mark" style={`--z:${zOf(laid.bookmark.depth)}`}>
+            <span class="mono">{laid.bookmark.page}</span>
+          </span>
+        {/if}
+      {/if}
       <div class="book__face book__fore"></div>
       <div class="book__face book__head"></div>
       <div class="book__face book__tail"></div>
@@ -133,6 +170,8 @@
     <span class="book-card__title serif authored">{work.title}</span>
     <span class="book-card__meta mono">
       {statusLabel} · {pageCount}P · {work.direction.toUpperCase()}
+      {#if laid?.bookmark}<span class="book-card__marked">· {i18n.t('lib.mark')} p.{laid.bookmark.page}</span>{/if}
+      {#if laid?.tabs.length}<span class="book-card__marked">· <svg class="book-card__heart" viewBox="0 0 12 11" aria-label="ここすき" role="img"><path d="M6 10.5 1.2 5.8A3 3 0 0 1 6 2a3 3 0 0 1 4.8 3.8Z" fill="currentColor" /></svg> {laid.tabs.length}</span>{/if}
       {#if work.read_locked}
         <svg class="book-card__lock" viewBox="0 0 12 14" aria-label={i18n.t('ov.locked')} role="img">
           <rect x="1" y="6" width="10" height="7.5" rx="1.2" fill="currentColor" />
@@ -340,6 +379,56 @@
   }
   .book__head { transform: rotateX(90deg) translateZ(calc(var(--H) / 2 - 1px)); }
   .book__tail { transform: rotateX(-90deg) translateZ(calc(var(--H) / 2 - 1px)); }
+
+  /* --- 付箋 & しおり --------------------------------------------------------
+     Placed in the box's own coordinates: x at the fore-edge (tabs) or near the
+     spine (the bookmark card), z at the page's depth between the boards. */
+  .book {
+    --tab-0: rgba(255, 196, 64, 0.92);
+    --tab-1: rgba(255, 110, 150, 0.9);
+    --tab-2: rgba(90, 200, 250, 0.9);
+    --tab-3: rgba(150, 225, 110, 0.9);
+    --tab-4: rgba(255, 140, 90, 0.9);
+  }
+  .book__tab {
+    position: absolute;
+    top: calc(10% + var(--slot) * 14%);
+    left: calc(100% - 3px);
+    width: calc(var(--W) * 0.075);
+    height: 8%;
+    border-radius: 0 2px 2px 0;
+    background: linear-gradient(90deg, rgba(0, 0, 0, 0.12), transparent 30%), var(--tab);
+    transform: translateZ(var(--z));
+  }
+  .book--bind-right .book__tab {
+    left: auto;
+    right: calc(100% - 3px);
+    border-radius: 2px 0 0 2px;
+    background: linear-gradient(270deg, rgba(0, 0, 0, 0.12), transparent 30%), var(--tab);
+  }
+  .book__mark {
+    position: absolute;
+    top: -13%;
+    left: 16%;
+    width: 11%;
+    height: 26%;
+    display: flex;
+    justify-content: center;
+    padding-top: 4%;
+    background: linear-gradient(180deg, var(--accent) 0 12%, #f4efe4 12%);
+    border-radius: 1px;
+    box-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.25);
+    color: #16140f;
+    transform: translateZ(var(--z));
+  }
+  .book--bind-right .book__mark { left: auto; right: 16%; }
+  .book__mark span {
+    margin-top: 0.4em;
+    font-size: max(6px, 3.4cqi);
+    letter-spacing: 0.04em;
+  }
+  .book-card__marked { color: var(--fg); }
+  .book-card__heart { width: 0.62rem; height: 0.56rem; color: #ff6e96; vertical-align: -0.05em; }
 
   /* --- Label on the shelf edge --------------------------------------------- */
   .book-card__label {

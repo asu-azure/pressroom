@@ -196,6 +196,12 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
   lettering and the old overlay collided with it. Books stand on planks drawn per item (±½ gap);
   the last one runs on and fades — room for the next book.
 - Reduced motion: the resting pose, a plain link, no hint line.
+- **付箋 & しおり** (`src/lib/shelfmarks.ts`, tested): the reader also saves progress and ここすき
+  favourites as *positions* (`pressroom:shelfmarks:{workId}` = total / at / favs), because the shelf
+  can't map page IDs to order — locked works hide their page rows from anon reads. The book then
+  shows a sticky tab out of the fore-edge per favourite (by depth, walking down 5 slots, max 12) and
+  a bookmark card out of the head at the page being read; the label adds "しおり p.N · ♥ n".
+  Re-read on `pageshow` (bfcache) and `storage`. Only ever this visitor's own browser data.
 
 ### Removed on purpose — do not reintroduce
 
