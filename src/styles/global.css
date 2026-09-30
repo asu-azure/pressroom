@@ -1449,7 +1449,7 @@ body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top
   background: rgba(12, 12, 13, 0.8);
   font-size: 0.55rem;
   letter-spacing: 0.16em;
-  color: var(--accent);
+  color: var(--ink-fg);
   white-space: nowrap;
 }
 .lb__hud {
