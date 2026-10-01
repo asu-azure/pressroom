@@ -241,16 +241,25 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
   before paint; no JS = grid). Layout `src/lib/wallLayout.ts` (pure, tested: hash-jittered prints,
   shortest-row packing, lead spans two rows, no overlaps) runs on the server into per-tile CSS vars in
   world units; `--u = 100cqh / --wh` makes the rows fill the wall's height. Camera `src/scripts/wall.ts`:
-  drag + inertia + rubber band, ctrl/⌘ wheel & pinch zoom, − ＋ FIT ALL, keys, minimap, sway from pan
-  speed (CSS transitions), pin-up entrance, hover lifts the paper (`.asu__print`) not the button. Click
-  flies the print into the lightbox and back (`originOf` in `lightbox.ts`). Plaster tile:
+  drag + inertia + rubber band, ctrl/⌘ wheel & pinch zoom, − ＋ FIT ALL, keys, minimap, pin-up
+  entrance, hover lifts the paper (`.asu__print`) not the button. Click flies the print into the
+  lightbox and back (`originOf` in `lightbox.ts`); a mouse resting 250 ms on a piece prefetches its
+  full size so the flight lands on it (mouse only — no data spent guessing on phones). Plaster tile:
   `node scripts/wall-tiles.mjs`. Not the retired strip: 2-D, ~2½ screens at rest, FIT/ALL, map, GRID.
-  **WIP (2026-09-30, stopped mid-measure):** headed Chrome on the prod build (UHD 610): scroll/fling/
-  zoom/zoomed-pan all ≤ 34 ms frames, CLS 0.0005; open items — a ~50–67 ms frame at pan start (seen
-  with sway disabled too, so not the sway transitions; next suspect: `is-grabbing` class restyle /
-  will-change toggle), two ~400 ms frames at load not yet compared against GRID view (run
-  `VIEW=grid` in the scratchpad's wallperf2.js), verify the lightbox flight in real Chrome, then
-  report to the owner.
+  **Performance rules, each measured on the prod build in headed Chrome on an Intel UHD 610**
+  (pan/fling/zoom now match the GRID page: 60 fps, one ~50 ms frame the first time a pan reveals
+  unseen wall):
+  - **No transitions on the 53 prints at rest.** Prints used to swing while the wall panned
+    (`--sway` → `rotate` transitions); Chrome ran those on the main thread and restyled ~300
+    elements every frame (17–56 ms each, 2.4 s of style work in one pan). Removed. Transitions exist
+    only during a filter re-hang (`.is-relayout`) and on the one hovered paper.
+  - **The pencil grid is its own box** (`.asu__grid::before`), not four more layers of the wall's
+    background. Six background layers on one element held panning at ~30 fps; split, 1–5 slow
+    frames per test instead of 35–144. Either half alone is cheap.
+  - Neighbouring prints are fetched and `decode()`d only after the wall has been seen and the page
+    is idle (`warm` in `wall.ts`); at load that competed with the hero.
+  - Load: with a warm cache the wall costs ~60 ms more main-thread work than the grid (style + layout
+    of the prints); the pin-up entrance itself is not the cost (stubbed out, no change).
 - (Before the wall) **the gallery was a masonry grid** (CSS columns), not the drag strip it started as: nineteen
   pieces in one horizontal track meant hundreds of rem of dragging, and an illustrator's work runs
   0.36 to 1.34 aspect, so nothing is cropped. `.tile--natural` is the modifier that undoes the

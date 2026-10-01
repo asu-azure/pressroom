@@ -13,9 +13,11 @@
  *   - Zoom: ctrl/⌘ + wheel or a trackpad pinch, two-finger pinch on touch,
  *     − ＋ FIT ALL, and the keyboard (arrows, + − 0).
  *   - A minimap shows where you are and jumps where you point.
- *   - Prints swing a little when the wall is panned fast (one `--sway`, animated
- *     by CSS transitions on the compositor), lift toward the pointer on hover,
- *     and are pinned up one after another the first time the wall comes into view.
+ *   - Prints lift toward the pointer on hover and are pinned up one after
+ *     another the first time the wall comes into view. They do NOT swing while
+ *     the wall pans: that was 53 `rotate` transitions, which Chrome ran on the
+ *     main thread — ~300 elements restyled every frame of a pan (17–56 ms each
+ *     on an Intel UHD 610), and the pan stuttered. Measured, then removed.
  *   - Images: 320 px thumbs at rest; the 900 px size is asked for only for prints
  *     in view once a zoom settles.
  *
@@ -23,7 +25,7 @@
  * see the whole. The wall is 2-D, ~2½ screens wide at rest, has FIT/ALL and a
  * map, and the GRID view is one tap away.
  *
- * No frame loop at rest. Reduced motion: no inertia, easing, sway or entrance.
+ * No frame loop at rest. Reduced motion: no inertia, easing or entrance.
  */
 import { layoutWall, wallRows, type WallItem, type WallLayout, type WallPrint } from '../lib/wallLayout';
 import type { FlyRect } from './lightbox';
@@ -71,8 +73,8 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
   let panTarget: { x: number; y: number } | null = null;
   let raf = 0;
   let last = 0;
-  let sway = 0;
   let settleTimer = 0;
+  let warm = false; // prefetching neighbours is allowed (after the first look)
 
   // --- layout -------------------------------------------------------------------
   function hang(t: HTMLElement, p: WallPrint) {
@@ -86,7 +88,6 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
     s.setProperty('--pbb', String(p.bb));
     s.setProperty('--pr', String(p.r));
     s.setProperty('--ptr', String(p.tr));
-    s.setProperty('--pk', String(p.k));
     t.dataset.hold = p.hold;
     if (p.hold === 'pin') t.dataset.pin = String(p.tr);
     else delete t.dataset.pin;
@@ -253,20 +254,9 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
       }
     }
     if (drag || pinch) moving = true;
-    // moving right, the bottoms trail left: clockwise
-    swayTo(drag || moving ? (drag ? dragV : vx) / 420 : 0);
     render();
     if (moving) raf = requestAnimationFrame(tick);
     else settle();
-  }
-
-  // the prints swing (CSS transition on --sway) — changed in steps, so rarely
-  function swayTo(s: number) {
-    if (reduced) return;
-    const q = Math.round(Math.max(-2.5, Math.min(2.5, s)) * 2) / 2;
-    if (q === sway) return;
-    sway = q;
-    world.style.setProperty('--sway', String(q));
   }
 
   // after a move: crisp raster, sharper images where zoomed, prefetch what's near
@@ -276,7 +266,6 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
       () => {
         if (raf) return;
         world.style.willChange = '';
-        swayTo(0);
         if (view !== 'wall') return;
         const x0 = -tx / z / u;
         const x1 = (vw - tx) / z / u;
@@ -288,7 +277,14 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
           const img = t.querySelector('img');
           if (!img) continue;
           const near = p.x + p.w > x0 - span && p.x < x1 + span;
-          if (near && img.loading === 'lazy') img.loading = 'eager';
+          if (warm && near && img.loading === 'lazy') {
+            // fetch it, and decode it off-thread now, so the first pan onto it
+            // doesn't pay for the decode in a frame (measured: two 50 ms frames)
+            img.loading = 'eager';
+            const decode = () => img.decode().catch(() => {});
+            if (img.complete) decode();
+            else img.addEventListener('load', decode, { once: true });
+          }
           const seen = p.x + p.w > x0 && p.x < x1 && p.y + p.h > y0 && p.y < y1;
           if (seen) {
             const want = Math.ceil((p.w - 2 * p.b) * u * z);
@@ -307,7 +303,6 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
   let pending: { id: number; x: number; y: number; tx: number; ty: number } | null = null;
   let pinch: { d: number; z: number; mx: number; my: number } | null = null;
   let samples: { t: number; x: number; y: number }[] = [];
-  let dragV = 0;
   let swallowClick = false;
 
   const local = (e: { clientX: number; clientY: number }) => {
@@ -388,9 +383,6 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
       ty = band(pending.ty + p.y - pending.y, r.y);
       samples.push({ t: e.timeStamp, x: p.x, y: p.y });
       while (samples.length > 2 && e.timeStamp - samples[0].t > 100) samples.shift();
-      const s0 = samples[0];
-      const span = (e.timeStamp - s0.t) / 1000;
-      dragV = span > 0.004 ? (p.x - s0.x) / span : 0;
     }
   });
 
@@ -421,7 +413,6 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
       const cap = 4200;
       vx = Math.max(-cap, Math.min(cap, vx));
       vy = Math.max(-cap, Math.min(cap, vy));
-      dragV = 0;
       kick();
     }
     drag = false;
@@ -627,20 +618,22 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
       seenIO.disconnect();
       if (!pinned && view === 'wall') pinUp();
       else root.classList.remove('is-await');
+      // Then, when the page is idle, fetch the prints a pan or two away. Not
+      // before: at load it competed with the hero and the in-view prints (lazy
+      // loading already fetches those) and cost the wall view ~200 ms of long
+      // frames over the grid.
+      const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1200));
+      idle(
+        () => {
+          warm = true;
+          settle(true);
+        },
+        { timeout: 2500 },
+      );
     },
     { threshold: 0.3 },
   );
   seenIO.observe(vp);
-  // warm the first screen's images a little before the wall scrolls into view
-  const nearIO = new IntersectionObserver(
-    (entries) => {
-      if (!entries.some((en) => en.isIntersecting)) return;
-      nearIO.disconnect();
-      settle(true);
-    },
-    { rootMargin: '600px 0px' },
-  );
-  nearIO.observe(vp);
 
   // --- view switch ---------------------------------------------------------------
   function setView(v: GalleryView, persist: boolean) {
@@ -727,7 +720,7 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
       const clip = view === 'wall' ? vp.getBoundingClientRect() : new DOMRect(0, 0, innerWidth, innerHeight);
       if (cx < clip.left || cx > clip.right || cy < clip.top || cy > clip.bottom) return null;
       const k = view === 'wall' ? z : 1;
-      const rot = view === 'wall' ? (place.get(t)?.r ?? 0) + sway * (place.get(t)?.k ?? 0) : 0;
+      const rot = view === 'wall' ? (place.get(t)?.r ?? 0) : 0;
       return { cx, cy, w: img.offsetWidth * k, h: img.offsetHeight * k, rot, src: img.currentSrc || img.src };
     },
   };

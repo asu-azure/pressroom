@@ -108,7 +108,7 @@ const wall = layoutWall(
 const wallAt = new Map(displayOrder.map((w, i) => [w.id, wall.prints[i]]));
 // CSS reads these per print (world units; scaled by the wall's height in CSS)
 const printVars = (p: WallPrint) =>
-  `--px:${p.x};--py:${p.y};--pw:${p.w};--ph:${p.h};--pb:${p.b};--pbb:${p.bb};--pr:${p.r};--ptr:${p.tr};--pk:${p.k}`;
+  `--px:${p.x};--py:${p.y};--pw:${p.w};--ph:${p.h};--pb:${p.b};--pbb:${p.bb};--pr:${p.r};--ptr:${p.tr}`;
 // a first guess at each picture's width on a ~720 px wall; wall.ts refines it
 const wallSizes = (p: WallPrint) => `${Math.ceil(((p.w - 2 * p.b) * 720) / wall.height)}px`;
 const GRID_SIZES = '(max-width: 640px) 92vw, (max-width: 1100px) 44vw, 23vw';
@@ -577,6 +577,21 @@ cacheShell(Astro);
       const el = (e.target as Element | null)?.closest<HTMLElement>('[data-lb-open]');
       if (!el) return;
       lb.open(Number(el.dataset.lbOpen ?? 0));
+    });
+    // A mouse resting on a piece fetches its full size, so the lightbox flight
+    // lands on the real picture instead of the thumbnail blown up. Mouse only:
+    // a touch has no hover, and guessing would spend a phone's data.
+    const fetched = new Set<number>();
+    let intent = 0;
+    document.addEventListener('pointerover', (e) => {
+      clearTimeout(intent);
+      if (e.pointerType !== 'mouse' || e.buttons) return;
+      const i = Number((e.target as Element | null)?.closest<HTMLElement>('[data-lb-open]')?.dataset.lbOpen ?? NaN);
+      if (Number.isNaN(i) || fetched.has(i) || !items[i]) return;
+      intent = window.setTimeout(() => {
+        fetched.add(i);
+        new Image().src = items[i].src;
+      }, 250);
     });
   }
 
@@ -1058,23 +1073,31 @@ cacheShell(Astro);
     transform-origin: 0 0;
     background-color: #1a191e;
     /* the one grain tile twice: fine grain, and blown up into soft mottling */
+    background-image: url('/wall/plaster.png'), url('/wall/plaster.png');
+    background-size:
+      128px 128px,
+      700px 700px;
+  }
+  /* The pencil grid lives on its own box, NOT as four more layers of the wall's
+     background: all six on one element made Chrome repaint slowly while the
+     wall panned — ~30 fps on an Intel UHD 610 (35–144 slow frames per pan test
+     vs 1–5 split this way, measured on the production build). */
+  .wall[data-view='wall'] .asu__grid::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
     background-image:
-      url('/wall/plaster.png'),
-      url('/wall/plaster.png'),
       linear-gradient(rgba(244, 241, 234, 0.05) 1px, transparent 1px),
       linear-gradient(90deg, rgba(244, 241, 234, 0.05) 1px, transparent 1px),
       linear-gradient(rgba(244, 241, 234, 0.022) 1px, transparent 1px),
       linear-gradient(90deg, rgba(244, 241, 234, 0.022) 1px, transparent 1px);
     background-size:
-      128px 128px,
-      700px 700px,
       calc(100 * var(--u)) calc(100 * var(--u)),
       calc(100 * var(--u)) calc(100 * var(--u)),
       calc(20 * var(--u)) calc(20 * var(--u)),
       calc(20 * var(--u)) calc(20 * var(--u));
     background-position:
-      0 0,
-      0 0,
       0 calc(24 * var(--u)),
       calc(70 * var(--u)) 0,
       0 calc(24 * var(--u)),
@@ -1096,13 +1119,13 @@ cacheShell(Astro);
     background: none;
     overflow: visible;
     translate: calc(var(--px) * var(--u)) calc(var(--py) * var(--u));
-    rotate: calc((var(--pr) + var(--sway, 0) * var(--pk)) * 1deg);
+    rotate: calc(var(--pr) * 1deg);
     transform-origin: 50% 0;
-    transition: rotate 1.2s cubic-bezier(0.25, 1.6, 0.5, 1);
   }
+  /* no transitions at rest: 53 running ones restyle on the main thread (wall.ts) */
   .wall.is-relayout .asu__tile {
     transition:
-      rotate 1.2s cubic-bezier(0.25, 1.6, 0.5, 1),
+      rotate 0.7s var(--ease),
       translate 0.7s var(--ease);
   }
   .wall[data-view='wall'] .asu__tile::after {

@@ -40,8 +40,6 @@ export interface WallPrint {
   hold: Hold;
   /** tape angle (degrees) or pin colour index */
   tr: number;
-  /** how much it swings when the wall is panned fast */
-  k: number;
   row: number;
   span: number;
 }
@@ -138,7 +136,6 @@ export function layoutWall(items: WallItem[], rows: number): WallLayout {
       r: r2((tiltU * 2 - 1) * maxTilt),
       hold,
       tr: hold === 'pin' ? Math.floor(tapeU * 3) : r2((tapeU * 2 - 1) * 7),
-      k: hold === 'pin' ? 1.3 : hold === 'tape' ? 0.75 : 0.35,
       row,
       span,
     });
