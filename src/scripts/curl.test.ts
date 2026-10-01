@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clipHalfPlane, reflectMatrix, reachable, fold, doorAngle, doorCommit, DOOR_MAX, type Pt } from './curl';
+import { clipHalfPlane, reflectMatrix, reachable, fold, doorAngle, doorCommit, DOOR_MAX, COVER_MAX, landingPage, mirrored, type Pt } from './curl';
 
 const apply = (m: number[], p: Pt): Pt => ({ x: m[0] * p.x + m[2] * p.y + m[4], y: m[1] * p.x + m[3] * p.y + m[5] });
 const close = (a: Pt, b: Pt) => {
@@ -71,5 +71,36 @@ describe('door turn', () => {
     expect(doorCommit(DOOR_MAX - 20, false, false)).toBe(false);
     expect(doorCommit(DOOR_MAX - 40, false, false)).toBe(true);
     expect(doorCommit(5, true, true)).toBe(true);
+  });
+});
+
+describe('the cover turn (a door that lands)', () => {
+  // an RTL book open on a 1000-wide stage: spine at 500, pages 340 wide
+  const spread = [
+    { x: 160, y: 40, w: 340, h: 480 }, // left page
+    { x: 500, y: 40, w: 340, h: 480 }, // right page
+  ];
+  it('lands on the page across the spine, touching the hinge', () => {
+    expect(landingPage(500, false, spread)).toBe(1); // RTL: hinge on the cover's right → the right page
+    expect(landingPage(500, true, spread)).toBe(0); // LTR: hinge on its left → the left page
+    expect(landingPage(500, false, [spread[0]])).toBe(-1); // nothing across the spine
+  });
+
+  it('turns the leaf into a box that, flipped about the hinge, lies on the page exactly', () => {
+    // the closed RTL cover sits left of the spine, a little wider than a page
+    const cover = { x: 148, y: 40, w: 352, h: 480 };
+    const box = mirrored(spread[1], { leaf: cover, hingeLeft: false });
+    expect(box).toEqual({ x: 500 - 340, y: 40, w: 340, h: 480 });
+    // mirrored about x = 500 it covers 500…840 — the right page
+    expect([2 * 500 - (box.x + box.w), 2 * 500 - box.x]).toEqual([spread[1].x, spread[1].x + spread[1].w]);
+    const ltr = mirrored(spread[0], { leaf: { x: 500, y: 40, w: 352, h: 480 }, hingeLeft: true });
+    expect(ltr.x).toBe(500);
+  });
+
+  it('turns a full 180° over one page width, and commits like a page', () => {
+    expect(doorAngle(200, 400, COVER_MAX)).toBeCloseTo(90);
+    expect(doorAngle(400, 400, COVER_MAX)).toBe(180);
+    expect(doorCommit(COVER_MAX - 20, false, false, COVER_MAX)).toBe(false);
+    expect(doorCommit(COVER_MAX - 40, false, false, COVER_MAX)).toBe(true);
   });
 });

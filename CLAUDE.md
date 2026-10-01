@@ -676,6 +676,16 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   contain rect, and the ▦ grid / chapter thumbs aim `object-position` at the front. The turning
   page is now the sharp `.si__img` once loaded — it used to grab the first `<img>`, the blurred
   thumbnail.
+- **In double layout the solo cover is the book CLOSED** (`closedCover` in `FlipSurface`): it is
+  one page wide and sits on its half of the spread — its spine on the spread's spine (RTL left of
+  it, LTR right), an invisible `.fs__gap` sized like a page holding the other half. The owner found
+  the centred, full-size cover wrong: on a phone it was twice the width of a spread page and its
+  spine missed the book's. Opening it is a door with `land` (`curl.ts`): one sheet with the
+  facing page on its back, turning the full 180° (`COVER_MAX`) and landing exactly on that page
+  (`landingPage` picks it across the spine; at 90°, edge-on, the leaf trades the cover's box for
+  the page's — `mirrored`); until then that half shows the reader's floor, like a closed book on
+  a table. Closing runs it backwards. Single layout keeps the plain door. Tested geometry in
+  `curl.test.ts`; harness frames checked on desktop and a 390-wide phone.
 - Reader harness (scratchpad, not in the repo): Playwright `page.route` serves a fake unlocked
   6-page book (works/pages/chapters REST + generated page images) — never the real DB, never a
   password.

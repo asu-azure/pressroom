@@ -2,7 +2,7 @@
   import { gsap } from 'gsap';
   import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
-  import { Curl, Door, DOOR_MAX, doorAngle, doorCommit } from '../../scripts/curl';
+  import { Curl, Door, doorAngle, doorCommit, landingPage } from '../../scripts/curl';
   import { parseCropAttr, pictureLayer } from '../../lib/coverCrop';
 
   let {
@@ -44,6 +44,10 @@
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   /** Only sheets near the current one are mounted — hundreds of pages stay cheap. */
+  // A solo cover before the spreads is the book CLOSED: it sits on its half of
+  // the spread, its spine on the spine (RTL left of it, LTR right), the size of
+  // one page — not centred and full size, which made the first turn jump.
+  const closedCover = $derived(sheets[0]?.kind === 'single' && sheets[1]?.kind === 'spread');
   const mounted = $derived(
     sheets
       .map((sheet, index) => ({ sheet, index }))
@@ -237,21 +241,36 @@
     const h0 = stage.getBoundingClientRect();
     const rel0 = (r: DOMRect, dx = 0) => ({ x: r.left - h0.left + dx, y: r.top - h0.top, w: r.width, h: r.height });
 
-    // One page on screen: the door turn.
-    if (now.length === 1) {
+    // One page on screen: the door turn. Opening or closing the cover over the
+    // first spread, the door is one sheet with the facing page on its back: it
+    // turns 180° and lands on that page.
+    const coverTurn = closedCover && Math.min(cur, target) === 0;
+    const landOn = (leaf: { x: number; w: number }, hingeLeft: boolean, spread: { r: DOMRect; pic: string }[], dx = 0) => {
+      if (!coverTurn) return undefined;
+      const rects = spread.map((p) => rel0(p.r, dx));
+      const i = landingPage(hingeLeft ? leaf.x : leaf.x + leaf.w, hingeLeft, rects);
+      return i < 0 || !spread[i].pic ? undefined : { rect: rects[i], pic: spread[i].pic, floor: floorColour() };
+    };
+    if (now.length === 1 || (coverTurn && !forward)) {
       const hingeLeft = direction === 'ltr';
       if (forward) {
         if (!now[0].pic) return false;
         gsap.killTweensOf(track);
         gsap.set(track, { x: -target * width * s });
-        doorFx = new Door({ host: stage, leaf: rel0(now[0].r), pic: now[0].pic, hingeLeft, forward: true });
+        const leaf = rel0(now[0].r);
+        const land = landOn(leaf, hingeLeft, pageEls(target));
+        if (coverTurn && !land) return false;
+        doorFx = new Door({ host: stage, leaf, pic: now[0].pic, hingeLeft, forward: true, land });
         doorW = now[0].r.width;
       } else {
         const prev = pageEls(target);
         if (prev.length !== 1 || !prev[0].pic) return false;
         // the previous sheet sits one screen over on the track: bring its rect on-screen
         const shift = -(target - cur) * width * s;
-        doorFx = new Door({ host: stage, leaf: rel0(prev[0].r, shift), pic: prev[0].pic, hingeLeft, forward: false });
+        const leaf = rel0(prev[0].r, shift);
+        const land = landOn(leaf, hingeLeft, now);
+        if (coverTurn && !land) return false;
+        doorFx = new Door({ host: stage, leaf, pic: prev[0].pic, hingeLeft, forward: false, land });
         doorW = prev[0].r.width;
       }
       doorForward = forward;
@@ -285,12 +304,21 @@
     return true;
   }
 
+  // what shows where a closed book has no page: the reader's own background
+  function floorColour(): string {
+    for (let el: HTMLElement | null = stage; el; el = el.parentElement) {
+      const c = getComputedStyle(el).backgroundColor;
+      if (c && c !== 'transparent' && !/rgba\(.*,\s*0\)$/.test(c)) return c;
+    }
+    return '#0c0c0d';
+  }
+
   async function endDoor(commit: boolean, ms: number) {
     const fx = doorFx;
     if (!fx) return;
     curlBusy = true;
-    const done = doorForward ? DOOR_MAX : 0;
-    const undone = doorForward ? 0 : DOOR_MAX;
+    const done = doorForward ? fx.max : 0;
+    const undone = doorForward ? 0 : fx.max;
     await fx.run(commit ? done : undone, ms);
     if (commit) {
       if (!doorForward) gsap.set(track, { x: -curlTarget * width * s });
@@ -405,7 +433,8 @@
       // forward: the finger travels toward the spine; back: away from it
       const dx = e.clientX - startX;
       const towardSpine = direction === 'ltr' ? -dx : dx;
-      doorFx.set(doorForward ? doorAngle(towardSpine, doorW) : DOOR_MAX - doorAngle(-towardSpine, doorW));
+      const max = doorFx.max;
+      doorFx.set(doorForward ? doorAngle(towardSpine, doorW, max) : max - doorAngle(-towardSpine, doorW, max));
       return;
     }
     if (gesture === 'curl' && curlFx) {
@@ -461,7 +490,7 @@
       const v = dx / Math.max(1, performance.now() - startT);
       const towardSpine = direction === 'ltr' ? -v : v;
       const fling = (doorForward ? towardSpine : -towardSpine) > 0.5;
-      const commit = doorCommit(doorFx.angle, doorForward, fling);
+      const commit = doorCommit(doorFx.angle, doorForward, fling, doorFx.max);
       void endDoor(commit, commit ? 420 : 300);
       return;
     }
@@ -579,18 +608,27 @@
       >
         <div
           class="fs__pages"
-          class:is-spread={sheet.kind === 'spread'}
+          class:is-spread={sheet.kind === 'spread' || (index === 0 && closedCover)}
           class:is-rtl={direction === 'rtl'}
           bind:this={pagesEls[index]}
           style={index === cur
             ? `transform: translate(${tx}px, ${ty}px) scale(${scale}); transform-origin: center center;`
             : undefined}
         >
+          {#if index === 0 && closedCover}
+            <!-- the other half of the closed book: empty, one page wide (before
+                 the cover in the DOM, so RTL's row-reverse puts it on the right) -->
+            <span
+              class="fs__gap"
+              aria-hidden="true"
+              style={`aspect-ratio: ${sheet.pages[0].width} / ${sheet.pages[0].height}; --pw: ${sheet.pages[0].width}; --ph: ${sheet.pages[0].height};`}
+            ></span>
+          {/if}
           {#each sheet.pages as page (page.id)}
             <SheetImage
               {page}
               eager
-              sizes={sheet.kind === 'spread' ? '50vw' : '100vw'}
+              sizes={sheet.kind === 'spread' || (index === 0 && closedCover) ? '50vw' : '100vw'}
               alt={`Page ${pageNumberOf(page.id)}`}
               {translateOn}
               {characters}
@@ -661,18 +699,26 @@
      calc() width sidesteps intrinsic sizing on every engine; max-width still
      letterboxes oversized spreads (imgs are absolutely positioned with
      object-fit: contain). */
-  .fs__pages :global(.si) {
+  .fs__gap {
+    display: block;
+    visibility: hidden;
+    flex: none;
+  }
+  .fs__pages :global(.si),
+  .fs__gap {
     height: calc(100svh - 6.4rem);
     width: calc((100svh - 6.4rem) * (var(--pw) / var(--ph)));
     max-width: 100%;
   }
-  .fs__pages.is-spread :global(.si) {
+  .fs__pages.is-spread :global(.si),
+  .fs__pages.is-spread .fs__gap {
     max-width: 50%;
   }
   .fs__pages.is-spread.is-rtl {
     flex-direction: row-reverse;
   }
-  .is-fit-width .fs__pages :global(.si) {
+  .is-fit-width .fs__pages :global(.si),
+  .is-fit-width .fs__gap {
     height: auto;
     width: min(100%, 62rem);
   }
@@ -688,12 +734,14 @@
     .fs__pages {
       width: 100%;
     }
-    .fs__pages :global(.si) {
+    .fs__pages :global(.si),
+    .fs__gap {
       height: auto;
       width: 100%;
       max-width: 100%;
     }
-    .fs__pages.is-spread :global(.si) {
+    .fs__pages.is-spread :global(.si),
+    .fs__pages.is-spread .fs__gap {
       width: 50%;
       max-width: 50%;
       height: auto;

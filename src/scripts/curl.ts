@@ -238,6 +238,17 @@ export class Curl {
   }
 }
 
+const boxOf = (r: Rect) => `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;`;
+
+/**
+ * The leaf's box (before its rotation) that, turned 180° about the hinge, lies
+ * exactly on `target` — the hinge stays where it is.
+ */
+export function mirrored(target: Rect, s: { leaf: Rect; hingeLeft: boolean }): Rect {
+  const hingeX = s.hingeLeft ? s.leaf.x : s.leaf.x + s.leaf.w;
+  return { x: s.hingeLeft ? hingeX : hingeX - target.w, y: target.y, w: target.w, h: target.h };
+}
+
 // --- the single-page door turn ------------------------------------------------
 //
 // One page on screen has no facing page for a fold to land on, and a fold that
@@ -249,14 +260,35 @@ export class Curl {
 
 export const DOOR_MAX = 160;
 
+/** A book's cover lands flat on the far side of the spine. */
+export const COVER_MAX = 180;
+
 /** Angle for a drag: `travel` px in the turning direction across a page `w` wide. */
-export function doorAngle(travel: number, w: number): number {
-  return Math.max(0, Math.min(1, travel / Math.max(1, w))) * DOOR_MAX;
+export function doorAngle(travel: number, w: number, max = DOOR_MAX): number {
+  return Math.max(0, Math.min(1, travel / Math.max(1, w))) * max;
 }
 
-/** Whether a released door completes: past 35° (or short of 125° coming back), or flung. */
-export function doorCommit(angle: number, forward: boolean, fling: boolean): boolean {
-  return fling || (forward ? angle > 35 : angle < DOOR_MAX - 35);
+/** Whether a released door completes: past 35° (or 35° short of the far side coming back), or flung. */
+export function doorCommit(angle: number, forward: boolean, fling: boolean, max = DOOR_MAX): boolean {
+  return fling || (forward ? angle > 35 : angle < max - 35);
+}
+
+/**
+ * Which of the pages under a turning cover it lands on: the one across the
+ * spine from it, touching the hinge (RTL: the right page; LTR: the left).
+ */
+export function landingPage(hingeX: number, hingeLeft: boolean, pages: readonly Rect[]): number {
+  let best = -1;
+  let gap = Infinity;
+  pages.forEach((r, i) => {
+    const d = hingeLeft ? Math.abs(r.x + r.w - hingeX) : Math.abs(r.x - hingeX);
+    const across = hingeLeft ? r.x + r.w / 2 < hingeX : r.x + r.w / 2 > hingeX;
+    if (across && d < gap) {
+      gap = d;
+      best = i;
+    }
+  });
+  return best;
 }
 
 export interface DoorSetup {
@@ -268,6 +300,13 @@ export interface DoorSetup {
   hingeLeft: boolean;
   /** true: the current page swings away; false: the previous page swings back in */
   forward: boolean;
+  /**
+   * A book's cover opening onto (or closing over) the first spread: the leaf is
+   * one sheet with the facing page on its back, so it turns the full 180° and
+   * lands exactly on that page instead of fading out. `floor` paints the spot
+   * it lands on until it lies there (a closed book has nothing on that side).
+   */
+  land?: { rect: Rect; pic: string; floor: string };
 }
 
 export class Door {
@@ -275,12 +314,17 @@ export class Door {
   private leaf: HTMLElement;
   private shade: HTMLElement;
   private shadow: HTMLElement;
+  private backShade: HTMLElement | null = null;
   private s: DoorSetup;
+  private landed = false; // the leaf is past 90°, wearing the landing page's box
   angle: number;
+  /** how far this door turns: a cover lands flat (180°), a page fades out (DOOR_MAX) */
+  readonly max: number;
 
   constructor(s: DoorSetup) {
     this.s = s;
-    this.angle = s.forward ? 0 : DOOR_MAX;
+    this.max = s.land ? COVER_MAX : DOOR_MAX;
+    this.angle = s.forward ? 0 : this.max;
     const { leaf: r } = s;
     const el = (css: string) => {
       const d = document.createElement('div');
@@ -294,23 +338,32 @@ export class Door {
         `perspective-origin:${r.x + r.w * (origin / 100)}px ${r.y + r.h / 2}px;`,
     );
     this.shadow = el(`position:absolute;${box}opacity:0;`);
+    // where the cover will land: empty table until it lies there
+    const floor = s.land ? el(`position:absolute;${boxOf(s.land.rect)}background:${s.land.floor};`) : null;
     this.leaf = el(`position:absolute;${box}transform-style:preserve-3d;transform-origin:${origin}% 50%;`);
     const img = s.pic;
     const front = el(`position:absolute;inset:0;backface-visibility:hidden;background:${img},#f1ece2;`);
     this.shade = el('position:absolute;inset:0;opacity:0;');
     front.append(this.shade);
-    // the reverse: paper, with the print showing through mirrored
+    // the reverse: the facing page for a cover (it reads the right way round
+    // once the leaf has turned 180°), else paper with the print showing through
     const back = el('position:absolute;inset:0;backface-visibility:hidden;transform:rotateY(180deg);background:#f1ece2;');
-    const through = el(`position:absolute;inset:0;background:${img};opacity:.13;transform:scaleX(-1);`);
-    back.append(through);
+    if (s.land) {
+      back.style.background = `${s.land.pic},#f1ece2`;
+      this.backShade = el('position:absolute;inset:0;opacity:0;');
+      back.append(this.backShade);
+    } else {
+      back.append(el(`position:absolute;inset:0;background:${img};opacity:.13;transform:scaleX(-1);`));
+    }
     this.leaf.append(front, back);
+    if (floor) this.root.append(floor);
     this.root.append(this.shadow, this.leaf);
     s.host.append(this.root);
     this.render();
   }
 
   set(angle: number) {
-    this.angle = Math.max(0, Math.min(DOOR_MAX, angle));
+    this.angle = Math.max(0, Math.min(this.max, angle));
     this.render();
   }
 
@@ -318,12 +371,27 @@ export class Door {
     const a = this.angle;
     const sign = this.s.hingeLeft ? -1 : 1;
     this.leaf.style.transform = `rotateY(${(a * sign).toFixed(2)}deg)`;
-    this.leaf.style.opacity = String(a > 100 ? Math.max(0, 1 - (a - 100) / (DOOR_MAX - 100)) : 1);
+    const land = this.s.land;
+    if (land) {
+      // Edge-on at 90° nothing of the leaf shows, so that is where it trades the
+      // cover's size for the landing page's — it lands on that page exactly.
+      const past = a > 90;
+      if (past !== this.landed) {
+        this.landed = past;
+        const r = past ? mirrored(land.rect, this.s) : this.s.leaf;
+        Object.assign(this.leaf.style, { left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px` });
+      }
+      if (this.backShade) {
+        this.backShade.style.opacity = String(Math.sin((Math.max(a, 90) * Math.PI) / 180) * 0.9);
+        this.backShade.style.background = `linear-gradient(${this.s.hingeLeft ? 270 : 90}deg, rgba(0,0,0,.08), rgba(0,0,0,.42))`;
+      }
+    }
+    this.leaf.style.opacity = String(!land && a > 100 ? Math.max(0, 1 - (a - 100) / (DOOR_MAX - 100)) : 1);
     const k = Math.sin((Math.min(a, 90) * Math.PI) / 180);
     this.shade.style.opacity = String(k);
     this.shade.style.background = `linear-gradient(${this.s.hingeLeft ? 90 : 270}deg, rgba(0,0,0,.08), rgba(0,0,0,.42))`;
     // the shadow the lifted leaf throws on the page below, strongest near the spine
-    this.shadow.style.opacity = String(Math.sin((a * Math.PI) / 180) * (a > 100 ? 1 - (a - 100) / (DOOR_MAX - 100) : 1));
+    this.shadow.style.opacity = String(Math.sin((a * Math.PI) / 180) * (!land && a > 100 ? 1 - (a - 100) / (DOOR_MAX - 100) : 1));
     this.shadow.style.background = `linear-gradient(${this.s.hingeLeft ? 90 : 270}deg, rgba(0,0,0,.45), rgba(0,0,0,.12) 35%, transparent 70%)`;
   }
 
