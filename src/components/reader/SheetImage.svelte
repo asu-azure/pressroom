@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageRec, Character } from '../../lib/types';
+  import { cropAttr, cropImgStyle } from '../../lib/coverCrop';
 
   let {
     page,
@@ -47,25 +48,36 @@
   class="si"
   class:si--blank={page.isBlank}
   data-page-id={page.isBlank ? undefined : page.id}
+  data-crop={page.crop ? cropAttr(page.crop) : undefined}
   style={`aspect-ratio: ${page.width} / ${page.height}; --pw: ${page.width}; --ph: ${page.height};`}
 >
+  {#snippet pictures(style: string | undefined)}
+    <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" {style} />
+    <img
+      bind:this={imgEl}
+      class="si__img"
+      class:is-loaded={loaded}
+      src={page.medUrl}
+      srcset={`${page.medUrl} 900w, ${page.fullUrl} 1600w`}
+      {sizes}
+      {alt}
+      decoding="async"
+      loading={eager ? 'eager' : 'lazy'}
+      draggable="false"
+      onload={() => (loaded = true)}
+      {style}
+    />
+  {/snippet}
   {#if page.isBlank}
     <span class="mono si__blankMark" aria-hidden="true">◦</span>
   {:else}
-  <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" />
-  <img
-    bind:this={imgEl}
-    class="si__img"
-    class:is-loaded={loaded}
-    src={page.medUrl}
-    srcset={`${page.medUrl} 900w, ${page.fullUrl} 1600w`}
-    {sizes}
-    {alt}
-    decoding="async"
-    loading={eager ? 'eager' : 'lazy'}
-    draggable="false"
-    onload={() => (loaded = true)}
-  />
+  {#if page.crop}
+    <!-- only part of the image is this page (the cover's front): a frame of the
+         crop's shape, the picture scaled and shifted inside it -->
+    <span class="si__crop">{@render pictures(cropImgStyle(page.crop))}</span>
+  {:else}
+    {@render pictures(undefined)}
+  {/if}
 
   {#if translateOn && page.bubbles?.length}
     <div class="si__bubbles">
@@ -141,6 +153,21 @@
     object-fit: contain;
     user-select: none;
     -webkit-user-drag: none;
+  }
+  /* The frame for a cropped page: the same contain rect the bubbles use */
+  .si__crop {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(100cqw, 100cqh * var(--pw) / var(--ph));
+    height: min(100cqh, 100cqw * var(--ph) / var(--pw));
+    overflow: hidden;
+  }
+  .si__crop > img {
+    inset: auto;
+    max-width: none;
+    object-fit: fill;
   }
   .si__thumb {
     filter: blur(14px);

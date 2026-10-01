@@ -3,6 +3,7 @@
   import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
   import { Curl, Door, DOOR_MAX, doorAngle, doorCommit } from '../../scripts/curl';
+  import { parseCropAttr, pictureLayer } from '../../lib/coverCrop';
 
   let {
     sheets,
@@ -207,8 +208,21 @@
     if (!host) return [];
     return [...host.querySelectorAll<HTMLElement>('.si')]
       .map((el) => {
-        const img = el.querySelector('img');
-        return { r: el.getBoundingClientRect(), src: img?.complete ? img.currentSrc || img.src : '' };
+        // the sharp picture once it has loaded — the first <img> is the blurred thumb
+        const full = el.querySelector<HTMLImageElement>('img.si__img');
+        const img = full?.complete && full.naturalWidth ? full : el.querySelector<HTMLImageElement>('img.si__thumb');
+        const src = img?.complete && img.naturalWidth ? img.currentSrc || img.src : '';
+        const crop = parseCropAttr(el.dataset.crop);
+        let r = el.getBoundingClientRect();
+        if (crop) {
+          // a cropped page (the cover's front) draws inside the contain rect of
+          // its own shape — the overlay takes exactly that box
+          const ar = Number(el.style.getPropertyValue('--pw')) / Number(el.style.getPropertyValue('--ph')) || 1;
+          const w = Math.min(r.width, r.height * ar);
+          const h = Math.min(r.height, r.width / ar);
+          r = new DOMRect(r.left + (r.width - w) / 2, r.top + (r.height - h) / 2, w, h);
+        }
+        return { r, pic: src ? pictureLayer(src, crop) : '' };
       })
       .sort((a, b) => a.r.left - b.r.left);
   }
@@ -227,17 +241,17 @@
     if (now.length === 1) {
       const hingeLeft = direction === 'ltr';
       if (forward) {
-        if (!now[0].src) return false;
+        if (!now[0].pic) return false;
         gsap.killTweensOf(track);
         gsap.set(track, { x: -target * width * s });
-        doorFx = new Door({ host: stage, leaf: rel0(now[0].r), src: now[0].src, hingeLeft, forward: true });
+        doorFx = new Door({ host: stage, leaf: rel0(now[0].r), pic: now[0].pic, hingeLeft, forward: true });
         doorW = now[0].r.width;
       } else {
         const prev = pageEls(target);
-        if (prev.length !== 1 || !prev[0].src) return false;
+        if (prev.length !== 1 || !prev[0].pic) return false;
         // the previous sheet sits one screen over on the track: bring its rect on-screen
         const shift = -(target - cur) * width * s;
-        doorFx = new Door({ host: stage, leaf: rel0(prev[0].r, shift), src: prev[0].src, hingeLeft, forward: false });
+        doorFx = new Door({ host: stage, leaf: rel0(prev[0].r, shift), pic: prev[0].pic, hingeLeft, forward: false });
         doorW = prev[0].r.width;
       }
       doorForward = forward;
@@ -246,7 +260,7 @@
     }
     const leaf = turningRight ? now[now.length - 1] : now[0];
     const still = now.length > 1 ? (turningRight ? now[0] : now[now.length - 1]) : null;
-    if (!leaf.src) return false;
+    if (!leaf.pic) return false;
 
     gsap.killTweensOf(track);
     gsap.set(track, { x: -target * width * s });
@@ -260,12 +274,12 @@
     curlFx = new Curl({
       host: stage,
       leaf: rel(leaf.r),
-      leafSrc: leaf.src,
+      leafPic: leaf.pic,
       turningRight,
       cornerTop: from ? from.y < leaf.r.top + leaf.r.height / 2 : false,
       staticRect: still ? rel(still.r) : undefined,
-      staticSrc: still?.src || undefined,
-      backSrc: back?.src || undefined,
+      staticPic: still?.pic || undefined,
+      backPic: back?.pic || undefined,
     });
     curlTarget = target;
     return true;

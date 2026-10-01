@@ -664,6 +664,18 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   perspective, front darkening, a shadow on the page below, fading out past 100°; going back, the
   previous page swings in from the spine. Spreads keep the fold. `doorAngle`/`doorCommit` tested.
   **Test on a real iPhone before trusting it** — the harness is desktop Chromium.
+- **The book opens on its front cover, not the wraparound** (`src/lib/coverCrop.ts`, tested). The
+  cover page is the whole wraparound and `works.cover_crop` marks the front; the reader used to
+  show the whole sheet, so the first door turn hinged on the far edge of the back cover (the owner
+  caught it on a phone). Now, when the first leaf is `cover_page_id` and the crop is a real
+  wraparound front (`wrapBack`: hugs one edge, >30 % left over — the same rule the shelf's 3D book
+  uses for its back cover; a mere framing crop leaves the page whole), the page becomes the front
+  (`frontOnly`: width/height in the crop's pixels, translation boxes moved onto it, `crop` kept).
+  SheetImage draws it in `.si__crop` (the contain rect, picture scaled and shifted inside), the
+  curl/door overlays take each page as a CSS background layer (`pictureLayer`) over the crop's own
+  contain rect, and the ▦ grid / chapter thumbs aim `object-position` at the front. The turning
+  page is now the sharp `.si__img` once loaded — it used to grab the first `<img>`, the blurred
+  thumbnail.
 - Reader harness (scratchpad, not in the repo): Playwright `page.route` serves a fake unlocked
   6-page book (works/pages/chapters REST + generated page images) — never the real DB, never a
   password.

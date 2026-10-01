@@ -4,6 +4,7 @@
   import { punch } from '../../scripts/mv';
   import { sfx } from '../../scripts/sound';
   import { MUSIC } from '../../lib/features';
+  import { cropFocus } from '../../lib/coverCrop';
 
   let {
     work,
@@ -328,7 +329,13 @@
                   gridOpen = false;
                 }}
               >
-                <img class="rc-grid__thumb" src={page.thumbUrl} alt="" loading="lazy" />
+                <img
+                  class="rc-grid__thumb"
+                  src={page.thumbUrl}
+                  alt=""
+                  loading="lazy"
+                  style={page.crop ? `object-position:${cropFocus(page.crop)}` : undefined}
+                />
                 <span class="mono rc-grid__num">{String(pageNumberOf(page.id)).padStart(2, '0')}</span>
                 {#if favorites.includes(page.id)}
                   <svg class="rc-grid__heart" viewBox="0 0 24 24" role="img" aria-label={i18n.t('rd.fav')}><path d={HEART} /></svg>
@@ -366,7 +373,13 @@
               }}
             >
               {#if mark.coverUrl}
-                <img class="rc-toc__cover" src={mark.coverUrl} alt="" loading="lazy" />
+                <img
+                  class="rc-toc__cover"
+                  src={mark.coverUrl}
+                  alt=""
+                  loading="lazy"
+                  style={mark.coverFocus ? `object-position:${mark.coverFocus}` : undefined}
+                />
               {:else}
                 <span class="rc-toc__cover rc-toc__cover--blank"></span>
               {/if}

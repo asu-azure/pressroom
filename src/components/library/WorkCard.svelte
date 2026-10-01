@@ -4,6 +4,7 @@
   import { book, region } from '../../scripts/book3d';
   import { loadShelfmarks, layoutMarks, type Shelfmarks } from '../../lib/shelfmarks';
   import type { Work } from '../../lib/types';
+  import { wrapBack } from '../../lib/coverCrop';
 
   let {
     work,
@@ -31,15 +32,9 @@
 
   const front = $derived(work.cover_crop ?? { x: 0, y: 0, w: 1, h: 1 });
 
-  /** Leftover of the wraparound beside the front, if there is enough of it. */
-  const back = $derived.by(() => {
-    const c = work.cover_crop;
-    if (!c) return null;
-    const rightRoom = 1 - (c.x + c.w);
-    if (c.x < 0.04 && rightRoom > 0.3) return { x: c.x + c.w, w: rightRoom, right: true };
-    if (rightRoom < 0.04 && c.x > 0.3) return { x: 0, w: c.x, right: false };
-    return null;
-  });
+  /** Leftover of the wraparound beside the front, if there is enough of it
+      (the same rule the reader uses to open on the front — lib/coverCrop.ts). */
+  const back = $derived(wrapBack(work.cover_crop));
 
   // The binding sits between front and back in the wraparound. Without a back
   // to tell us, fall back to reading direction: right-to-left books bind right.

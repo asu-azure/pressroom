@@ -1,6 +1,7 @@
 <script lang="ts">
   import { supabase } from '../../lib/supabase';
   import { toPageRec } from '../../lib/storagePaths';
+  import { cropFocus, frontOnly } from '../../lib/coverCrop';
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
   import { i18n } from '../../lib/i18n.svelte';
@@ -62,6 +63,7 @@
           title: ch.title,
           sheet: first ? sheetIndexOf(sheets, first.id) : -1,
           coverUrl: cover?.thumbUrl ?? null,
+          coverFocus: cropFocus(cover?.crop),
         };
       })
       .filter((m) => m.sheet >= 0),
@@ -123,7 +125,9 @@
       }
       rows = unlockedRows;
     }
-    pages = (rows ?? []).map(toPageRec);
+    // The cover page is the whole wraparound; the book opens on its front
+    // (lib/coverCrop.ts) — only when it really is the first leaf.
+    pages = (rows ?? []).map(toPageRec).map((p, i) => (i === 0 && p.id === work.cover_page_id ? frontOnly(p, work.cover_crop) : p));
     chapters = (chRows ?? []) as Chapter[];
 
     // Deep link (?p=pageId from the overview page) wins over saved progress.

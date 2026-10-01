@@ -114,12 +114,14 @@ const poly = (pts: Pt[]) => (pts.length < 3 ? 'polygon(0 0,0 0,0 0)' : `polygon(
 export interface CurlSetup {
   host: HTMLElement; // positioned ancestor the overlays live in (the stage)
   leaf: Rect; // turning page, host coords
-  leafSrc: string;
+  /** each picture is one CSS background layer for its box (lib/coverCrop.ts
+      pictureLayer: the whole page contained, or the cover's front) */
+  leafPic: string;
   turningRight: boolean; // the free edge is on the right
   cornerTop: boolean;
   staticRect?: Rect; // current non-turning page (spreads)
-  staticSrc?: string;
-  backSrc?: string; // target's page that the leaf lands on (spreads)
+  staticPic?: string;
+  backPic?: string; // target's page that the leaf lands on (spreads)
 }
 
 export class Curl {
@@ -147,13 +149,13 @@ export class Curl {
       return d;
     };
     const box = (r: Rect) => `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;`;
-    const img = (src: string) => `background:#f1ece2 url("${src}") center/contain no-repeat;`;
+    const img = (pic: string) => `background:${pic},#f1ece2;`;
 
     this.root = el('curl', 'position:absolute;inset:0;pointer-events:none;z-index:4;');
-    if (s.staticRect && s.staticSrc) {
-      this.root.append(el('curl__static', `position:absolute;${box(s.staticRect)}${img(s.staticSrc)}`));
+    if (s.staticRect && s.staticPic) {
+      this.root.append(el('curl__static', `position:absolute;${box(s.staticRect)}${img(s.staticPic)}`));
     }
-    this.front = el('curl__front', `position:absolute;${box(leaf)}${img(s.leafSrc)}`);
+    this.front = el('curl__front', `position:absolute;${box(leaf)}${img(s.leafPic)}`);
     this.shade = el('curl__shade', 'position:absolute;inset:0;');
     this.front.append(this.shade);
     // the wrapper carries the drop shadow, so it follows the clipped shape
@@ -161,16 +163,16 @@ export class Curl {
       'curl__backWrap',
       `position:absolute;${box(leaf)}filter:drop-shadow(0 0 14px rgba(0,0,0,.45));`,
     );
-    const backFace = s.backSrc
+    const backFace = s.backPic
       ? // pre-mirrored: the reflection turns it the right way round on landing
-        `background:#f1ece2 url("${s.backSrc}") center/contain no-repeat;`
+        `background:${s.backPic},#f1ece2;`
       : // a single page's reverse: paper, with the print faintly showing through
-        `background:linear-gradient(rgba(241,236,226,.88),rgba(241,236,226,.88)),url("${s.leafSrc}") center/contain no-repeat,#f1ece2;`;
+        `background:linear-gradient(rgba(241,236,226,.88),rgba(241,236,226,.88)),${s.leafPic},#f1ece2;`;
     this.back = el('curl__back', `position:absolute;inset:0;transform-origin:0 0;`);
     // The reflection mirrors whatever is on the back. Show-through should look
     // mirrored, so it is left alone; the facing page is pre-mirrored so it reads
     // the right way round once it has landed.
-    const face = el('curl__face', `position:absolute;inset:0;${backFace}${s.backSrc ? 'transform:scaleX(-1);' : ''}`);
+    const face = el('curl__face', `position:absolute;inset:0;${backFace}${s.backPic ? 'transform:scaleX(-1);' : ''}`);
     const gloss = el('curl__gloss', 'position:absolute;inset:0;');
     this.back.append(face, gloss);
     this.backWrap.append(this.back);
@@ -211,7 +213,7 @@ export class Curl {
     this.shade.style.background = `linear-gradient(${ang + 180}deg, transparent 55%, rgba(0,0,0,${(0.28 * k).toFixed(3)}))`;
     (this.back.lastElementChild as HTMLElement).style.background = `linear-gradient(${ang + 180}deg, rgba(255,255,255,${(0.35 * k).toFixed(3)}), rgba(0,0,0,${(0.12 * k).toFixed(3)}) 60%, transparent)`;
     // a single page leaving the book fades as it goes past the spine
-    if (!this.s.backSrc) this.backWrap.style.opacity = String(1 - Math.max(0, f.progress - 0.75) * 4);
+    if (!this.s.backPic) this.backWrap.style.opacity = String(1 - Math.max(0, f.progress - 0.75) * 4);
   }
 
   /** Animate the corner to `to` (host coords) and resolve when there. */
@@ -260,7 +262,8 @@ export function doorCommit(angle: number, forward: boolean, fling: boolean): boo
 export interface DoorSetup {
   host: HTMLElement;
   leaf: Rect;
-  src: string;
+  /** the page as one CSS background layer (lib/coverCrop.ts pictureLayer) */
+  pic: string;
   /** the spine is the page's left edge (LTR) */
   hingeLeft: boolean;
   /** true: the current page swings away; false: the previous page swings back in */
@@ -292,7 +295,7 @@ export class Door {
     );
     this.shadow = el(`position:absolute;${box}opacity:0;`);
     this.leaf = el(`position:absolute;${box}transform-style:preserve-3d;transform-origin:${origin}% 50%;`);
-    const img = `url("${s.src}") center/contain no-repeat`;
+    const img = s.pic;
     const front = el(`position:absolute;inset:0;backface-visibility:hidden;background:${img},#f1ece2;`);
     this.shade = el('position:absolute;inset:0;opacity:0;');
     front.append(this.shade);

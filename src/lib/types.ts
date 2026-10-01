@@ -122,6 +122,10 @@ export interface PageRec {
   note: string | null;
   bubbles: Bubble[];
   isBlank: boolean;
+  /** The part of the image this page shows, when that is not all of it — the
+      reader's cover is the front of the wraparound (lib/coverCrop.ts). Width and
+      height are then the crop's, in pixels. */
+  crop?: CoverCrop;
 }
 
 export type Sheet =
@@ -143,6 +147,8 @@ export interface ChapterMark {
   title: string;
   sheet: number;
   coverUrl: string | null;
+  /** object-position keeping a cropped cover's front in view (lib/coverCrop.ts) */
+  coverFocus?: string;
 }
 
 /** Social/contact links on the artist profile (all optional). */
