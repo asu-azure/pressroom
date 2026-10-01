@@ -104,14 +104,17 @@
     <span class="bracket bracket--br" aria-hidden="true"></span>
 
     <p class="mono lg__title"><span class="lg__keyGlyph" aria-hidden="true">🗝</span> {i18n.t('lock.title')} · LOCKED</p>
-    <p class="serif lg__work">{work.title}</p>
+    <p class="serif authored lg__work">{work.title}</p>
 
-    <!-- Shown only when the author has set one, in Studio → the work → meta. -->
+    <!-- Shown only when the author has set one, in Studio → the work → meta.
+         Without one, say the book is limited — never where the password comes from. -->
     {#if work.password_hint}
       <p class="mono lg__hint">
         <span class="lg__hintLabel">{i18n.t('lock.hint')} —</span>
-        {work.password_hint}
+        <span class="authored">{work.password_hint}</span>
       </p>
+    {:else}
+      <p class="mono lg__limited">{i18n.t('ov.limited')} — {i18n.t('ov.limitedNote')}</p>
     {/if}
 
     <label class="lg__field">
@@ -137,6 +140,12 @@
 </div>
 
 <style>
+  .lg__limited {
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    line-height: 1.7;
+    color: var(--fg-dim);
+  }
   .lg {
     position: fixed;
     inset: 0;

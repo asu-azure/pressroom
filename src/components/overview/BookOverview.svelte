@@ -9,7 +9,12 @@
   import { converge } from '../../scripts/mv';
   import { stamp, stampStatic } from '../../data/showcase';
   import { toRichHtml } from '../../lib/richtext';
-  import { i18n } from '../../lib/i18n.svelte';
+  import { tidyForeword } from '../../lib/foreword';
+  import { frontOnly, cropImgStyle } from '../../lib/coverCrop';
+  import { seriesRun } from '../../lib/series';
+  import { bookInfo } from '../../lib/bookInfo';
+  import { shareLink } from '../../lib/share';
+  import { i18n, type DictKey } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
   import LockGate from './LockGate.svelte';
@@ -54,10 +59,92 @@
       })
       .filter((c) => c.pages.length > 0),
   );
-  const forewordHtml = $derived(work ? toRichHtml(work.foreword) : '');
+  // The hero shows the FRONT of the wraparound, like the shelf and the reader.
+  // No `inner` page on purpose: a locked book gets its pages only on unlock,
+  // and the hero would re-trim and jump at that moment.
+  const heroCover = $derived(
+    cover && work && cover.id === work.cover_page_id ? frontOnly(cover, work.cover_crop) : cover,
+  );
+  // Render-time tidy (lib/foreword.ts): pasted subset fonts, empty lines, a
+  // duplicate title h1; numbered run-ins become the section nav.
+  const fore = $derived(
+    work ? tidyForeword(toRichHtml(work.foreword), work.title) : { html: '', sections: [] },
+  );
+  const forewordHtml = $derived(fore.html);
+  const info = $derived(work ? bookInfo(work, i18n.lang, (k) => i18n.t(k as DictKey)) : []);
+  const warnings = $derived((work?.content_warnings ?? []).map((w) => w.trim()).filter(Boolean));
   const statusKey = $derived(
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
+
+  // --- Series: the other published books sharing series_title (book-info.sql).
+  //     Loaded after the page is up and never allowed to break it. ---
+  interface SeriesCard {
+    id: string;
+    slug: string;
+    title: string;
+    series_order: number | null;
+    series_kind: 'main' | 'side' | null;
+    series_label: string | null;
+    read_locked: boolean;
+    cover: PageRec | null;
+  }
+  let seriesCards = $state<SeriesCard[]>([]);
+  const series = $derived(work ? seriesRun(seriesCards, work.id) : { list: [], prev: null, next: null });
+
+  async function loadSeries(w: Work) {
+    if (!w.series_title) return;
+    try {
+      const { data: rows } = await supabase
+        .from('works')
+        .select('id,slug,title,series_order,series_kind,series_label,read_locked,cover_page_id,cover_crop')
+        .eq('published', true)
+        .eq('series_title', w.series_title);
+      if (!rows?.length) return;
+      const coverIds = rows.map((r) => r.cover_page_id).filter(Boolean) as string[];
+      // RLS lets anyone read a locked book's cover row (read-lock.sql)
+      const { data: covers } = coverIds.length
+        ? await supabase.from('pages').select('*').in('id', coverIds)
+        : { data: [] };
+      const byId = new Map((covers ?? []).map((p) => [p.id, toPageRec(p as PageRow)]));
+      seriesCards = rows.map((r) => {
+        const c = r.cover_page_id ? byId.get(r.cover_page_id) : undefined;
+        return {
+          id: r.id,
+          slug: r.slug,
+          title: r.title,
+          series_order: r.series_order === null ? null : Number(r.series_order),
+          series_kind: r.series_kind,
+          series_label: r.series_label,
+          read_locked: r.read_locked,
+          cover: c ? frontOnly(c, r.cover_crop) : null,
+        };
+      });
+    } catch {
+      seriesCards = []; // the page stands without its series
+    }
+  }
+
+  // --- Share this book (the overview URL, without ?c=) ---
+  let shareNote = $state('');
+  let shareReset = 0;
+  async function share() {
+    if (!work) return;
+    const result = await shareLink({ title: work.title, text: work.description || undefined, url: `${location.origin}/w/${slug}` });
+    if (result === 'copied' || result === 'failed') {
+      shareNote = i18n.t(result === 'copied' ? 'ov.shareCopied' : 'ov.shareFail');
+      clearTimeout(shareReset);
+      shareReset = window.setTimeout(() => (shareNote = ''), 1600);
+    }
+  }
+
+  /** Skip the spoilers: straight past the synopsis. */
+  function skipSynopsis(e: Event) {
+    e.preventDefault();
+    const target = document.getElementById('ov-after');
+    target?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+    target?.focus({ preventScroll: true });
+  }
 
   // --- Reading lock: RLS hides page rows of locked works (cover excepted).
   //     `unlocked` flips when the session key works or the author is signed in
@@ -170,6 +257,7 @@
     }
     continueAt = loadProgress(work.id);
     status = 'ready';
+    void loadSeries(work);
     // Deep link: /w/slug?c=charId opens that character's file directly.
     const requested = new URLSearchParams(location.search).get('c');
     if (requested) {
@@ -296,13 +384,20 @@
     <div class="bracket bracket--tl" aria-hidden="true"></div>
     <div class="bracket bracket--tr" aria-hidden="true"></div>
     <div class="ov-hero__inner">
-      {#if cover}
-        <figure class="ov-hero__cover" use:reveal={{ y: 34 }}>
-          <img
-            src={cover.medUrl}
-            alt={`${work.title} — cover`}
-            style={`aspect-ratio: ${cover.width} / ${cover.height}`}
-          />
+      {#if heroCover}
+        <figure
+          class="ov-hero__cover"
+          class:is-cropped={Boolean(heroCover.crop)}
+          style={`aspect-ratio: ${heroCover.width} / ${heroCover.height}`}
+          use:reveal={{ y: 34 }}
+        >
+          {#if heroCover.crop}
+            <!-- the front is ~half the wraparound's width: the full-size image
+                 keeps it sharp at the hero's size -->
+            <img src={heroCover.fullUrl} alt={`${work.title} — cover`} style={cropImgStyle(heroCover.crop)} />
+          {:else}
+            <img src={heroCover.medUrl} alt={`${work.title} — cover`} />
+          {/if}
           <!-- RLS returns only the cover row for a locked work, so realPageCount
                would read "1P" — same guard as the CONTENTS header below. -->
           <figcaption class="mono ov-hero__coverTag">
@@ -315,10 +410,29 @@
         <h1 class="ov-hero__title serif authored" use:titleIn>{work.title}</h1>
         <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
           {i18n.t(statusKey)}
-          {#if work.tags.length}· {work.tags.join(' / ')}{/if}
+          {#if work.series_kind}· {i18n.t(`series.${work.series_kind}`)}{/if}
+          {#if work.tags.length}· <span class="authored">{work.tags.join(' / ')}</span>{/if}
         </p>
+        {#if info.length}
+          <!-- 奥付: what the book is before anyone opens it — a Japanese visitor
+               learns here that the book is in Thai, and whether it is translated -->
+          <dl class="ov-info" use:reveal={{ delay: 0.11 }}>
+            {#each info as item (item.key)}
+              <div class="ov-info__item">
+                <dt class="mono">{item.label}</dt>
+                <dd class="ov-info__value">{item.value}</dd>
+              </div>
+            {/each}
+          </dl>
+        {/if}
         {#if work.description}
-          <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{work.description}</p>
+          <p class="ov-hero__desc serif authored" use:reveal={{ delay: 0.14 }}>{work.description}</p>
+        {/if}
+        {#if warnings.length}
+          <div class="ov-cw" role="note" use:reveal={{ delay: 0.17 }}>
+            <span class="mono ov-cw__label"><span aria-hidden="true">⚠</span> {i18n.t('ov.cw')}</span>
+            <p class="ov-cw__items">{warnings.join('・')}</p>
+          </div>
         {/if}
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
           <a
@@ -340,6 +454,10 @@
               {i18n.t('ov.start')}
             </a>
           {/if}
+          <button type="button" class="ov-btn ov-btn--ghost mono" onclick={share}>
+            {shareNote || i18n.t('ov.share')}
+          </button>
+          <span class="ov-live" aria-live="polite">{shareNote}</span>
         </div>
       </div>
     </div>
@@ -358,7 +476,7 @@
   </section>
 
   <!-- ACT II: contents — page & chapter overview, straight after the cover (ink) -->
-  <section class="ov-toc spread spread--ink" id="ov-more">
+  <section class="ov-toc spread spread--ink" class:is-locked={locked} id="ov-more">
     <div class="ov-toc__inner">
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
@@ -370,14 +488,19 @@
       {#if locked}
         <!-- RLS returns only the cover row, so there is nothing to strip —
              show the gate invitation instead of thumbnails. -->
-        <div class="ov-lockNote" use:reveal>
-          <span class="ov-lockNote__glyph" aria-hidden="true">🔒</span>
-          <p class="mono ov-lockNote__text">{i18n.t('ov.locked')}</p>
-          <!-- Shown only when the author has set one, in the studio. -->
-          {#if work.password_hint}
-            <p class="mono ov-lockNote__hint">{i18n.t('lock.hint')} — {work.password_hint}</p>
-          {/if}
-          <button type="button" class="mono ov-lockNote__btn" onclick={() => openLock(null)}>
+        <div class="ov-lockbar" use:reveal>
+          <span class="ov-lockbar__glyph" aria-hidden="true">🔒</span>
+          <p class="mono ov-lockbar__text">
+            {#if work.password_hint}
+              {i18n.t('ov.locked')}
+              <!-- Shown only when the author has set one, in the studio. -->
+              <span class="ov-lockbar__hint">{i18n.t('lock.hint')} — <span class="authored">{work.password_hint}</span></span>
+            {:else}
+              <!-- No hint: say it is limited, never where the password comes from -->
+              {i18n.t('ov.limited')} — {i18n.t('ov.limitedNote')}
+            {/if}
+          </p>
+          <button type="button" class="mono ov-lockbar__btn" onclick={() => openLock(null)}>
             {i18n.t('lock.unlock')} →
           </button>
         </div>
@@ -422,7 +545,7 @@
         <div class="ov-chapter" use:reveal>
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">{String(ci + 1).padStart(2, '0')}</span>
-            <h3 class="serif ov-chapter__title">{ch.title}</h3>
+            <h3 class="serif authored ov-chapter__title">{ch.title}</h3>
             <span class="mono ov-chapter__count">{chPages.filter((p) => !p.isBlank).length}P</span>
             <a
               class="mono ov-chapter__read"
@@ -498,6 +621,15 @@
 
   <!-- ACT IV: synopsis — the spoiler leaf, last before the imprint (paper) -->
   {#if forewordHtml}
+    <!-- The synopsis tells the whole story. It stays open (the owner's call),
+         but nobody walks into it unwarned: a band first, and a way past it. -->
+    <aside class="ov-spoiler" aria-label={i18n.t('ov.spoilerTitle')}>
+      <div class="ov-spoiler__inner">
+        <p class="mono ov-spoiler__title"><span aria-hidden="true">⚠</span> {i18n.t('ov.spoilerTitle')}</p>
+        <p class="ov-spoiler__body">{i18n.t('ov.spoilerBody')}</p>
+        <a class="mono ov-spoiler__skip" href="#ov-after" onclick={skipSynopsis}>{i18n.t('ov.skip')} ↓</a>
+      </div>
+    </aside>
     <section class="ov-fore spread spread--paper">
       <div class="paper-grid paper-grid--margin" aria-hidden="true"></div>
       <div class="crop crop--tl" aria-hidden="true"></div>
@@ -507,7 +639,15 @@
       <div class="regmark ov-fore__reg" aria-hidden="true"></div>
       <div class="ov-fore__inner">
         <p class="mono ov-fore__label" use:headingIn>✳ {i18n.t('ov.foreword')}</p>
-        <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
+        {#if fore.sections.length >= 2}
+          <nav class="ov-fore__nav" aria-label={i18n.t('ov.sections')}>
+            <ol>
+              {#each fore.sections as sec (sec.id)}
+                <li><a class="authored" href={`#${sec.id}`}>{sec.text}</a></li>
+              {/each}
+            </ol>
+          </nav>
+        {/if}
         <div class="ov-fore__body serif authored" use:revealChildren>
           {@html forewordHtml}
         </div>
@@ -525,8 +665,67 @@
     </section>
   {/if}
 
+  <!-- ACT V: the series — the other books, and where to go next (ink) -->
+  {#if series.list.length}
+    <section class="ov-series spread spread--ink" id="ov-after" tabindex="-1">
+      <div class="ov-series__inner">
+        <header class="ov-series__head" use:reveal>
+          <span class="index-num" aria-hidden="true">続</span>
+          <h2 class="serif ov-series__title" use:headingIn>{i18n.t('ov.series')}</h2>
+          <span class="ov-series__rule" aria-hidden="true"></span>
+          <span class="mono authored">{work.series_title}</span>
+        </header>
+        <ol class="ov-series__list">
+          {#each series.list as b (b.id)}
+            {@const current = b.id === work.id}
+            <li>
+              <a
+                class="ov-seriesCard"
+                class:is-current={current}
+                href={current ? undefined : `/w/${b.slug}`}
+                aria-current={current ? 'page' : undefined}
+                data-sfx={current ? undefined : 'open'}
+              >
+                <span
+                  class="ov-seriesCard__cover"
+                  style={b.cover ? `aspect-ratio: ${b.cover.width} / ${b.cover.height}` : undefined}
+                >
+                  {#if b.cover?.crop}
+                    <img src={b.cover.medUrl} alt="" loading="lazy" style={cropImgStyle(b.cover.crop)} />
+                  {:else if b.cover}
+                    <img src={b.cover.medUrl} alt="" loading="lazy" />
+                  {/if}
+                </span>
+                <span class="mono ov-seriesCard__kind">
+                  {#if b.series_kind}{i18n.t(`series.${b.series_kind}`)}{/if}
+                  {#if b.read_locked}<span aria-hidden="true"> 🔒</span>{/if}
+                  {#if current}<span class="ov-seriesCard__here">· {i18n.t('ov.thisBook')}</span>{/if}
+                </span>
+                <span class="serif authored ov-seriesCard__title">{b.series_label || b.title}</span>
+              </a>
+            </li>
+          {/each}
+        </ol>
+        {#if series.prev || series.next}
+          <nav class="ov-series__step">
+            {#if series.prev}
+              <a class="mono" href={`/w/${series.prev.slug}`} data-sfx="open" data-vt="back">
+                ← {i18n.t('ov.prev')} <span class="authored">{series.prev.series_label || series.prev.title}</span>
+              </a>
+            {/if}
+            {#if series.next}
+              <a class="mono ov-series__next" href={`/w/${series.next.slug}`} data-sfx="open">
+                {i18n.t('ov.next')} <span class="authored">{series.next.series_label || series.next.title}</span> →
+              </a>
+            {/if}
+          </nav>
+        {/if}
+      </div>
+    </section>
+  {/if}
+
   <!-- Page foot: back link + imprint, always the last leaf (ink) -->
-  <footer class="ov-foot spread spread--ink">
+  <footer class="ov-foot spread spread--ink" id={series.list.length ? undefined : 'ov-after'} tabindex="-1">
     <a class="mono ov-foot__back" href="/">← {i18n.t('ov.back')}</a>
     <span class="ov-foot__right">
       <!-- The artist is reachable from a book too, not only from the shelf. -->
@@ -650,6 +849,67 @@
     width: 100%;
     height: auto;
   }
+  /* The front of the wraparound: the frame has the front's aspect, the picture
+     is scaled and shifted inside it (cropImgStyle) — as the reader's .si__crop. */
+  .ov-hero__cover.is-cropped {
+    overflow: hidden;
+    width: 100%;
+  }
+  .ov-hero__cover.is-cropped img {
+    position: absolute;
+    max-width: none;
+  }
+  /* 奥付 — a row of small facts under the title */
+  .ov-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.3rem;
+    margin: 0;
+  }
+  .ov-info__item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .ov-info dt {
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+  }
+  .ov-info__value {
+    margin: 0;
+    font-family: var(--font-display-authored);
+    font-size: 0.86rem;
+    color: var(--fg);
+  }
+  /* Content notes — before the read button, in the amber warning voice */
+  .ov-cw {
+    display: grid;
+    gap: 0.3rem;
+    max-width: 36em;
+    padding: 0.7rem 0.95rem;
+    border-left: 3px solid #e8a31a;
+    background: rgba(232, 163, 26, 0.09);
+  }
+  .ov-cw__label {
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    color: #e8a31a;
+  }
+  .ov-cw__items {
+    font-family: var(--font-display-authored);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--fg);
+  }
+  .ov-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
   .ov-hero__coverTag {
     position: absolute;
     bottom: 0.5rem;
@@ -715,6 +975,10 @@
     }
     .ov-hero__cover {
       max-width: min(70vw, 18rem);
+    }
+    /* the front is portrait: a little narrower keeps the title in the first screen */
+    .ov-hero__cover.is-cropped {
+      max-width: min(58vw, 15rem);
     }
   }
 
@@ -876,11 +1140,92 @@
   .ov-fore__label {
     color: var(--accent);
   }
-  /* Spoiler notice — the amber warning voice, tucked under the label. */
-  .ov-fore__spoiler {
-    margin-top: -1.2rem;
-    font-size: 0.6rem;
-    color: #b07708;
+  /* A section head (lib/foreword.ts) starts below any floated figure, and reads
+     from the start edge even inside a block the author centred. */
+  .ov-fore__body :global(h2[id^='ov-s-']) {
+    clear: both;
+    text-align: start;
+    margin-top: 1.4em;
+  }
+  /* Section nav — built from the synopsis's own numbered heads */
+  .ov-fore__nav ol {
+    display: grid;
+    gap: 0.45rem;
+    margin: -0.6rem 0 0;
+    padding: 0.9rem 0 0.9rem 1.1rem;
+    border-left: 1px solid var(--paper-mark, var(--line-strong));
+    list-style: none;
+  }
+  .ov-fore__nav a {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--fg-dim);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 0.25em;
+    transition: color 0.2s var(--ease), text-decoration-color 0.2s var(--ease);
+  }
+  .ov-fore__nav a:hover,
+  .ov-fore__nav a:focus-visible {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+  }
+
+  /* ---- spoiler band: a full-width hazard strip before the synopsis ---- */
+  .ov-spoiler {
+    position: relative;
+    z-index: 1;
+    background: #e8a31a;
+    color: #14110a;
+    padding: calc(clamp(1.4rem, 4vh, 2.2rem) + 10px) var(--pad);
+  }
+  .ov-spoiler::before,
+  .ov-spoiler::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: repeating-linear-gradient(-45deg, #14110a 0 10px, transparent 10px 20px);
+  }
+  .ov-spoiler::before {
+    top: 0;
+  }
+  .ov-spoiler::after {
+    bottom: 0;
+  }
+  .ov-spoiler__inner {
+    max-width: 44rem;
+    margin: 0 auto;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .ov-spoiler__title,
+  .ov-spoiler__body,
+  .ov-spoiler__skip {
+    color: #14110a;
+  }
+  .ov-spoiler__title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+  }
+  .ov-spoiler__body {
+    font-family: var(--font-serif-authored);
+    font-size: clamp(1rem, 1.6vw, 1.15rem);
+    line-height: 1.7;
+  }
+  .ov-spoiler__skip {
+    justify-self: start;
+    margin-top: 0.3rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+  .ov-spoiler__skip:hover,
+  .ov-spoiler__skip:focus-visible {
+    text-decoration-thickness: 2px;
   }
   /* Block flow (not grid) so author figures can float and wrap text.
      Blocks carry their own margins for rhythm. */
@@ -1153,38 +1498,162 @@
     border-radius: 50%;
     background: #e8a31a;
   }
-  /* Locked contents — the gate invitation where the strips would be. */
-  .ov-lockNote {
-    display: grid;
-    justify-items: center;
-    gap: 0.8rem;
-    padding: clamp(2.5rem, 8vh, 4.5rem) 1rem;
-    border: 1px dashed var(--line-strong);
-    text-align: center;
+  /* Locked contents — one line where the strips would be, not an empty box. */
+  .ov-toc.is-locked {
+    padding-top: clamp(3.5rem, 9vh, 5.5rem);
+    padding-bottom: clamp(2.5rem, 6vh, 3.5rem);
   }
-  .ov-lockNote__glyph {
-    font-size: 1.6rem;
+  .ov-lockbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.7rem 1.1rem;
+    padding: 0.85rem 1rem;
+    border: 1px dashed var(--line-strong);
+  }
+  .ov-lockbar__glyph {
+    font-size: 1.1rem;
     opacity: 0.75;
   }
-  .ov-lockNote__text {
-    letter-spacing: 0.2em;
+  .ov-lockbar__text {
+    flex: 1 1 16rem;
+    letter-spacing: 0.12em;
+    line-height: 1.7;
   }
-  .ov-lockNote__hint {
-    font-size: 0.6rem;
+  .ov-lockbar__hint {
+    display: block;
+    font-size: 0.62rem;
     color: #e8a31a;
   }
-  .ov-lockNote__btn {
-    margin-top: 0.4rem;
+  .ov-lockbar__btn {
     background: var(--accent);
     color: var(--ink-fg);
     border: 0;
-    padding: 0.8em 1.5em;
+    padding: 0.7em 1.3em;
     letter-spacing: 0.14em;
     cursor: pointer;
     transition: background-color 0.25s var(--ease);
   }
-  .ov-lockNote__btn:hover {
+  .ov-lockbar__btn:hover {
     background: #1d33c4;
+  }
+
+  /* ---- series ---- */
+  .ov-series {
+    position: relative;
+    z-index: 1;
+    padding: clamp(4.5rem, 11vh, 7rem) var(--pad) clamp(3rem, 8vh, 5rem);
+  }
+  .ov-series:focus,
+  .ov-foot:focus {
+    outline: none;
+  }
+  .ov-series__inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    gap: clamp(1.8rem, 4.5vh, 2.8rem);
+  }
+  .ov-series__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6rem 1.2rem;
+    position: relative;
+  }
+  .ov-series__head .index-num {
+    position: absolute;
+    top: -0.55em;
+    left: -0.12em;
+    z-index: -1;
+    font-size: clamp(5rem, 13vw, 9rem);
+  }
+  .ov-series__title {
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+  }
+  .ov-series__rule {
+    flex: 1;
+    min-width: 2rem;
+    height: 1px;
+    background: var(--line-strong);
+  }
+  .ov-series__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, 40vw), 1fr));
+    gap: clamp(1rem, 3vw, 2rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ov-seriesCard {
+    display: grid;
+    gap: 0.45rem;
+    color: inherit;
+  }
+  .ov-seriesCard__cover {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    aspect-ratio: 0.72;
+    transition: border-color 0.25s var(--ease), transform 0.25s var(--ease);
+  }
+  .ov-seriesCard__cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+  }
+  /* a cropped front: cropImgStyle sets the box, so undo the cover fit */
+  .ov-seriesCard__cover img[style] {
+    inset: auto;
+    object-fit: fill;
+  }
+  @media (hover: hover) {
+    a.ov-seriesCard[href]:hover .ov-seriesCard__cover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+    }
+  }
+  a.ov-seriesCard[href]:focus-visible .ov-seriesCard__cover {
+    border-color: var(--accent);
+  }
+  .ov-seriesCard.is-current .ov-seriesCard__cover {
+    border-color: var(--line-strong);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .ov-seriesCard__kind {
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+  }
+  .ov-seriesCard__here {
+    color: var(--accent);
+  }
+  .ov-seriesCard__title {
+    font-size: clamp(0.98rem, 1.6vw, 1.12rem);
+    line-height: 1.4;
+  }
+  .ov-series__step {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.8rem 1.6rem;
+    border-top: 1px solid var(--line);
+    padding-top: 1rem;
+  }
+  .ov-series__step a {
+    color: var(--fg-dim);
+    letter-spacing: 0.1em;
+  }
+  .ov-series__step a:hover {
+    color: var(--accent);
+  }
+  .ov-series__next {
+    margin-left: auto;
   }
 
   .ov-foot {

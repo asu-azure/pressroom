@@ -93,7 +93,7 @@ text. See `src/lib/richtext.ts` and its tests.
    `AUTHOR_UID` with the author user's `auth.users.id` first.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
    `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
-   `scenes.sql`.
+   `scenes.sql`, `book-info.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
@@ -206,6 +206,39 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
   shows a sticky tab out of the fore-edge per favourite (by depth, walking down 5 slots, max 12) and
   a bookmark card out of the head at the page being read; the label adds "しおり p.N · ♥ n".
   Re-read on `pageshow` (bfcache) and `storage`. Only ever this visitor's own browser data.
+
+### The book overview (`/w/[slug]`, `BookOverview.svelte`)
+
+Order: hero → 収録内容 → 登場人物 → spoiler band + あらすじ → シリーズ → foot. The visitors it is
+written for are Japanese; the books are Thai.
+
+- **The hero shows the front of the wraparound** (`frontOnly` + `cropImgStyle`, full-size image —
+  the front is half the picture). No `inner` page on purpose: a locked book's pages arrive on
+  unlock, and the hero would re-trim and jump.
+- **奥付 row + content notes** from `supabase/book-info.sql` (all optional): `book_lang`,
+  `translations`, `formats`, `release_label`, `content_warnings`, `series_*` (`lib/bookInfo.ts`,
+  tested; language names via `Intl.DisplayNames`). "翻訳 なし" is shown on purpose — it is how a
+  Japanese visitor learns the Thai book has no Japanese yet. Content notes sit above the read
+  button, amber, `role="note"`. Studio META edits them all (content notes one per line).
+- **Locked contents is one bar**, not a box: with no `password_hint` it says 限定公開 — 合言葉を
+  お持ちの方のみ読めます and never where the password comes from (the owner hands it out in closed
+  circles). LockGate says the same.
+- **The synopsis stays open** (the owner's call) behind a full-width amber spoiler band with a skip
+  link to `#ov-after` (the series section, or the foot). The section nav comes after the band —
+  book 1's headings are spoilers themselves.
+- **`tidyForeword()`** (`lib/foreword.ts`, `foreword.dom.test.ts`) tidies the stored HTML at render
+  time only: drops inline `font-family` naming the SUBSET webfonts (a paste had set 96 % of one
+  synopsis in 'Noto Serif JP'), empty blocks (each drew an empty ruled line), a leading h1 repeating
+  the title (then demotes headings); and promotes bold numbered run-ins ("1. 出会い 本文…") to h2
+  with ids, which is what the section nav is built from. The editor's font menu now offers system
+  mincho/gothic stacks instead of the subset names — the root cause.
+- **Series**: published works sharing `series_title`, queried directly (not through
+  `library_cards()`, whose return type would need a drop) after the page is up, try/catch;
+  `lib/series.ts` orders them and finds prev/next. `series_kind` main/side → 本編/外伝.
+- **SHARE** (`lib/share.ts`, lifted from the lightbox): share sheet on touch, copy on desktop.
+- ⚠ The JP subset fonts in `public/fonts/` predate most of the chrome copy: kanji like 読 訳 翻
+  限 are missing from them, so those labels mix in a fallback face. Regenerating the subsets from
+  the kanji in `src/` is an open follow-up.
 
 ### Removed on purpose — do not reintroduce
 
@@ -598,6 +631,34 @@ The vermillion box holding a single kanji is **retired**. The artist's own anima
 the `/asu` hero and every book's synopsis (the library author card that also used it is retired).
 Animated WebP cannot be paused with
 CSS, so each placement uses `<picture>` with the still frame under `prefers-reduced-motion`.
+
+## Translations — lettered into the balloons (`TypesetLayer.svelte` + `lib/typeset.ts`)
+
+Bubbles (`pages.bubbles`) are drawn two ways; `ReaderSettings.translateMode` picks one and the
+chrome offers 吹き出し / 一覧 / オフ:
+
+- **typeset** (default): the translation lettered into the balloon, vertical (縦書き) unless the box
+  is wide or Latin. The fit is computed once in the page's pixels (`fitBubble`: `Intl.Segmenter`
+  words, kinsoku, column length = the ellipse's chord at each column's outer edge, one book-wide
+  base size snapped to steps ×1 … ×0.6, `TS.MIN` then overflow) and drawn in `cqh` of the layer, so
+  nothing re-measures at any size or zoom. Fill = a soft radial gradient with a 4 % bleed that
+  covers the Thai lettering; `dark` for black balloons, `shape` ellipse/round/rect/none, `dir`,
+  `scale`. All optional on the bubble — old bubbles just work. `normalizeBubble` validates.
+  Not interactive (no `data-bub`): taps turn pages, long-press still faves. The rail shows notes
+  only in this mode.
+- **notes**: the original hotspots + tooltips + the side rail.
+- **Page turns carry the lettering**: the curl and door overlays are CSS backgrounds, so FlipSurface
+  clones the page's `.ts` layer (`inkOf`, boxed in % of the page) into the leaf, the still half and
+  the pre-mirrored back (`CurlSetup.leafInk/staticInk/backInk`, `DoorSetup.ink`, `land.ink`).
+  Without that the turning page showed Thai for the whole turn.
+- A translated book opens translated when `work.translations` includes the reader's UI language
+  (a reader who ever changed a setting keeps theirs — settings are saved whole).
+- `kind: 'prose'` is reserved for a novel page's whole text (book 2): the layer skips it until the
+  novel renderer exists.
+- BubbleEditor: balloon/dark/direction/size per bubble, PREVIEW TYPESET, the fit readout
+  ("1.70% · 3 COLUMNS" / TOO LONG), arrow-key nudges. Draw the box on the balloon's inside, not the
+  tail.
+- Fonts: `--font-typeset` = system mincho only, never the subset webfont.
 
 ## Gotchas
 

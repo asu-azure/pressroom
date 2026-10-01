@@ -49,7 +49,17 @@ export interface Bubble {
   w: number;
   h: number;
   text: string; // the translation
+  // Typeset mode (lib/typeset.ts) — all optional, so older bubbles keep working.
+  shape?: BubbleShape; // absent = 'ellipse'; 'none' = text with a halo over the art
+  dark?: boolean; // a black balloon: dark fill, light text
+  dir?: 'v' | 'h'; // absent = auto (vertical unless the box is much wider than tall)
+  scale?: number; // the author's nudge on the base size, clamped 0.5–1.6
+  /** 'prose' = a novel page's whole text block, drawn as a translated page
+      (reserved: the reader renders it from the novel translation onwards). */
+  kind?: 'line' | 'prose';
 }
+
+export type BubbleShape = 'ellipse' | 'round' | 'rect' | 'none';
 
 /** Normalized 0..1 crop of the cover image shown in the library card. */
 export interface CoverCrop {
@@ -79,7 +89,20 @@ export interface Work {
   published: boolean;
   created_at: string;
   updated_at: string;
+  // Book info + series (supabase/book-info.sql). Optional: rows and fallbacks
+  // from before the migration render the overview as it always was.
+  book_lang?: string | null; // language the book is written in, e.g. 'th'
+  translations?: string[]; // languages a translation exists in, e.g. ['ja']
+  formats?: BookFormat[];
+  release_label?: string | null;
+  content_warnings?: string[];
+  series_title?: string | null; // same string = same series
+  series_order?: number | null;
+  series_kind?: 'main' | 'side' | null;
+  series_label?: string | null; // the arc name, e.g. 夜光虫編
 }
+
+export type BookFormat = 'manga' | 'novel' | 'illust';
 
 export interface Chapter {
   id: string;
@@ -137,9 +160,13 @@ export interface ReaderSettings {
   mode: Mode;
   fit: FitMode;
   translate: boolean;
+  /** How translations show: lettered into the balloons, or as hotspots + a list. */
+  translateMode: TranslateMode;
   /** Flip mode turns pages with a paper curl (scripts/curl.ts). */
   curl: boolean;
 }
+
+export type TranslateMode = 'typeset' | 'notes';
 
 /** A chapter's entry point in the resolved sheet list (reader TOC). */
 export interface ChapterMark {
