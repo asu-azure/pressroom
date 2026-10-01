@@ -24,9 +24,21 @@
 </script>
 
 <div class="ts" lang="ja" aria-hidden={fits.length ? undefined : 'true'}>
+  <!-- First every patch of original lettering is painted out, so a balloon's
+       text sits on a clean balloon with its own outline intact. -->
+  {#each fits as { b } (b.id)}
+    {#each b.cover ?? [] as [cx, cy, cw, ch], ci (ci)}
+      <span
+        class="ts__cover"
+        class:is-dark={b.dark}
+        style={`left:${cx * 100}%;top:${cy * 100}%;width:${cw * 100}%;height:${ch * 100}%`}
+      ></span>
+    {/each}
+  {/each}
   {#each fits as { b, fit } (b.id)}
     <div
       class="ts__b ts__b--{b.shape ?? 'ellipse'}"
+      class:is-covered={Boolean(b.cover?.length)}
       class:is-dark={b.dark}
       class:is-overflow={fit.overflow}
       style={`left:${b.x * 100}%;top:${b.y * 100}%;width:${b.w * 100}%;height:${b.h * 100}%;--fs:${fit.fs};--pitch:${fit.pitch}`}
@@ -75,8 +87,19 @@
   .ts__b--round::before {
     border-radius: 22%;
   }
-  .ts__b--none::before {
-    content: none;
+  .ts__b--none::before,
+  .ts__b.is-covered::before {
+    content: none; /* the cover patches did the painting */
+  }
+  /* A patch over the original lettering: the balloon's own paper colour, a
+     touch rounded so its corner never nicks a curved outline. */
+  .ts__cover {
+    position: absolute;
+    background: #fff;
+    border-radius: 0.4cqh;
+  }
+  .ts__cover.is-dark {
+    background: #000;
   }
   .ts__b--none .ts__t {
     text-shadow:
@@ -85,7 +108,7 @@
       0 0 0.25em #fff;
   }
   .ts__b.is-dark {
-    --ts-fill: #111;
+    --ts-fill: #000;
     color: #f4f1ea;
   }
   .ts__b--none.is-dark .ts__t {
@@ -100,7 +123,8 @@
     text-orientation: mixed;
     font-size: calc(var(--fs) * 1cqh);
     line-height: var(--pitch);
-    text-align: center;
+    /* columns start on one line (天揃え), the block is centred by the grid */
+    text-align: start;
     white-space: nowrap;
   }
   .ts__t.is-h {

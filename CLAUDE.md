@@ -641,9 +641,16 @@ chrome offers 吹き出し / 一覧 / オフ:
   is wide or Latin. The fit is computed once in the page's pixels (`fitBubble`: `Intl.Segmenter`
   words, kinsoku, column length = the ellipse's chord at each column's outer edge, one book-wide
   base size snapped to steps ×1 … ×0.6, `TS.MIN` then overflow) and drawn in `cqh` of the layer, so
-  nothing re-measures at any size or zoom. Fill = a soft radial gradient with a 4 % bleed that
-  covers the Thai lettering; `dark` for black balloons, `shape` ellipse/round/rect/none, `dir`,
-  `scale`. All optional on the bubble — old bubbles just work. `normalizeBubble` validates.
+  nothing re-measures at any size or zoom. Columns are **top-aligned (天揃え) and the block is
+  centred** in the balloon — in an ellipse the block is the rectangle inscribed at its width, the way
+  Japanese lettering sits; per-column centring looked ragged (the owner's note).
+  **`cover`** ([x,y,w,h] page fractions) paints out each patch of the original lettering — one patch
+  per Thai text row, so it follows a curved balloon and leaves its outline; a balloon holding two
+  Thai blocks is two bubbles, each with its own Japanese where its Thai was. Without `cover` the box
+  gets the old soft balloon-shaped fill (hand-drawn bubbles in the Studio). `dark` for black
+  balloons (black patches), `shape` ellipse/round/rect/none, `dir`, `scale`. All optional on the
+  bubble — old bubbles just work. `normalizeBubble` validates. The vol. 1 translation's patches are
+  measured from the page images by a private tool (doujin/.local-tools/pressroom-ja), not in this repo.
   Not interactive (no `data-bub`): taps turn pages, long-press still faves. The rail shows notes
   only in this mode.
 - **notes**: the original hotspots + tooltips + the side rail.

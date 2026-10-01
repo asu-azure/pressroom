@@ -64,6 +64,17 @@ describe('fitBubble', () => {
     );
   });
 
+  it('keeps the whole top-aligned block inside an elliptical balloon', () => {
+    const f = fitBubble(LONG, W, H);
+    const fs = (f.fs / 100) * H;
+    const pad = TS.PAD * Math.min(LONG.w * W, LONG.h * H);
+    const a = (LONG.w * W - 2 * pad) / 2;
+    const b = (LONG.h * H - 2 * pad) / 2;
+    const halfW = ((f.lines.length - 1) * fs * f.pitch + fs) / 2;
+    const halfH = (Math.max(...colText(f).map((c) => c.length)) * fs) / 2;
+    expect((halfW / a) ** 2 + (halfH / b) ** 2).toBeLessThanOrEqual(1 + 1e-6); // the corners are on or in the curve
+  });
+
   it('fits less into an ellipse than into a rectangle of the same box', () => {
     const text = 'お母さんってさ、すごい生き物なんだよ。痛いときに呼べば来てくれる';
     const box: [number, number, number, number] = [895, 150, 1015, 345];
@@ -111,6 +122,12 @@ describe('normalizeBubble', () => {
   it('keeps a good bubble and clamps it onto the page', () => {
     const b = normalizeBubble({ id: 'x', panel: 2.4, charId: 'c', x: 0.9, y: -1, w: 0.5, h: 0.2, text: ' やあ ', shape: 'round', dark: true, dir: 'h', scale: 9, kind: 'prose' });
     expect(b).toEqual({ id: 'x', panel: 2, charId: 'c', x: 0.9, y: 0, w: 1 - 0.9, h: 0.2, text: 'やあ', shape: 'round', dark: true, dir: 'h', scale: 1.6, kind: 'prose' });
+  });
+
+  it('keeps cover patches on the page and drops broken ones', () => {
+    const b = normalizeBubble({ id: 'x', x: 0.1, y: 0.1, w: 0.2, h: 0.2, text: 'a', cover: [[0.1, 0.1, 0.05, 0.05], [0.98, 0.5, 0.1, 0.1], [0, 0, 0, 0.1], 'junk', [1, 2]] });
+    expect(b!.cover).toEqual([[0.1, 0.1, 0.05, 0.05], [0.98, 0.5, 1 - 0.98, 0.1]]);
+    expect(normalizeBubble({ id: 'x', x: 0, y: 0, w: 0.1, h: 0.1, text: 'a', cover: [] })).not.toHaveProperty('cover');
   });
 
   it('drops unknown values and rejects junk', () => {

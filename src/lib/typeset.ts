@@ -158,21 +158,19 @@ function splitWord(w: Word, cap: number): Word[] {
 
 // ---------------------------------------------------------------- geometry
 
-/** Each column's length (px) for n columns at size fs (px), centred in the box. */
+/**
+ * Each column's length (px) for n columns at size fs (px). Japanese lettering
+ * tops its columns on one line (天揃え) and centres the block in the balloon,
+ * so the block is a rectangle: in an ellipse it is the rectangle inscribed at
+ * that width (its corners on the curve), in a box it is the box.
+ */
 function capacities(shape: BubbleShape, across: number, along: number, fs: number, pitch: number, n: number): number[] | null {
   const span = (n - 1) * pitch + fs;
   if (span > across + 1e-6) return null;
-  const a = across / 2;
-  const caps: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const centre = -span / 2 + fs / 2 + i * pitch;
-    const edge = Math.min(a, Math.abs(centre) + fs / 2);
-    let len = along;
-    if (shape === 'ellipse') len = along * Math.sqrt(Math.max(0, 1 - (edge / a) ** 2));
-    else if (shape === 'round') len = along * (edge > a * 0.8 ? 0.9 : 1);
-    caps.push(len);
-  }
-  return caps;
+  let len = along;
+  if (shape === 'ellipse') len = along * Math.sqrt(Math.max(0, 1 - (span / across) ** 2));
+  else if (shape === 'round') len = along * (span > across * 0.8 ? 0.92 : 1);
+  return Array.from({ length: n }, () => len);
 }
 
 /** Fill columns with words; null when they don't fit. `limit` balances lengths. */
@@ -327,5 +325,16 @@ export function normalizeBubble(raw: unknown): Bubble | null {
   if (r.dir === 'v' || r.dir === 'h') b.dir = r.dir;
   if (typeof r.scale === 'number' && Number.isFinite(r.scale) && r.scale !== 1) b.scale = clamp(r.scale, 0.5, 1.6, 1);
   if (r.kind === 'prose') b.kind = 'prose';
+  if (Array.isArray(r.cover)) {
+    const cover = r.cover
+      .filter((c): c is number[] => Array.isArray(c) && c.length === 4 && c.every((v) => typeof v === 'number' && Number.isFinite(v)))
+      .map(([cx, cy, cw, ch]) => {
+        const x0 = clamp(cx, 0, 1, 0);
+        const y0 = clamp(cy, 0, 1, 0);
+        return [x0, y0, clamp(cw, 0, 1 - x0, 0), clamp(ch, 0, 1 - y0, 0)] as [number, number, number, number];
+      })
+      .filter(([, , cw, ch]) => cw > 0 && ch > 0);
+    if (cover.length) b.cover = cover;
+  }
   return b;
 }

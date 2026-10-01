@@ -54,6 +54,13 @@ export interface Bubble {
   dark?: boolean; // a black balloon: dark fill, light text
   dir?: 'v' | 'h'; // absent = auto (vertical unless the box is much wider than tall)
   scale?: number; // the author's nudge on the base size, clamped 0.5–1.6
+  /**
+   * Where the original lettering sits, [x, y, w, h] in page fractions: each
+   * patch is painted over (white, or black for a dark balloon) so none of it
+   * shows, and the balloon's own outline stays. Without it the whole box gets
+   * the soft balloon-shaped fill (hand-drawn bubbles in the Studio).
+   */
+  cover?: [number, number, number, number][];
   /** 'prose' = a novel page's whole text block, drawn as a translated page
       (reserved: the reader renders it from the novel translation onwards). */
   kind?: 'line' | 'prose';
