@@ -630,7 +630,10 @@
     gap: clamp(2rem, 5vw, 4rem);
     align-items: center;
     width: 100%;
-    padding: clamp(5rem, 12vh, 7rem) var(--pad) clamp(3rem, 8vh, 5rem);
+    /* The back chip and the LangBar are fixed at --chrome-top: when the hero
+       runs taller than the screen (phones), its top padding must clear them or
+       the cover starts underneath. */
+    padding: max(clamp(5rem, 12vh, 7rem), calc(var(--chrome-top, 0px) + 3rem)) var(--pad) clamp(3rem, 8vh, 5rem);
     max-width: 1200px;
     margin: 0 auto;
   }
@@ -708,7 +711,7 @@
   @media (max-width: 820px) {
     .ov-hero__inner {
       grid-template-columns: 1fr;
-      padding-top: clamp(4.5rem, 10vh, 6rem);
+      padding-top: max(clamp(4.5rem, 10vh, 6rem), calc(var(--chrome-top, 0px) + 3rem));
     }
     .ov-hero__cover {
       max-width: min(70vw, 18rem);
