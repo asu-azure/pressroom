@@ -115,6 +115,9 @@
      Noto below is the CJK-suffixed family name, which cannot collide with them. */
   --font-serif-authored: 'Fraunces', 'Ekkamai Vibe', 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'MS Mincho', Georgia, serif;
   --font-display-authored: 'Space Grotesk', 'Prompt', 'Yu Gothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Meiryo', system-ui, sans-serif;
+  /* The reader's typeset translations (TypesetLayer): mincho, like the dialogue
+     lettering of a Japanese manga. System faces only — same reason as above. */
+  --font-typeset: 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'Source Han Serif JP', 'MS Mincho', serif;
   --font-display: 'Space Grotesk', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Ekkamai Vibe', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;

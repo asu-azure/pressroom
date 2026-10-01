@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageRec, Character } from '../../lib/types';
   import { cropAttr, cropImgStyle } from '../../lib/coverCrop';
+  import TypesetLayer from './TypesetLayer.svelte';
 
   let {
     page,
@@ -8,6 +9,7 @@
     eager = false,
     alt,
     translateOn = false,
+    typesetOn = false,
     characters = [],
     highlightId = null,
     onHighlight,
@@ -16,7 +18,10 @@
     sizes: string;
     eager?: boolean;
     alt: string;
+    /** Hotspots + tooltips (the translation as notes). */
     translateOn?: boolean;
+    /** The translation lettered into the balloons (TypesetLayer). */
+    typesetOn?: boolean;
     characters?: Character[];
     highlightId?: string | null;
     onHighlight?: (id: string | null) => void;
@@ -79,7 +84,12 @@
     {@render pictures(undefined)}
   {/if}
 
-  {#if translateOn && page.bubbles?.length}
+  {#if typesetOn && page.bubbles?.length}
+    <!-- the same contain rect as the hotspots; the layer sizes its text off it -->
+    <div class="si__bubbles si__bubbles--ts">
+      <TypesetLayer bubbles={page.bubbles} pw={page.width} ph={page.height} />
+    </div>
+  {:else if translateOn && page.bubbles?.length}
     <div class="si__bubbles">
       {#each page.bubbles as b (b.id)}
         {@const on = highlightId === b.id || openId === b.id}
@@ -195,6 +205,9 @@
     width: min(100cqw, 100cqh * var(--pw) / var(--ph));
     height: min(100cqh, 100cqw * var(--ph) / var(--pw));
     z-index: 3;
+  }
+  .si__bubbles--ts {
+    pointer-events: none;
   }
   .si__bub {
     position: absolute;

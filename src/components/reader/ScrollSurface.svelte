@@ -12,6 +12,7 @@
     pageNumberOf,
     onCurrent,
     translateOn = false,
+    typesetOn = false,
     characters = [],
     highlightId = null,
     onHighlight,
@@ -23,6 +24,7 @@
     pageNumberOf: (pageId: string) => number;
     onCurrent: (index: number) => void;
     translateOn?: boolean;
+    typesetOn?: boolean;
     characters?: Character[];
     highlightId?: string | null;
     onHighlight?: (id: string | null) => void;
@@ -89,6 +91,7 @@
             sizes={sheet.kind === 'spread' ? '(max-width: 760px) 50vw, 40vw' : '(max-width: 760px) 100vw, 62vw'}
             alt={`Page ${pageNumberOf(page.id)}`}
             {translateOn}
+            {typesetOn}
             {characters}
             {highlightId}
             {onHighlight}

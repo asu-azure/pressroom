@@ -13,6 +13,7 @@
     pageNumberOf,
     onNavigate,
     translateOn = false,
+    typesetOn = false,
     curl = true,
     characters = [],
     highlightId = null,
@@ -25,6 +26,7 @@
     pageNumberOf: (pageId: string) => number;
     onNavigate: (index: number) => void;
     translateOn?: boolean;
+    typesetOn?: boolean;
     curl?: boolean;
     characters?: Character[];
     highlightId?: string | null;
@@ -207,6 +209,20 @@
   let curlTarget = -1;
   let curlBusy = false;
 
+  /** A clone of the page's typeset translation, boxed in % of the overlay box `r`. */
+  function inkOf(el: HTMLElement, r: DOMRect): HTMLElement | undefined {
+    const ts = el.querySelector<HTMLElement>('.si__bubbles--ts > .ts');
+    if (!ts || !r.width || !r.height) return undefined;
+    const t = ts.getBoundingClientRect();
+    const ink = ts.cloneNode(true) as HTMLElement;
+    ink.setAttribute('aria-hidden', 'true');
+    ink.style.cssText =
+      `position:absolute;inset:auto;transform:none;` +
+      `left:${((t.left - r.left) / r.width) * 100}%;top:${((t.top - r.top) / r.height) * 100}%;` +
+      `width:${(t.width / r.width) * 100}%;height:${(t.height / r.height) * 100}%;`;
+    return ink;
+  }
+
   function pageEls(index: number) {
     const host = pagesEls[index];
     if (!host) return [];
@@ -226,7 +242,7 @@
           const h = Math.min(r.height, r.width / ar);
           r = new DOMRect(r.left + (r.width - w) / 2, r.top + (r.height - h) / 2, w, h);
         }
-        return { r, pic: src ? pictureLayer(src, crop) : '' };
+        return { r, pic: src ? pictureLayer(src, crop) : '', ink: inkOf(el, r) };
       })
       .sort((a, b) => a.r.left - b.r.left);
   }
@@ -245,11 +261,13 @@
     // first spread, the door is one sheet with the facing page on its back: it
     // turns 180° and lands on that page.
     const coverTurn = closedCover && Math.min(cur, target) === 0;
-    const landOn = (leaf: { x: number; w: number }, hingeLeft: boolean, spread: { r: DOMRect; pic: string }[], dx = 0) => {
+    const landOn = (leaf: { x: number; w: number }, hingeLeft: boolean, spread: { r: DOMRect; pic: string; ink?: HTMLElement }[], dx = 0) => {
       if (!coverTurn) return undefined;
       const rects = spread.map((p) => rel0(p.r, dx));
       const i = landingPage(hingeLeft ? leaf.x : leaf.x + leaf.w, hingeLeft, rects);
-      return i < 0 || !spread[i].pic ? undefined : { rect: rects[i], pic: spread[i].pic, floor: floorColour() };
+      return i < 0 || !spread[i].pic
+        ? undefined
+        : { rect: rects[i], pic: spread[i].pic, floor: floorColour(), ink: spread[i].ink };
     };
     if (now.length === 1 || (coverTurn && !forward)) {
       const hingeLeft = direction === 'ltr';
@@ -260,7 +278,7 @@
         const leaf = rel0(now[0].r);
         const land = landOn(leaf, hingeLeft, pageEls(target));
         if (coverTurn && !land) return false;
-        doorFx = new Door({ host: stage, leaf, pic: now[0].pic, hingeLeft, forward: true, land });
+        doorFx = new Door({ host: stage, leaf, pic: now[0].pic, ink: now[0].ink, hingeLeft, forward: true, land });
         doorW = now[0].r.width;
       } else {
         const prev = pageEls(target);
@@ -270,7 +288,7 @@
         const leaf = rel0(prev[0].r, shift);
         const land = landOn(leaf, hingeLeft, now);
         if (coverTurn && !land) return false;
-        doorFx = new Door({ host: stage, leaf, pic: prev[0].pic, hingeLeft, forward: false, land });
+        doorFx = new Door({ host: stage, leaf, pic: prev[0].pic, ink: prev[0].ink, hingeLeft, forward: false, land });
         doorW = prev[0].r.width;
       }
       doorForward = forward;
@@ -299,6 +317,9 @@
       staticRect: still ? rel(still.r) : undefined,
       staticPic: still?.pic || undefined,
       backPic: back?.pic || undefined,
+      leafInk: leaf.ink,
+      staticInk: still?.ink,
+      backInk: back?.ink,
     });
     curlTarget = target;
     return true;
@@ -631,6 +652,7 @@
               sizes={sheet.kind === 'spread' || (index === 0 && closedCover) ? '50vw' : '100vw'}
               alt={`Page ${pageNumberOf(page.id)}`}
               {translateOn}
+              {typesetOn}
               {characters}
               {highlightId}
               {onHighlight}

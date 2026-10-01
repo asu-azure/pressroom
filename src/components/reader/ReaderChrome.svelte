@@ -274,7 +274,9 @@
       <div class="rc-panel__group">
         <span class="mono rc-panel__label">{i18n.t('rd.translate')}</span>
         <div class="rc-panel__opts">
-          <button class="mono rc-opt" class:is-on={settings.translate} onclick={() => onSettings({ translate: true })}>{i18n.t('rd.on')}</button>
+          <!-- in the balloons (lettered) · as a list (hotspots + side notes) · off -->
+          <button class="mono rc-opt" class:is-on={settings.translate && settings.translateMode !== 'notes'} onclick={() => onSettings({ translate: true, translateMode: 'typeset' })}>{i18n.t('rd.tsBubbles')}</button>
+          <button class="mono rc-opt" class:is-on={settings.translate && settings.translateMode === 'notes'} onclick={() => onSettings({ translate: true, translateMode: 'notes' })}>{i18n.t('rd.tsList')}</button>
           <button class="mono rc-opt" class:is-on={!settings.translate} onclick={() => onSettings({ translate: false })}>{i18n.t('rd.off')}</button>
         </div>
       </div>

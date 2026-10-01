@@ -24,7 +24,7 @@
   let pages = $state<PageRec[]>([]);
   let chapters = $state<Chapter[]>([]);
   let status = $state<'loading' | 'ready' | 'missing'>('loading');
-  let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height', translate: false, curl: true });
+  let settings = $state<ReaderSettings>({ layout: 'double', mode: 'flip', fit: 'height', translate: false, translateMode: 'typeset', curl: true });
   let cur = $state(0);
   let chrome = $state<ReaderChrome | null>(null);
   let highlightId = $state<string | null>(null);
@@ -42,7 +42,10 @@
   const characters = $derived(work?.characters ?? []);
   const anyBubbles = $derived(pages.some((p) => p.bubbles?.length));
   const hasBubbles = $derived(Boolean(currentSheet?.pages.some((p) => p.bubbles?.length)));
-  const showRail = $derived(hasNote || (settings.translate && hasBubbles));
+  // Lettered into the balloons, or as hotspots + the side list (the 'notes' mode).
+  const typesetOn = $derived(settings.translate && settings.translateMode !== 'notes');
+  const notesOn = $derived(settings.translate && settings.translateMode === 'notes');
+  const showRail = $derived(hasNote || (notesOn && hasBubbles));
   const dirSign = $derived(work?.direction === 'rtl' ? -1 : 1);
 
   const orderedPages = $derived([...pages].sort((a, b) => (a.sortKey < b.sortKey ? -1 : 1)));
@@ -102,9 +105,15 @@
       layout: work.default_layout,
       mode: work.default_mode,
       fit: work.default_mode === 'flip' ? 'height' : 'width',
-      translate: false,
+      // a translated book opens translated for a reader of that language
+      // (a reader who has ever changed a setting keeps their own choice)
+      translate: Boolean(work.translations?.includes(i18n.lang)),
+      translateMode: 'typeset',
       curl: true,
     });
+    if (settings.translateMode !== 'typeset' && settings.translateMode !== 'notes') {
+      settings = { ...settings, translateMode: 'typeset' }; // saved before the mode existed
+    }
 
     let [{ data: rows }, { data: chRows }] = await Promise.all([
       supabase.from('pages').select('*').eq('work_id', work.id).order('sort_key'),
@@ -385,7 +394,8 @@
           startIndex={cur}
           {pageNumberOf}
           onCurrent={setCur}
-          translateOn={settings.translate}
+          translateOn={notesOn}
+          {typesetOn}
           curl={settings.curl}
           {characters}
           {highlightId}
@@ -399,7 +409,8 @@
           {cur}
           {pageNumberOf}
           onNavigate={setCur}
-          translateOn={settings.translate}
+          translateOn={notesOn}
+          {typesetOn}
           {characters}
           {highlightId}
           onHighlight={(id) => (highlightId = id)}
@@ -423,7 +434,7 @@
         sheet={currentSheet}
         mode={settings.mode}
         {pageNumberOf}
-        translateOn={settings.translate}
+        translateOn={notesOn}
         {characters}
         {highlightId}
         onHighlight={(id) => (highlightId = id)}

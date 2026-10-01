@@ -122,6 +122,14 @@ export interface CurlSetup {
   staticRect?: Rect; // current non-turning page (spreads)
   staticPic?: string;
   backPic?: string; // target's page that the leaf lands on (spreads)
+  /**
+   * "Ink": a clone of a page's typeset translation layer (TypesetLayer), boxed
+   * in % of its page. The pictures above are only backgrounds, so without these
+   * the turning leaf would show the untranslated page for the whole turn.
+   */
+  leafInk?: HTMLElement;
+  staticInk?: HTMLElement;
+  backInk?: HTMLElement;
 }
 
 export class Curl {
@@ -153,10 +161,13 @@ export class Curl {
 
     this.root = el('curl', 'position:absolute;inset:0;pointer-events:none;z-index:4;');
     if (s.staticRect && s.staticPic) {
-      this.root.append(el('curl__static', `position:absolute;${box(s.staticRect)}${img(s.staticPic)}`));
+      const still = el('curl__static', `position:absolute;${box(s.staticRect)}${img(s.staticPic)}`);
+      if (s.staticInk) still.append(s.staticInk);
+      this.root.append(still);
     }
     this.front = el('curl__front', `position:absolute;${box(leaf)}${img(s.leafPic)}`);
     this.shade = el('curl__shade', 'position:absolute;inset:0;');
+    if (s.leafInk) this.front.append(s.leafInk);
     this.front.append(this.shade);
     // the wrapper carries the drop shadow, so it follows the clipped shape
     this.backWrap = el(
@@ -173,6 +184,8 @@ export class Curl {
     // mirrored, so it is left alone; the facing page is pre-mirrored so it reads
     // the right way round once it has landed.
     const face = el('curl__face', `position:absolute;inset:0;${backFace}${s.backPic ? 'transform:scaleX(-1);' : ''}`);
+    // inside the face, so it is mirrored with it and reads right once landed
+    if (s.backPic && s.backInk) face.append(s.backInk);
     const gloss = el('curl__gloss', 'position:absolute;inset:0;');
     this.back.append(face, gloss);
     this.backWrap.append(this.back);
@@ -306,7 +319,9 @@ export interface DoorSetup {
    * lands exactly on that page instead of fading out. `floor` paints the spot
    * it lands on until it lies there (a closed book has nothing on that side).
    */
-  land?: { rect: Rect; pic: string; floor: string };
+  land?: { rect: Rect; pic: string; floor: string; ink?: HTMLElement };
+  /** the page's typeset translation, cloned (see CurlSetup.leafInk) */
+  ink?: HTMLElement;
 }
 
 export class Door {
@@ -344,12 +359,14 @@ export class Door {
     const img = s.pic;
     const front = el(`position:absolute;inset:0;backface-visibility:hidden;background:${img},#f1ece2;`);
     this.shade = el('position:absolute;inset:0;opacity:0;');
+    if (s.ink) front.append(s.ink);
     front.append(this.shade);
     // the reverse: the facing page for a cover (it reads the right way round
     // once the leaf has turned 180°), else paper with the print showing through
     const back = el('position:absolute;inset:0;backface-visibility:hidden;transform:rotateY(180deg);background:#f1ece2;');
     if (s.land) {
       back.style.background = `${s.land.pic},#f1ece2`;
+      if (s.land.ink) back.append(s.land.ink); // boxed in %, so it follows the 90° box swap
       this.backShade = el('position:absolute;inset:0;opacity:0;');
       back.append(this.backShade);
     } else {
