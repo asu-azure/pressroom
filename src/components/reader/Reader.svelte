@@ -126,8 +126,11 @@
       rows = unlockedRows;
     }
     // The cover page is the whole wraparound; the book opens on its front
-    // (lib/coverCrop.ts) — only when it really is the first leaf.
-    pages = (rows ?? []).map(toPageRec).map((p, i) => (i === 0 && p.id === work.cover_page_id ? frontOnly(p, work.cover_crop) : p));
+    // (lib/coverCrop.ts) — only when it really is the first leaf — trimmed to
+    // the shape of the first page inside, so cover and pages are one size.
+    const recs = (rows ?? []).map(toPageRec);
+    const inner = recs.find((p, i) => i > 0 && !p.isBlank);
+    pages = recs.map((p, i) => (i === 0 && p.id === work.cover_page_id ? frontOnly(p, work.cover_crop, inner) : p));
     chapters = (chRows ?? []) as Chapter[];
 
     // Deep link (?p=pageId from the overview page) wins over saved progress.

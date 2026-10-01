@@ -50,6 +50,33 @@ describe('frontOnly', () => {
     expect(p.bubbles[0].w).toBeCloseTo(0.1 / front.w);
   });
 
+  it('trims the front to the inner pages’ shape, off the spine side', () => {
+    // the real book: front 844×1140 (0.740), pages 1151×1600 (0.719)
+    const inner = { width: 1151, height: 1600 };
+    const p = frontOnly(cover, front, inner);
+    expect(p.width / p.height).toBeCloseTo(inner.width / inner.height, 3);
+    expect(p.height).toBe(1140);
+    expect(p.crop!.x).toBe(0); // the outer edge stays; the spine edge moves in
+    expect(p.crop!.w).toBeLessThan(front.w);
+    // front on the right (back on the left): the spine is the left edge
+    const r = frontOnly(cover, { x: 1 - front.w, y: 0, w: front.w, h: 1 }, inner);
+    expect(r.crop!.x + r.crop!.w).toBeCloseTo(1, 6);
+    expect(r.crop!.x).toBeGreaterThan(1 - front.w);
+  });
+
+  it('takes spare height evenly off head and tail when the pages are wider', () => {
+    const p = frontOnly(cover, front, { width: 1200, height: 1600 });
+    expect(p.width / p.height).toBeCloseTo(0.75, 3);
+    expect(p.crop!.w).toBe(front.w);
+    expect(p.crop!.y).toBeCloseTo((1 - p.crop!.h) / 2, 6);
+  });
+
+  it('keeps the author’s crop when matching would cut too much, or without a page', () => {
+    expect(frontOnly(cover, front, { width: 600, height: 1600 }).crop).toEqual(front);
+    expect(frontOnly(cover, front, null).crop).toEqual(front);
+    expect(frontOnly(cover, front, { width: 0, height: 0 }).crop).toEqual(front);
+  });
+
   it('leaves the page whole for a framing crop, no crop, or a blank leaf', () => {
     expect(frontOnly(cover, { x: 0.2, y: 0.1, w: 0.5, h: 0.6 })).toBe(cover);
     expect(frontOnly(cover, null)).toBe(cover);

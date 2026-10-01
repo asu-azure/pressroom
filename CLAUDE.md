@@ -676,6 +676,11 @@ CSS, so each placement uses `<picture>` with the still frame under `prefers-redu
   contain rect, and the ▦ grid / chapter thumbs aim `object-position` at the front. The turning
   page is now the sharp `.si__img` once loaded — it used to grab the first `<img>`, the blurred
   thumbnail.
+  **The front is trimmed to the first inner page's shape** (`frontOnly(page, crop, inner)`): the
+  crop carries the spine and bleed, so the real fronts are 2–4 % wider than the pages (0.741 vs
+  0.719) and the cover changed size as it opened and closed (the owner caught it). Spare width
+  comes off the spine side (the edge beside the back — no lettering there on either book), spare
+  height evenly off head and tail; more than `MAX_TRIM` (12 %) is the author's framing and is kept.
 - **In double layout the solo cover is the book CLOSED** (`closedCover` in `FlipSurface`): it is
   one page wide and sits on its half of the spread — its spine on the spread's spine (RTL left of
   it, LTR right), an invisible `.fs__gap` sized like a page holding the other half. The owner found

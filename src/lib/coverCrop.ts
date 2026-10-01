@@ -22,13 +22,45 @@ export function wrapBack(c: CoverCrop | null | undefined): { x: number; w: numbe
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0));
 
-/** The reader's cover page: the front of the wraparound only, as if the book were closed. */
-export function frontOnly(page: PageRec, crop: CoverCrop | null | undefined): PageRec {
-  if (!crop || page.isBlank || !wrapBack(crop)) return page;
-  const x = clamp01(crop.x);
-  const y = clamp01(crop.y);
-  const w = Math.max(0.05, Math.min(1 - x, clamp01(crop.w)));
-  const h = Math.max(0.05, Math.min(1 - y, clamp01(crop.h)));
+/** The most of the front a trim to the pages' shape may take. The real covers differ by 2–4 %
+    (spine and bleed); past this the crop is the author's framing, so it is left alone. */
+export const MAX_TRIM = 0.12;
+
+/**
+ * The reader's cover page: the front of the wraparound only, as if the book were closed.
+ * With `inner` (the first page inside), the front is trimmed to that page's shape so the
+ * cover and the pages are one size — it would otherwise change size as it opens and
+ * closes. Spare width comes off the spine side (the edge beside the back: spine and
+ * bleed, never the title), spare height evenly off head and tail.
+ */
+export function frontOnly(
+  page: PageRec,
+  crop: CoverCrop | null | undefined,
+  inner?: { width: number; height: number } | null,
+): PageRec {
+  const back = wrapBack(crop);
+  if (!crop || page.isBlank || !back) return page;
+  let x = clamp01(crop.x);
+  let y = clamp01(crop.y);
+  let w = Math.max(0.05, Math.min(1 - x, clamp01(crop.w)));
+  let h = Math.max(0.05, Math.min(1 - y, clamp01(crop.h)));
+  const target = inner && inner.width > 0 && inner.height > 0 ? inner.width / inner.height : 0;
+  if (target) {
+    const aspect = (page.width * w) / (page.height * h);
+    if (aspect > target) {
+      const nw = (target * page.height * h) / page.width;
+      if (1 - nw / w <= MAX_TRIM) {
+        if (!back.right) x += w - nw; // back on the left: the spine is the crop's left edge
+        w = nw;
+      }
+    } else if (aspect < target) {
+      const nh = (page.width * w) / (target * page.height);
+      if (1 - nh / h <= MAX_TRIM) {
+        y += (h - nh) / 2;
+        h = nh;
+      }
+    }
+  }
   return {
     ...page,
     width: Math.round(page.width * w),
