@@ -15,6 +15,11 @@
 // takes over once it has loaded. Anything else — no origin, off screen, no
 // size — falls back to the fade.
 //
+// Share (when the page passes `share`): a SHARE button in the HUD — the phone's
+// share sheet on touch devices, else the link copied to the clipboard.
+// `onShow` reports the piece on screen (null when closed), so the page can keep
+// its URL in step; the lightbox itself never touches history.
+//
 // Ported from the sibling art site. Self-contained: builds its own DOM and uses
 // the `.lb__*` styles already in global.css (shared with the showcase lightbox —
 // different [data-*] hooks, so the two never cross-wire).
@@ -29,6 +34,8 @@ export interface LightboxItem {
   /** the artwork's size, for the flight's landing box */
   w?: number;
   h?: number;
+  /** its link key (lib/artLink.ts), for pages that link to single pieces */
+  key?: string;
 }
 
 /** A picture on screen: centre, unrotated size, tilt (deg) and the src it shows. */
@@ -48,9 +55,14 @@ const LOUPE_R = 95;
 
 export function initLightbox(
   items: LightboxItem[],
-  opts: { reduced?: boolean; originOf?: (i: number) => FlyRect | null } = {},
+  opts: {
+    reduced?: boolean;
+    originOf?: (i: number) => FlyRect | null;
+    onShow?: (i: number | null) => void;
+    share?: (i: number) => { url: string; title: string } | null;
+  } = {},
 ) {
-  const { reduced = false, originOf } = opts;
+  const { reduced = false, originOf, onShow, share } = opts;
 
   const root = document.createElement('div');
   root.className = 'lb';
@@ -71,6 +83,7 @@ export function initLightbox(
     </div>
     <div class="lb__hud lb__hud--bl mono" aria-hidden="true">ASU AZURE · 作品</div>
     <button type="button" class="lb__btn lb__close mono" data-lb-close aria-label="Close">✕</button>
+    ${share ? '<button type="button" class="lb__btn lb__share mono" aria-label="Share this piece">SHARE</button>' : ''}
     <button type="button" class="lb__btn lb__prev mono" aria-label="Previous">←</button>
     <button type="button" class="lb__btn lb__next mono" aria-label="Next">→</button>
     <div class="lb__loupe" aria-hidden="true"><span class="lb__loupeK mono">LOUPE ×${LOUPE_MAG}</span></div>
@@ -159,6 +172,7 @@ export function initLightbox(
     medium.textContent = it.medium;
     preload(idx + 1);
     preload(idx - 1);
+    onShow?.(idx);
     if (!reduced && dir !== 0) {
       // Brief channel-cut: the incoming frame slides from the nav direction.
       gsap.fromTo(
@@ -206,6 +220,7 @@ export function initLightbox(
   const close = () => {
     if (!isOpen) return;
     isOpen = false;
+    onShow?.(null);
     hideLoupe();
     window.removeEventListener('keydown', onKey);
     const done = () => {
@@ -249,5 +264,34 @@ export function initLightbox(
     else if (dx > 40) show(idx - 1, -1);
   });
 
-  return { open, close };
+  // --- share -----------------------------------------------------------------
+  const shareBtn = root.querySelector<HTMLButtonElement>('.lb__share');
+  let shareReset = 0;
+  const flash = (text: string) => {
+    if (!shareBtn) return;
+    shareBtn.textContent = text;
+    clearTimeout(shareReset);
+    shareReset = window.setTimeout(() => (shareBtn.textContent = 'SHARE'), 1600);
+  };
+  shareBtn?.addEventListener('click', async () => {
+    const s = share?.(idx);
+    if (!s) return;
+    // a phone's own share sheet (LINE, X, …); on a desktop the link is what's wanted
+    if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
+      try {
+        await navigator.share(s);
+      } catch {
+        /* dismissed */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(s.url);
+      flash('COPIED');
+    } catch {
+      flash('COPY FAILED');
+    }
+  });
+
+  return { open, close, isOpen: () => isOpen };
 }

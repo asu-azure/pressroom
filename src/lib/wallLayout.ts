@@ -55,8 +55,8 @@ export const ROW_H = 100;
 export const ROW_GAP = 18;
 export const MARGIN_Y = 24;
 export const MARGIN_X = 70;
-const BORDER = 0.045;
-const BOTTOM = 2.6; // × BORDER
+export const BORDER = 0.045;
+export const BOTTOM = 2.6; // × BORDER
 
 /** Rows for n pieces: fewer, larger prints on a wide screen; one more on a narrow one. */
 export function wallRows(n: number, narrow = false): number {
@@ -148,4 +148,16 @@ export function layoutWall(items: WallItem[], rows: number): WallLayout {
     height: MARGIN_Y * 2 + rows * ROW_H + (rows - 1) * ROW_GAP,
     rows,
   };
+}
+
+/**
+ * The wall for a whole gallery in display order (lead first), exactly as /asu
+ * hangs it on the server — the share card (pages/og/art) reads a piece's tilt
+ * and holder from here, so the card matches the wall.
+ */
+export function hangGallery(order: readonly { id: string; width: number; height: number }[], rows = wallRows(order.length)): WallLayout {
+  return layoutWall(
+    order.map((w, i) => ({ id: w.id, aspect: w.width && w.height ? w.width / w.height : 1, lead: i === 0 })),
+    rows,
+  );
 }

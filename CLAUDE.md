@@ -49,9 +49,10 @@ Astro (`output: 'server'`, Vercel adapter) + **Svelte 5 islands** for everything
 backend) + GSAP + Lenis for motion. `pdfjs-dist` rasterizes uploaded PDFs client-side
 (worker via `?url` import, client-only — never import pdfjs in Astro frontmatter).
 
-**Server-side reads are permitted for `<head>` metadata, for `/asu`'s content, and for the
-homepage artist teaser.** Metadata: public work fields, so a shared link previews with its real
-title and cover (crawlers never run the island). `/asu` is content-bearing — the page's whole job
+**Server-side reads are permitted for `<head>` metadata, for `/asu`'s content, for the
+homepage artist teaser, and for share cards.** Metadata: public work fields, so a shared link
+previews with its real title and cover (crawlers never run the island). Share cards:
+`/og/art/<key>.jpg` (below) reads the published artworks to draw one as an image. `/asu` is content-bearing — the page's whole job
 is to be read, and an empty first paint would defeat it. The homepage reads `site_copy` for the
 same reason and is therefore **`prerender = false`**: a static build would freeze author-edited
 copy until the next deploy. Everywhere else, data fetching stays in the browser.
@@ -272,6 +273,26 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
 - **The lightbox has a loupe** (`lightbox.ts`, fine pointers, motion allowed): ×2.5 glass drawn from
   the full-size image with `background-position` — plain CSS, because /asu stays WebGL-free. It is
   exactly on the pointer, never takes pointer events, and hides on navigation and close.
+- **Every piece has its own link: `/asu?art=<key>`** (`src/lib/artLink.ts`, tested; key = the
+  uuid's first 8 hex digits — stable across reorders, unlike the printed Nº). The page is the same
+  `/asu`; the server swaps the meta (title, alt as description, `canonical` with the query — a
+  `Base` prop, because the default canonical drops queries) and the script lands on the piece:
+  scrolls to the gallery, centres the wall's camera on its print (`wall.reveal`), opens the
+  lightbox, so closing flies it home. The lightbox reports what it shows (`onShow`) and the page
+  keeps the URL in step: opening pushes ONE history entry (a phone's Back closes the piece), ← →
+  replace it, closing pops it. ScrollTrigger resets the scroll on load/refresh, so the landing
+  re-applies its position while the piece is still open. **SHARE** in the lightbox: the share
+  sheet on touch, the link copied on desktop. The Studio's GALLERY rows have COPY LINK.
+- **Share card: `src/pages/og/art/[key].jpg.ts`** — 1200×630 JPEG of the piece as a print on the
+  studio wall, with the tilt and tape/pin it has on the wall (`hangGallery` in `wallLayout.ts`,
+  same `galleryOrder` as the page). Geometry + one SVG overlay in `src/lib/shareCard.ts` (pure,
+  tested), rasterised by **sharp — a runtime dependency now, keep it in `dependencies`**. No
+  `<text>` (a function has no fonts), no files from `public/` (the plaster grain is regenerated in
+  code, tested pixel-identical to `plaster.png`); librsvg reads JPEG/PNG data URIs, not WebP, so
+  the picture is re-encoded first, and sharp won't tile anything taller than the card (the mottle
+  is 560 px, not the wall's 700). Cached a year at the edge — the page adds `?v=<hash of the
+  picture URL>`. Unknown key → 404; any failure after the piece is found → 302 to its 900 px
+  picture, so a share still shows the art. ~0.35–0.4 s to draw cold, 77–97 KB.
 - Two separate commission switches: `commissions_open` picks WHICH line shows,
   `commissions_show` picks whether commissions are mentioned at all. Hiding takes the hero line
   and the whole craft-section panel together.

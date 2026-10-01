@@ -11,6 +11,9 @@ interface Props {
   description?: string;
   /** Absolute URL of a share-card image (a work's cover). Upgrades the card. */
   image?: string;
+  /** Path (+ query) this page is canonically at, when the query matters — a
+      shared artwork (`/asu?art=…`) is its own card. Defaults to the pathname. */
+  canonical?: string;
   /** Reader route drives its own scrolling — skip Lenis + progress hairline. */
   chromeless?: boolean;
   /** Site header (PRESSROOM · SHELF · ASU AZURE · OST · sound). Pages that own
@@ -22,6 +25,7 @@ const {
   title = 'Pressroom — Asu Azure',
   description = "Where Asu Azure's original work is collected — read it online.",
   image,
+  canonical: canonicalPath,
   chromeless = false,
   topbar = !chromeless,
 } = Astro.props;
@@ -33,7 +37,7 @@ const nav = [
   ...(MUSIC ? [{ href: '/ost', label: 'OST ♪', current: path === '/ost' }] : []),
 ];
 
-const canonical = new URL(Astro.url.pathname, Astro.site);
+const canonical = new URL(canonicalPath ?? Astro.url.pathname, Astro.site);
 
 // Alias identity only — never the owner's real name (see CLAUDE.md identity separation).
 const jsonLd = JSON.stringify({

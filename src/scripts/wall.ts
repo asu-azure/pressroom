@@ -533,6 +533,18 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
     }
   });
 
+  /** where the camera goes to put a print in the middle; null if it is already well in view */
+  function centreOn(p: WallPrint, always = false): { x: number; y: number } | null {
+    const s = u * z;
+    const l = tx + p.x * s;
+    const r = tx + (p.x + p.w) * s;
+    const top = ty + p.y * s;
+    const bot = ty + (p.y + p.h) * s;
+    const m = 40;
+    if (!always && l >= m && r <= vw - m && top >= 0 && bot <= vh) return null;
+    return { x: vw / 2 - (p.x + p.w / 2) * s, y: vh / 2 - (p.y + p.h / 2) * s };
+  }
+
   // tabbing onto a print brings it into view
   vp.addEventListener('focusin', (e) => {
     if (view !== 'wall') return;
@@ -540,14 +552,9 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
     const p = t && place.get(t);
     if (!p) return;
     vp.scrollLeft = vp.scrollTop = 0; // overflow: clip can't scroll, but belt and braces
-    const s = u * z;
-    const l = tx + p.x * s;
-    const r = tx + (p.x + p.w) * s;
-    const top = ty + p.y * s;
-    const bot = ty + (p.y + p.h) * s;
-    const m = 40;
-    if (l >= m && r <= vw - m && top >= 0 && bot <= vh) return;
-    panTarget = { x: vw / 2 - (p.x + p.w / 2) * s, y: vh / 2 - (p.y + p.h / 2) * s };
+    const to = centreOn(p);
+    if (!to) return;
+    panTarget = to;
     kick();
   });
 
@@ -701,6 +708,28 @@ export function initWall(root: HTMLElement, { reduced, onView }: Opts) {
   setView(view, false);
 
   return {
+    /**
+     * Put lightbox item i in front of the visitor without animation (a shared
+     * link landing): on the wall, centre the camera on its print. Returns the
+     * element the page should scroll to — the wall, or the grid tile.
+     */
+    reveal(i: number): HTMLElement | null {
+      const t = tiles.find((el) => el.dataset.lbOpen === String(i));
+      if (!t || t.hidden) return null;
+      if (view !== 'wall') return t;
+      const p = place.get(t);
+      const to = p && centreOn(p, true);
+      if (to) {
+        panTarget = null;
+        vx = vy = 0;
+        tx = to.x;
+        ty = to.y;
+        clamp();
+        render();
+        settle(true);
+      }
+      return vp;
+    },
     /** re-hang after a filter changed which pieces are shown */
     relayout() {
       if (view === 'wall') {

@@ -30,7 +30,8 @@ import { resolveScenes } from '../lib/scenes';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
 import type { ArtistProfile, ArtworkRow, ArtworkRec } from '../lib/types';
 import { cacheShell } from '../lib/cache';
-import { layoutWall, wallRows, type WallPrint } from '../lib/wallLayout';
+import { hangGallery, type WallPrint } from '../lib/wallLayout';
+import { artKey, artPath, findArt, galleryOrder, shortHash } from '../lib/artLink';
 
 export const prerender = false;
 
@@ -71,13 +72,13 @@ const portrait = profile?.portrait_path ? artUrl(profile.portrait_path) : null;
 // The featured piece leads the gallery at full width; the rest follow it into
 // the masonry. Falls back to the first work so the grid never loses its anchor.
 const featured = works.find((w) => w.featured) ?? works[0] ?? null;
-const rest = featured ? works.filter((w) => w.id !== featured.id) : works;
 const mediums = [...new Set(works.map((w) => w.medium).filter(Boolean))].sort();
 
 // The order a visitor actually sees, which is NOT sort order — the featured
 // piece is pulled to the front. The lightbox indexes against this, so its
-// counter agrees with the number printed on the tile that opened it.
-const displayOrder = featured ? [featured, ...rest] : works;
+// counter agrees with the number printed on the tile that opened it. Shared with
+// the share card (pages/og/art), so a piece hangs the same in both.
+const displayOrder = galleryOrder(works);
 const lbIndex = new Map(displayOrder.map((w, i) => [w.id, i]));
 
 // Where the author's own artwork appears outside the gallery. Never throws and
@@ -95,16 +96,33 @@ const lightboxItems = displayOrder.map((w) => ({
   medium: w.medium || '',
   w: w.width,
   h: w.height,
+  key: artKey(w.id),
 }));
+
+// A shared piece: /asu?art=<key> (lib/artLink.ts). The page is the same; its
+// card is that piece on the wall (pages/og/art/[key].jpg.ts), and the script
+// opens it. An unknown key is just /asu.
+const shared = findArt(displayOrder, Astro.url.searchParams.get('art'));
+const sharedKey = shared ? artKey(shared.id) : null;
+const meta = shared
+  ? {
+      title: `${shared.title || 'Untitled'} — ${name}`,
+      description: shared.alt || `Artwork by ${name}.`,
+      image: new URL(`/og/art/${sharedKey}.jpg?v=${shortHash(shared.medUrl)}`, Astro.site ?? Astro.url).href,
+      canonical: artPath(sharedKey!),
+    }
+  : {
+      title: t['meta.title'],
+      description: `Illustrator ${name} — the artist behind the Pressroom shelf. Gallery, background, and commission status.`,
+      image: featured?.fullUrl,
+      canonical: undefined,
+    };
 
 // The studio wall (scripts/wall.ts): hung here, so the wall is whole before any
 // script runs. Rows for a wide screen; a narrow one re-hangs with one more row
 // before the wall scrolls into view (the wall's height never depends on it).
 const aspectOf = (w: ArtworkRec) => (w.width && w.height ? w.width / w.height : 1);
-const wall = layoutWall(
-  displayOrder.map((w, i) => ({ id: w.id, aspect: aspectOf(w), lead: !!featured && i === 0 })),
-  wallRows(displayOrder.length),
-);
+const wall = hangGallery(displayOrder);
 const wallAt = new Map(displayOrder.map((w, i) => [w.id, wall.prints[i]]));
 // CSS reads these per print (world units; scaled by the wall's height in CSS)
 const printVars = (p: WallPrint) =>
@@ -126,11 +144,7 @@ const pad2 = (n: number) => String(n).padStart(2, '0');
 cacheShell(Astro);
 ---
 
-<Base
-  title={t['meta.title']}
-  description={`Illustrator ${name} — the artist behind the Pressroom shelf. Gallery, background, and commission status.`}
-  image={featured?.fullUrl}
->
+<Base title={meta.title} description={meta.description} image={meta.image} canonical={meta.canonical}>
   {/* Language bar. Only /asu and the shelf teaser are trilingual; the reader
       chrome falls back to English for a Thai visitor (see lib/lang.ts). */}
   <nav class="asu__langs mono" aria-label="Language">
@@ -173,7 +187,7 @@ cacheShell(Astro);
     </section>
 
     <!-- ============ 01 · GALLERY (ink) — the art, first ============ -->
-    <section class="spread spread--ink asu__gallery" id="works">
+    <section class="spread spread--ink asu__gallery" id="works" data-open-art={shared ? lbIndex.get(shared.id) : undefined}>
       <header class="asu__galHead">
         <span class="mono asu__num asu__num--ink">
           <span class="asu__numDigits">01</span>
@@ -455,6 +469,7 @@ cacheShell(Astro);
   import { ScrollTrigger } from 'gsap/ScrollTrigger';
   import { initLightbox, type LightboxItem } from '../scripts/lightbox';
   import { initWall } from '../scripts/wall';
+  import { artPath } from '../lib/artLink';
   import { decode } from '../scripts/text';
   import { slideIn, punch } from '../scripts/mv';
   import { initDraw } from '../scripts/draw';
@@ -571,7 +586,83 @@ cacheShell(Astro);
     : null;
 
   if (items.length) {
-    const lb = initLightbox(items, { reduced, originOf: (i) => wall?.originOf(i) ?? null });
+    // --- one link per piece: /asu?art=<key> (lib/artLink.ts) ----------------
+    // The lightbox reports what it shows and the page keeps the URL in step.
+    // Opening pushes one history entry, so a phone's Back closes the piece
+    // instead of leaving the page; ← → only replace it.
+    let pushed = false; // the ?art entry on top of history is ours to pop
+    let following = false; // applying the URL (popstate, landing): don't write it back
+    const keyNow = () => new URL(location.href).searchParams.get('art');
+    const indexOf = (key: string | null) =>
+      key ? items.findIndex((it) => it.key === key.slice(0, 8).toLowerCase()) : -1;
+
+    const lb = initLightbox(items, {
+      reduced,
+      originOf: (i) => wall?.originOf(i) ?? null,
+      onShow: (i) => {
+        if (following) return;
+        const url = new URL(location.href);
+        if (i === null) {
+          if (pushed) {
+            pushed = false;
+            history.back();
+          } else if (url.searchParams.has('art')) {
+            url.searchParams.delete('art');
+            history.replaceState(history.state, '', url);
+          }
+          return;
+        }
+        const key = items[i]?.key;
+        if (!key) return;
+        const had = url.searchParams.has('art');
+        url.searchParams.set('art', key);
+        if (had) history.replaceState(history.state, '', url);
+        else {
+          history.pushState({ art: key }, '', url);
+          pushed = true;
+        }
+      },
+      share: (i) => {
+        const it = items[i];
+        return it?.key ? { url: new URL(artPath(it.key), location.origin).href, title: `${it.alt} — Asu Azure` } : null;
+      },
+    });
+    window.addEventListener('popstate', () => {
+      const i = indexOf(keyNow());
+      following = true;
+      if (i >= 0) lb.open(i);
+      else if (lb.isOpen()) {
+        pushed = false;
+        lb.close();
+      }
+      following = false;
+    });
+
+    // Landed on a shared link: bring the piece into view behind the lightbox —
+    // on the wall the camera centres on its print — then open it, so closing
+    // flies it back to where it hangs. The URL already names it.
+    const landing = Number(document.querySelector<HTMLElement>('[data-open-art]')?.dataset.openArt ?? NaN);
+    if (items[landing]) {
+      const target =
+        wall?.reveal(landing) ?? document.querySelector<HTMLElement>(`[data-lb-open="${landing}"]`);
+      const place = () => {
+        if (!target || !lb.isOpen()) return;
+        const r = target.getBoundingClientRect();
+        const y = Math.max(0, r.top + scrollY - Math.max(0, (innerHeight - r.height) / 2));
+        const lenis = (window as unknown as { __lenis?: { scrollTo(to: number, o: object): void } }).__lenis;
+        if (lenis) lenis.scrollTo(y, { immediate: true, force: true });
+        else window.scrollTo(0, y);
+      };
+      following = true;
+      lb.open(landing);
+      following = false;
+      place();
+      // ScrollTrigger re-measures (and resets the scroll) on load and on later
+      // refreshes; while the shared piece is still open, put the page back
+      ScrollTrigger.addEventListener('refresh', place);
+      addEventListener('load', () => requestAnimationFrame(place), { once: true });
+    }
+
     // Delegated, so tiles added or filtered after mount need no rewiring.
     document.addEventListener('click', (e) => {
       const el = (e.target as Element | null)?.closest<HTMLElement>('[data-lb-open]');

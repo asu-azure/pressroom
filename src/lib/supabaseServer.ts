@@ -1,6 +1,6 @@
 /**
- * Server-side Supabase client — used ONLY to fill <head> metadata (see the
- * stack rule in CLAUDE.md). Reads public work fields so a shared link previews
+ * Server-side Supabase client — used ONLY to fill <head> metadata and draw share
+ * cards (pages/og/art; see the stack rule in CLAUDE.md). Reads public work fields so a shared link previews
  * with its real title, synopsis and cover instead of the generic site card.
  *
  * Same anon key + RLS boundary as the browser client; `service_role` still must

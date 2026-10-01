@@ -1494,6 +1494,14 @@ body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top
 }
 .lb__btn:hover, .lb__btn:focus-visible { border-color: var(--accent); background: rgba(39,66,240,0.22); }
 .lb__close { top: clamp(1rem, 3vh, 2rem); right: var(--pad); }
+/* left of the close button; the label flips to COPIED for a moment (lightbox.ts) */
+.lb__share {
+  top: clamp(1rem, 3vh, 2rem);
+  right: calc(var(--pad) + 46px + 0.5rem);
+  padding: 0 1em;
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+}
 .lb__prev { left: var(--pad); top: 50%; translate: 0 -50%; }
 .lb__next { right: var(--pad); top: 50%; translate: 0 -50%; }
 @media (max-width: 760px) {
