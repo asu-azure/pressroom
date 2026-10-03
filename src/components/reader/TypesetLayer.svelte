@@ -15,18 +15,31 @@
   import { fitBubble } from '../../lib/typeset';
   import type { Bubble } from '../../lib/types';
 
-  let { bubbles, pw, ph }: { bubbles: Bubble[]; pw: number; ph: number } = $props();
+  let {
+    bubbles,
+    pw,
+    ph,
+    clean = false,
+  }: {
+    bubbles: Bubble[];
+    pw: number;
+    ph: number;
+    /** drawn over the page's clean export (lib/cleanPage.ts): no Thai to paint out */
+    clean?: boolean;
+  } = $props();
 
   // 'prose' (a novel page's whole text) gets its own renderer with the novel translation
   const fits = $derived(
-    bubbles.filter((b) => b.kind !== 'prose' && b.text.trim()).map((b) => ({ b, fit: fitBubble(b, pw, ph) })),
+    bubbles
+      .filter((b) => b.kind !== 'prose' && b.text.trim() && (clean || !b.cleanOnly))
+      .map((b) => ({ b, fit: fitBubble(b, pw, ph) })),
   );
 </script>
 
-<div class="ts" lang="ja" aria-hidden={fits.length ? undefined : 'true'}>
+<div class="ts" class:is-clean={clean} lang="ja" aria-hidden={fits.length ? undefined : 'true'}>
   <!-- First every patch of original lettering is painted out, so a balloon's
        text sits on a clean balloon with its own outline intact. -->
-  {#each fits as { b } (b.id)}
+  {#each clean ? [] : fits as { b } (b.id)}
     {#each b.cover ?? [] as [cx, cy, cw, ch], ci (ci)}
       <span
         class="ts__cover"
@@ -88,8 +101,9 @@
     border-radius: 22%;
   }
   .ts__b--none::before,
-  .ts__b.is-covered::before {
-    content: none; /* the cover patches did the painting */
+  .ts__b.is-covered::before,
+  .ts.is-clean .ts__b::before {
+    content: none; /* the cover patches did the painting, or the clean page needs none */
   }
   /* A patch over the original lettering: the balloon's own paper colour, a
      touch rounded so its corner never nicks a curved outline. */

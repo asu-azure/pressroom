@@ -3,6 +3,7 @@
   import { requireSession, watchSignOut } from '../../lib/authGuard';
   import Arranger from './Arranger.svelte';
   import PdfUploader from './PdfUploader.svelte';
+  import PreparedImport from './PreparedImport.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import CoverCropper from './CoverCropper.svelte';
   import CharacterProfileEditor from './CharacterProfileEditor.svelte';
@@ -276,6 +277,7 @@
   {:else if tab === 'pages'}
     <div class="we__pages">
       <PdfUploader {workId} {chapters} {pages} onDone={reload} />
+      <PreparedImport {workId} pageIds={pages.map((p) => p.id)} onDone={reload} />
       {#if pages.length || chapters.length}
         <Arranger
           {workId}

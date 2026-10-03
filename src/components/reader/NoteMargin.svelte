@@ -51,7 +51,8 @@
   const trans = $derived(
     translateOn
       ? sheet.pages
-          .filter((p) => p.bubbles?.length)
+          .map((p) => ({ id: p.id, bubbles: (p.bubbles ?? []).filter((b) => !b.cleanOnly) })) // cleanOnly marks are art, not lines
+          .filter((p) => p.bubbles.length)
           .map((p) => ({ no: pageNumberOf(p.id), panels: byPanel(p.bubbles) }))
       : [],
   );

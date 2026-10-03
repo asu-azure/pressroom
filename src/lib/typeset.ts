@@ -325,6 +325,7 @@ export function normalizeBubble(raw: unknown): Bubble | null {
   if (r.dir === 'v' || r.dir === 'h') b.dir = r.dir;
   if (typeof r.scale === 'number' && Number.isFinite(r.scale) && r.scale !== 1) b.scale = clamp(r.scale, 0.5, 1.6, 1);
   if (r.kind === 'prose') b.kind = 'prose';
+  if (r.cleanOnly === true) b.cleanOnly = true;
   if (Array.isArray(r.cover)) {
     const cover = r.cover
       .filter((c): c is number[] => Array.isArray(c) && c.length === 4 && c.every((v) => typeof v === 'number' && Number.isFinite(v)))

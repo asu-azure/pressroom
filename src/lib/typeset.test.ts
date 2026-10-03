@@ -130,6 +130,11 @@ describe('normalizeBubble', () => {
     expect(normalizeBubble({ id: 'x', x: 0, y: 0, w: 0.1, h: 0.1, text: 'a', cover: [] })).not.toHaveProperty('cover');
   });
 
+  it('keeps cleanOnly only when it is exactly true', () => {
+    expect(normalizeBubble({ id: 'x', x: 0, y: 0, w: 0.1, h: 0.1, text: '！', cleanOnly: true })!.cleanOnly).toBe(true);
+    expect(normalizeBubble({ id: 'x', x: 0, y: 0, w: 0.1, h: 0.1, text: '！', cleanOnly: 'yes' })).not.toHaveProperty('cleanOnly');
+  });
+
   it('drops unknown values and rejects junk', () => {
     expect(normalizeBubble({ id: 'x', x: 0, y: 0, w: 0.1, h: 0.1, text: 'a', shape: 'star', dir: 'z', dark: 'yes', scale: 1 })).toEqual({
       id: 'x', panel: 1, charId: null, x: 0, y: 0, w: 0.1, h: 0.1, text: 'a',

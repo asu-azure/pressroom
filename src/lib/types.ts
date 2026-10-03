@@ -64,6 +64,10 @@ export interface Bubble {
   /** 'prose' = a novel page's whole text block, drawn as a translated page
       (reserved: the reader renders it from the novel translation onwards). */
   kind?: 'line' | 'prose';
+  /** Drawn only over the page's clean export (lib/cleanPage.ts): a mark that was
+      lettering in the art file (an SFX, a !!!) and so is missing from the clean
+      picture, put back here. Over the original it would show twice. */
+  cleanOnly?: boolean;
 }
 
 export type BubbleShape = 'ellipse' | 'round' | 'rect' | 'none';
@@ -153,6 +157,9 @@ export interface PageRow {
   bubbles: Bubble[];
   is_blank: boolean;
   created_at: string;
+  /** the page with no lettering (supabase/clean-pages.sql); null/absent = none */
+  clean_path?: string | null;
+  clean_med_path?: string | null;
 }
 
 /** Page enriched with resolved public URLs — what the reader/arranger work with. */
@@ -169,6 +176,9 @@ export interface PageRec {
   note: string | null;
   bubbles: Bubble[];
   isBlank: boolean;
+  /** The page with no lettering, drawn under a typeset translation (lib/cleanPage.ts). */
+  cleanUrl?: string;
+  cleanMedUrl?: string;
   /** The part of the image this page shows, when that is not all of it — the
       reader's cover is the front of the wraparound (lib/coverCrop.ts). Width and
       height are then the crop's, in pixels. */

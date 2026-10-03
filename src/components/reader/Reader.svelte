@@ -2,6 +2,7 @@
   import { supabase } from '../../lib/supabase';
   import { toPageRec } from '../../lib/storagePaths';
   import { cropFocus, frontOnly } from '../../lib/coverCrop';
+  import { pictureOf } from '../../lib/cleanPage';
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
   import { i18n } from '../../lib/i18n.svelte';
@@ -309,12 +310,14 @@
     if (status !== 'ready' || settings.mode === 'scroll') return;
     for (let i = Math.max(0, cur - 2); i <= Math.min(sheets.length - 1, cur + 2); i++) {
       for (const page of sheets[i].pages) {
-        if (warmed.has(page.id)) continue;
-        warmed.add(page.id);
+        const pic = pictureOf(page, typesetOn);
+        const key = pic.clean ? `${page.id}:clean` : page.id; // switching to typeset warms the clean pictures
+        if (warmed.has(key)) continue;
+        warmed.add(key);
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'image';
-        link.setAttribute('imagesrcset', `${page.medUrl} 900w, ${page.fullUrl} 1600w`);
+        link.setAttribute('imagesrcset', `${pic.med} 900w, ${pic.full} 1600w`);
         link.setAttribute('imagesizes', sheets[i].kind === 'spread' ? '50vw' : '100vw');
         document.head.appendChild(link);
       }

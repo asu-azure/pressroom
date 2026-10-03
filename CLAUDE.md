@@ -93,7 +93,7 @@ text. See `src/lib/richtext.ts` and its tests.
    `AUTHOR_UID` with the author user's `auth.users.id` first.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
    `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
-   `scenes.sql`, `book-info.sql`, `novel.sql`.
+   `scenes.sql`, `book-info.sql`, `novel.sql`, `clean-pages.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
@@ -670,6 +670,24 @@ chrome offers 吹き出し / 一覧 / オフ:
   ("1.70% · 3 COLUMNS" / TOO LONG), arrow-key nudges. Draw the box on the balloon's inside, not the
   tail.
 - Fonts: `--font-typeset` = system mincho only, never the subset webfont.
+- **Clean pages** (`supabase/clean-pages.sql`, `lib/cleanPage.ts`, tested): a page may carry
+  `clean_path`/`clean_med_path`, the same page exported from the art file with no lettering. Under
+  a typeset translation, and only when the page has bubbles, SheetImage draws that instead (the
+  preload warms it too), and TypesetLayer gets `clean`: no cover patches, no soft fill. Thai mode,
+  notes mode and the thumbnails keep the page. The curl/door clones read the loaded image's
+  `currentSrc`, so a turning page carries the clean picture by itself. A check constraint keeps a
+  clean path inside its own page's folder.
+  **`cleanOnly` bubbles** put back marks that were lettering in the art file (an SFX, a 「!!!!!!」)
+  and so vanish from the clean export; they are drawn only over the clean picture and never listed
+  as lines. Find them by diffing the page against its export outside the lettered balloons (the
+  private tool does).
+- **IMPORT PREPARED FILES** (PAGES tab, `PreparedImport.svelte` + `lib/preparedImport.ts`, tested):
+  pick a folder holding `manifest.json` (`{work, files: [{file, path, page?, column?}]}`); it is
+  checked as untrusted input (this work's folder only, a page's file in that page's folder, no
+  `..`, image types, no duplicates), then the files go up with the author's session (upsert, 1-year
+  cache) and the clean columns are written per page once all its files are up. Also carries the
+  novel's illustrations (`works/{id}/novel/…`). Paths are cached a year: a re-export needs new file
+  names, not the same ones.
 
 ## The novel reader (`/w/[slug]/novel`, `NovelReader.svelte` + `lib/novel.ts`)
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PageRec, Character } from '../../lib/types';
   import { cropAttr, cropImgStyle } from '../../lib/coverCrop';
+  import { pictureOf } from '../../lib/cleanPage';
   import TypesetLayer from './TypesetLayer.svelte';
 
   let {
@@ -26,6 +27,9 @@
     highlightId?: string | null;
     onHighlight?: (id: string | null) => void;
   } = $props();
+
+  // under a typeset translation, the page without lettering when there is one
+  const pic = $derived(pictureOf(page, typesetOn));
 
   let loaded = $state(false);
   let imgEl = $state<HTMLImageElement | undefined>();
@@ -62,8 +66,8 @@
       bind:this={imgEl}
       class="si__img"
       class:is-loaded={loaded}
-      src={page.medUrl}
-      srcset={`${page.medUrl} 900w, ${page.fullUrl} 1600w`}
+      src={pic.med}
+      srcset={`${pic.med} 900w, ${pic.full} 1600w`}
       {sizes}
       {alt}
       decoding="async"
@@ -87,11 +91,11 @@
   {#if typesetOn && page.bubbles?.length}
     <!-- the same contain rect as the hotspots; the layer sizes its text off it -->
     <div class="si__bubbles si__bubbles--ts">
-      <TypesetLayer bubbles={page.bubbles} pw={page.width} ph={page.height} />
+      <TypesetLayer bubbles={page.bubbles} pw={page.width} ph={page.height} clean={pic.clean} />
     </div>
   {:else if translateOn && page.bubbles?.length}
     <div class="si__bubbles">
-      {#each page.bubbles as b (b.id)}
+      {#each page.bubbles.filter((x) => !x.cleanOnly) as b (b.id)}
         {@const on = highlightId === b.id || openId === b.id}
         <div
           class="si__bub"
