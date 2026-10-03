@@ -107,9 +107,26 @@ export interface Work {
   series_order?: number | null;
   series_kind?: 'main' | 'side' | null;
   series_label?: string | null; // the arc name, e.g. 夜光虫編
+  novel_langs?: string[]; // languages its prose exists in as text (supabase/novel.sql)
 }
 
 export type BookFormat = 'manga' | 'novel' | 'illust';
+
+/** One block of a novel section's text (supabase/novel.sql). */
+export type NovelBlock =
+  | { t: 'p'; text: string; align?: 'center' | 'end'; bold?: boolean }
+  | { t: 'img'; path: string; w: number; h: number; alt?: string } // path in the pages bucket
+  | { t: 'gap' }; // a blank line the author left on purpose
+
+/** A work's prose in one language, one row per section (novel_sections). */
+export interface NovelSection {
+  id: string;
+  work_id: string;
+  lang: 'th' | 'ja' | 'en';
+  sort_key: string;
+  title: string;
+  body: NovelBlock[];
+}
 
 export interface Chapter {
   id: string;

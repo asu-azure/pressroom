@@ -141,6 +141,10 @@
     {#if hasBubbles && settings.translate}
       <span class="mono rc-transflag" aria-hidden="true">◫ {i18n.t('rd.translate')}</span>
     {/if}
+    {#if work.novel_langs?.includes(i18n.lang)}
+      <!-- the novel part of this book also reads as text, in this language -->
+      <a class="mono rc-transflag rc-novel" href={`/w/${work.slug}/novel?lang=${i18n.lang}`}>{i18n.t('nv.inText')} →</a>
+    {/if}
     {#if chapterMarks.length}
       <button
         class="mono rc-btn"
@@ -399,6 +403,12 @@
 
 
 <style>
+  .rc-novel {
+    text-decoration: none;
+  }
+  .rc-novel:hover {
+    color: var(--accent);
+  }
   .rc-top {
     position: fixed;
     top: 0;

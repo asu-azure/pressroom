@@ -73,6 +73,13 @@
   const forewordHtml = $derived(fore.html);
   const info = $derived(work ? bookInfo(work, i18n.lang, (k) => i18n.t(k as DictKey)) : []);
   const warnings = $derived((work?.content_warnings ?? []).map((w) => w.trim()).filter(Boolean));
+  // the novel reader opens in the reader's language when the text exists in it
+  const novelHref = $derived.by(() => {
+    const langs = work?.novel_langs ?? [];
+    if (!langs.length) return null;
+    const lang = langs.includes(i18n.lang) ? i18n.lang : langs[0];
+    return `/w/${slug}/novel?lang=${lang}`;
+  });
   const statusKey = $derived(
     work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
   );
@@ -452,6 +459,18 @@
               onclick={(e) => locked && openLock(readHref, e)}
             >
               {i18n.t('ov.start')}
+            </a>
+          {/if}
+          {#if novelHref}
+            <!-- the prose reads as text in its own reader (supabase/novel.sql);
+                 the button above still opens the pages -->
+            <a
+              class="ov-btn ov-btn--ghost mono"
+              data-sfx="open"
+              href={novelHref}
+              onclick={(e) => locked && openLock(novelHref, e)}
+            >
+              {#if locked}<span aria-hidden="true">🔒 </span>{/if}{i18n.t('nv.read')} →
             </a>
           {/if}
           <button type="button" class="ov-btn ov-btn--ghost mono" onclick={share}>

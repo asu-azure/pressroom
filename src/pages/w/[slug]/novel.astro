@@ -1,0 +1,15 @@
+---
+import Base from '../../../layouts/Base.astro';
+import NovelReader from '../../../components/novel/NovelReader.svelte';
+import { cacheShell } from '../../../lib/cache';
+
+// The novel reader: a work's prose as text (supabase/novel.sql). Like the
+// page reader it owns the screen, so no site header and no global Lenis.
+const { slug } = Astro.params;
+
+cacheShell(Astro);
+---
+
+<Base title="Reading — Pressroom" chromeless>
+  <NovelReader client:only="svelte" slug={slug!} />
+</Base>

@@ -93,7 +93,7 @@ text. See `src/lib/richtext.ts` and its tests.
    `AUTHOR_UID` with the author user's `auth.users.id` first.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
    `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
-   `scenes.sql`, `book-info.sql`.
+   `scenes.sql`, `book-info.sql`, `novel.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
@@ -660,12 +660,44 @@ chrome offers 吹き出し / 一覧 / オフ:
   Without that the turning page showed Thai for the whole turn.
 - A translated book opens translated when `work.translations` includes the reader's UI language
   (a reader who ever changed a setting keeps theirs — settings are saved whole).
-- `kind: 'prose'` is reserved for a novel page's whole text (book 2): the layer skips it until the
-  novel renderer exists.
+- `kind: 'prose'` bubbles are skipped by the layer. Book 2's prose is not lettered onto page images:
+  it is read as text in the novel reader (below).
 - BubbleEditor: balloon/dark/direction/size per bubble, PREVIEW TYPESET, the fit readout
   ("1.70% · 3 COLUMNS" / TOO LONG), arrow-key nudges. Draw the box on the balloon's inside, not the
   tail.
 - Fonts: `--font-typeset` = system mincho only, never the subset webfont.
+
+## The novel reader (`/w/[slug]/novel`, `NovelReader.svelte` + `lib/novel.ts`)
+
+Book 2 is prose. Its text lives in `novel_sections` (`supabase/novel.sql`): one row per section per
+language, `body` a list of blocks — `{t:'p', text, align?, bold?}`, `{t:'img', path, w, h}`,
+`{t:'gap'}` — ordered by a `collate "C"` `sort_key`. `works.novel_langs` is public so the overview
+can offer 「小説を読む」 (and the image reader its chip) even while the book is locked.
+
+- **Locked works:** RLS hides the rows from anon; the reader calls `unlock_novel(work, password,
+  lang)` (security definer, same check as `unlock_pages`) with the tab's saved password, else goes
+  back to the overview. Never make the rows readable some other way — the whole book would be free.
+- **縦書き is the book** (Japanese only, the default): one `vertical-rl` strip translated a page at a
+  time. A page is the stage width rounded down to whole columns (`pagePitch`), every block keeps the
+  line pitch (titles 2 lines + 1 empty column), and titles, pictures and おわり are pushed to the
+  start of a page (`alignPageStarts`), so a turn never cuts a column and a picture is one page.
+  Three things that broke it once:
+  - the push is the physical **right** margin — a figure lays itself out `horizontal-tb` (so its
+    picture's max size resolves against a definite box; in the vertical grid it overflowed the
+    page), where `margin-block-start` would mean its top;
+  - `layout()` sets `--step` on `.nv` itself before measuring — Svelte writes the style attribute
+    only afterwards, and the first measure saw 1px-wide figures;
+  - a remainder of ≤ 2px past a page edge is rounding, not a column (padding it left a blank page).
+  Tap thirds / keys / swipe right = forward; ‹ › buttons with a mouse, kept clear of the text.
+- **横書き** is a plain scroll, and the only mode for Thai and English.
+- Settings (direction, 3 sizes, mincho/gothic) in `pressroom:novel-settings`; the place per work and
+  language in `pressroom:novel:{workId}:{lang}` — the first block that *starts* on the page, so a
+  paragraph carried over doesn't bring a reload back a page.
+- `tcyPieces` sets 1–2 digit numbers and !? / !! upright; longer numbers in the Japanese text are
+  written in kanji (五二三九〇), as a vertical book would.
+- Test harness (private, doujin/.local-tools/pressroom-ja/novel-review.mjs): mocked work, rows and
+  RPC, screenshots at 1440 and iPhone 13, and checks for cut lines, figures spanning pages, resume,
+  reduced motion and the locked flow. Never the real DB, never a password.
 
 ## Gotchas
 
