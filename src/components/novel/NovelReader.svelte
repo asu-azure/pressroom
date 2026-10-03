@@ -417,11 +417,13 @@
             <button type="button" class:is-on={settings.size === n} onclick={() => patch({ size: n as 0 | 1 | 2 })} style={`font-size:${0.7 + n * 0.12}rem`}>A</button>
           {/each}
         </div>
+        {#if lang !== 'th'}
         <div class="nv-opt">
           <span>{i18n.t('nv.face')}</span>
           <button type="button" class:is-on={settings.face === 'mincho'} onclick={() => patch({ face: 'mincho' })}>{i18n.t('nv.mincho')}</button>
           <button type="button" class:is-on={settings.face === 'gothic'} onclick={() => patch({ face: 'gothic' })}>{i18n.t('nv.gothic')}</button>
         </div>
+        {/if}
       </div>
     {/if}
   </div>
@@ -476,11 +478,14 @@
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
-  .nv[lang='th'],
   .nv[lang='en'] {
     font-family: var(--font-serif-authored);
   }
-  .nv.is-gothic {
+  /* Thai prose is one looped face (styles/novel-fonts.css); the 明朝/ゴシック choice doesn't apply */
+  .nv[lang='th'] {
+    font-family: 'Noto Serif Thai', var(--font-serif-authored);
+  }
+  .nv.is-gothic:not([lang='th']) {
     font-family: var(--font-display-authored);
   }
   .nv-bar,

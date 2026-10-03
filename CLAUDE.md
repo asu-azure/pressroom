@@ -424,6 +424,10 @@ names are the *system* families and are safe.
 Both Thai faces are **loopless** (ไม่มีหัว): Ekkamai Vibe for text, Prompt for display (its top
 metrics survive `background-clip: text`). The looped Royal Institute of Siam was dropped — don't
 add it back without asking; the loop/no-loop choice is the owner's call, not a technical one.
+**One exception, the owner's call (2026-10-03): Thai prose in the novel reader is Noto Serif Thai
+(looped)** — 50,000 characters read easier with loops (ด/ค, บ/ป, ถ/ภ). One face, no toggle; the
+site's chrome stays loopless. Self-hosted variable woff2 (thai + latin, OFL) declared in
+`src/styles/novel-fonts.css`, imported only by `/w/[slug]/novel`.
 
 What stays language-conditional is **leading only, scoped to `[data-i18n]`**. Thai vowel/tone marks
 stack, so display type at 0.86 line-height collides them — but the fix must only reach elements
@@ -689,7 +693,8 @@ can offer 「小説を読む」 (and the image reader its chip) even while the b
     only afterwards, and the first measure saw 1px-wide figures;
   - a remainder of ≤ 2px past a page edge is rounding, not a column (padding it left a blank page).
   Tap thirds / keys / swipe right = forward; ‹ › buttons with a mouse, kept clear of the text.
-- **横書き** is a plain scroll, and the only mode for Thai and English.
+- **横書き** is a plain scroll, and the only mode for Thai and English. Thai is set in Noto Serif Thai
+  (see Languages); the 明朝/ゴシック choice is hidden for Thai.
 - Settings (direction, 3 sizes, mincho/gothic) in `pressroom:novel-settings`; the place per work and
   language in `pressroom:novel:{workId}:{lang}` — the first block that *starts* on the page, so a
   paragraph carried over doesn't bring a reload back a page.
