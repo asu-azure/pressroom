@@ -19,6 +19,8 @@
   import { i18n } from '../../lib/i18n.svelte';
   import {
     normalizeSections,
+    chapters,
+    chapterOf,
     pickLang,
     placeKey,
     parsePlace,
@@ -331,7 +333,10 @@
         )
       : 0,
   );
-  const sectionNow = $derived(sections[place.section]?.title ?? '');
+  // an untitled section continues the chapter before it (lib/novel.ts chapters)
+  const toc = $derived(chapters(sections));
+  const chapterNow = $derived(chapterOf(sections, place.section));
+  const sectionNow = $derived(sections[chapterNow]?.title ?? '');
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -398,8 +403,8 @@
     {#if panel === 'toc'}
       <div class="nv-panel" role="dialog" aria-label={i18n.t('rd.toc')}>
         <ol>
-          {#each sections as s, si (s.id)}
-            <li><button type="button" class="authored" class:is-on={si === place.section} onclick={() => jumpTo(si)}>{s.title || `${si + 1}`}</button></li>
+          {#each toc as c (c.index)}
+            <li><button type="button" class="authored" class:is-on={c.index === chapterNow} onclick={() => jumpTo(c.index)}>{c.title ?? i18n.t('nv.opening')}</button></li>
           {/each}
         </ol>
       </div>

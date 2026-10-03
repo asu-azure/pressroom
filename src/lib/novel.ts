@@ -78,6 +78,23 @@ export function parsePlace(raw: string | null, sections: NovelSection[]): NovelP
   }
 }
 
+/**
+ * The table of contents. A section is a stretch of the book between page breaks in the
+ * manuscript, not always a chapter: one without a title continues the chapter before it,
+ * so only titled sections are listed — plus the opening, which may have none.
+ */
+export function chapters(sections: NovelSection[]): { index: number; title: string | null }[] {
+  return sections
+    .map((s, index) => ({ index, title: s.title || null }))
+    .filter((c) => c.title || c.index === 0);
+}
+
+/** The chapter a section belongs to: the nearest titled section at or before it (else the opening). */
+export function chapterOf(sections: NovelSection[], section: number): number {
+  for (let i = Math.min(section, sections.length - 1); i > 0; i--) if (sections[i].title) return i;
+  return 0;
+}
+
 /** Share of the whole text read up to a place — by characters, so long sections weigh more. */
 export function progressOf(sections: NovelSection[], place: NovelPlace): number {
   const size = (b: NovelBlock) => (b.t === 'p' ? b.text.length : b.t === 'img' ? 200 : 20);

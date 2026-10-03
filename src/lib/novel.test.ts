@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, tcyPieces } from './novel';
+import { chapters, chapterOf, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, tcyPieces } from './novel';
 import type { NovelSection } from './types';
 
 const sec = (sort_key: string, body: unknown[], lang = 'ja'): NovelSection =>
@@ -80,3 +80,22 @@ describe('tcyPieces', () => {
     expect(tcyPieces('')).toEqual([]);
   });
 });
+
+describe('chapters', () => {
+  const sec = (title: string, i: number): NovelSection => ({ id: `s${i}`, work_id: 'w', lang: 'ja', sort_key: `a${i}`, title, body: [] });
+  const book = ['', '第一話', '第二話', '', '', '第三話'].map(sec);
+  it('lists the opening and the titled sections only', () => {
+    expect(chapters(book)).toEqual([
+      { index: 0, title: null },
+      { index: 1, title: '第一話' },
+      { index: 2, title: '第二話' },
+      { index: 5, title: '第三話' },
+    ]);
+  });
+  it('puts an untitled section in the chapter before it', () => {
+    expect(chapterOf(book, 4)).toBe(2);
+    expect(chapterOf(book, 5)).toBe(5);
+    expect(chapterOf(book, 0)).toBe(0);
+  });
+});
+
