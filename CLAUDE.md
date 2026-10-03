@@ -692,9 +692,22 @@ chrome offers 吹き出し / 一覧 / オフ:
 ## The novel reader (`/w/[slug]/novel`, `NovelReader.svelte` + `lib/novel.ts`)
 
 Book 2 is prose. Its text lives in `novel_sections` (`supabase/novel.sql`): one row per section per
-language, `body` a list of blocks — `{t:'p', text, align?, bold?}`, `{t:'img', path, w, h}`,
-`{t:'gap'}` — ordered by a `collate "C"` `sort_key`. `works.novel_langs` is public so the overview
-can offer 「小説を読む」 (and the image reader its chip) even while the book is locked.
+language, `body` a list of blocks — `{t:'p', text, align?, bold?, italic?, box?, runs?}`,
+`{t:'img', path, w, h}`, `{t:'gap', rule?}` — ordered by a `collate "C"` `sort_key`.
+`works.novel_langs` is public so the overview can offer 「小説を読む」 (and the image reader its
+chip) even while the book is locked.
+
+- **The print's typography** (taken from the manuscript and its print PDF by the private tool):
+  `italic` (the Thai's inner voice and written words — the Japanese carries that in its wording),
+  `runs` = `[{text, i?, b?, size?}]` for partial italic/bold and the enlarged shouts (`size` in em;
+  the runs must join to exactly `text` or `normalizeBlock` drops them), `box` = a document quoted
+  in the story, framed (consecutive boxed paragraphs share one frame, `groupBoxes`), and
+  `rule: 'line' | 'dots' | 'wave'` = a drawn scene break. A section may END on a rule gap.
+- **In 縦書き none of it may leave the pitch grid**: a box's border + padding add exactly one
+  pitch; a line with a larger run widens by whole pitches (`rowsFor`, `--rows`); every run has
+  `line-height: 0` (a bold face's metrics alone widened a column 1 px and pushed the rest of the
+  book off the grid); boxes and widened lines that would straddle a page edge move to the next
+  page (`data-keep`, in `alignPageStarts`).
 
 - **Locked works:** RLS hides the rows from anon; the reader calls `unlock_novel(work, password,
   lang)` (security definer, same check as `unlock_pages`) with the tab's saved password, else goes

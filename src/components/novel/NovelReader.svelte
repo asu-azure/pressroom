@@ -28,9 +28,11 @@
     pagePitch,
     pageCount,
     tcyPieces,
+    groupBoxes,
+    rowsFor,
     type NovelPlace,
   } from '../../lib/novel';
-  import type { NovelSection, Work } from '../../lib/types';
+  import type { NovelPara, NovelSection, Work } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
 
@@ -71,7 +73,8 @@
   const vertical = $derived(settings.dir === 'v' && lang === 'ja');
   const FONT = [16, 18, 21];
   const fs = $derived(FONT[settings.size]);
-  const lh = $derived(Math.round(fs * (vertical ? 1.85 : 1.9))); // whole pixels: the pitch must not drift
+  const ratio = $derived(vertical ? 1.85 : 1.9);
+  const lh = $derived(Math.round(fs * ratio)); // whole pixels: the pitch must not drift
 
   // --- load ---
   $effect(() => {
@@ -136,22 +139,26 @@
   let pending: NovelPlace | null = null; // a place to land on after the next layout
 
   /**
-   * Push titles and pictures to the start of a page. The margin is the physical RIGHT
-   * one (block-start of the vertical-rl strip): a figure lays itself out horizontal-tb,
-   * where margin-block-start would mean its top.
+   * Push titles and pictures to the start of a page, and a framed box that would straddle
+   * a page edge on to the next one (data-keep). The margin is the physical RIGHT one
+   * (block-start of the vertical-rl strip): a figure lays itself out horizontal-tb, where
+   * margin-block-start would mean its top. In document order: each push moves what follows.
    */
   function alignPageStarts() {
     if (!strip) return;
-    const marks = [...strip.querySelectorAll<HTMLElement>('[data-pagestart]')];
+    const marks = [...strip.querySelectorAll<HTMLElement>('[data-pagestart], [data-keep]')];
     for (const el of marks) el.style.marginRight = '0px';
     const right = strip.getBoundingClientRect().right;
     for (const el of marks) {
-      const dist = Math.round(right - el.getBoundingClientRect().right); // from the strip's right edge
+      const box = el.getBoundingClientRect();
+      const dist = Math.round(right - box.right); // from the strip's right edge
       const rem = dist % step;
       // a pixel or two past a page edge is sub-pixel rounding, not a column: padding it
       // would push the title a whole page on and leave that page blank
-      const pad = rem <= 2 ? 0 : step - rem;
-      if (pad && dist > 0) el.style.marginRight = `${pad}px`;
+      if (rem <= 2 || dist <= 0) continue;
+      // a box that fits where it is stays; one wider than a page could never fit
+      if ('keep' in el.dataset && (box.width > step || rem + Math.round(box.width) <= step + 2)) continue;
+      el.style.marginRight = `${step - rem}px`;
     }
   }
 
@@ -434,22 +441,44 @@
   </div>
 {/if}
 
+{#snippet words(t: string)}{#if vertical}{#each tcyPieces(t) as piece, pi (pi)}{#if piece.tcy}<span class="nv-tcy">{piece.t}</span>{:else}{piece.t}{/if}{/each}{:else}{t}{/if}{/snippet}
+
+<!-- a line widened for a larger run keeps whole pitches (rowsFor), so 縦書き stays on the page grid -->
+{#snippet para(b: NovelPara, si: number, bi: number)}
+  {@const rows = rowsFor(b, ratio)}
+  <p
+    class="nv-p"
+    class:is-center={b.align === 'center'}
+    class:is-end={b.align === 'end'}
+    class:is-bold={b.bold}
+    class:is-italic={b.italic}
+    class:is-tall={rows > 1}
+    style={rows > 1 ? `--rows:${rows}` : undefined}
+    data-keep={vertical && rows > 1 ? '' : undefined}
+    data-s={si}
+    data-b={bi}
+  >{#if b.runs}{#each b.runs as r, ri (ri)}<span class="nv-run" class:is-i={r.i} class:is-b={r.b} class:is-sized={r.size} style={r.size ? `font-size:${r.size}em` : undefined}>{@render words(r.text)}</span>{/each}{:else}{@render words(b.text)}{/if}</p>
+{/snippet}
+
 {#snippet text()}
   {#each sections as s, si (s.id)}
     <section class="nv-sec">
       {#if s.title}
         <h2 class="nv-title" data-s={si} data-b={-1} data-pagestart={vertical ? '' : undefined}>{s.title}</h2>
       {/if}
-      {#each s.body as b, bi (bi)}
-        {#if b.t === 'p'}
-          <p class="nv-p" class:is-center={b.align === 'center'} class:is-end={b.align === 'end'} class:is-bold={b.bold} data-s={si} data-b={bi}>
-            {#if vertical}{#each tcyPieces(b.text) as piece, pi (pi)}{#if piece.tcy}<span class="nv-tcy">{piece.t}</span>{:else}{piece.t}{/if}{/each}{:else}{b.text}{/if}
-          </p>
-        {:else if b.t === 'gap'}
-          <p class="nv-gap" data-s={si} data-b={bi} aria-hidden="true">&nbsp;</p>
+      {#each groupBoxes(s.body) as g (g.i)}
+        {#if g.box}
+          <!-- a document quoted in the story, framed as in print; kept off a page edge in 縦書き -->
+          <div class="nv-box" data-keep={vertical ? '' : undefined}>
+            {#each g.items as it (it.i)}{@render para(it.b, si, it.i)}{/each}
+          </div>
+        {:else if g.b.t === 'p'}
+          {@render para(g.b, si, g.i)}
+        {:else if g.b.t === 'gap'}
+          <p class="nv-gap" data-rule={g.b.rule} data-s={si} data-b={g.i} aria-hidden="true">&nbsp;</p>
         {:else}
-          <figure class="nv-fig" data-s={si} data-b={bi} data-pagestart={vertical ? '' : undefined}>
-            <img src={publicUrl(b.path)} alt={b.alt ?? ''} width={b.w} height={b.h} loading="lazy" decoding="async" />
+          <figure class="nv-fig" data-s={si} data-b={g.i} data-pagestart={vertical ? '' : undefined}>
+            <img src={publicUrl(g.b.path)} alt={g.b.alt ?? ''} width={g.b.w} height={g.b.h} loading="lazy" decoding="async" />
           </figure>
         {/if}
       {/each}
@@ -642,11 +671,85 @@
     text-indent: 0;
     text-align: end;
   }
-  .nv-p.is-bold {
+  .nv-p.is-bold,
+  .nv-run.is-b {
     font-weight: 700;
+  }
+  /* italics carry the Thai print's inner voice and written words; the Japanese has none */
+  .nv-p.is-italic,
+  .nv-run.is-i {
+    font-style: italic;
+  }
+  /* a larger run sits inside a line widened by whole pitches; its own box adds nothing */
+  .nv-p.is-tall {
+    line-height: calc(var(--lh) * var(--rows));
+  }
+  .nv-run.is-sized {
+    line-height: 0;
+  }
+  /* in 縦書き no run may touch the pitch: a bold face's metrics alone widened its column 1px */
+  .nv.is-v .nv-run {
+    line-height: 0;
   }
   .nv-gap {
     text-indent: 0;
+  }
+
+  /* scene breaks drawn as in print, through the middle of the blank line (a column in 縦書き) */
+  .nv-gap[data-rule] {
+    --rule: color-mix(in srgb, var(--ink) 55%, transparent);
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  .nv-gap[data-rule='line'] {
+    background-image: linear-gradient(var(--rule), var(--rule));
+    background-size: 100% 1px;
+  }
+  .nv-gap[data-rule='dots'] {
+    background-image: linear-gradient(to right, var(--rule) 50%, transparent 0);
+    background-size: 6px 3px;
+    background-repeat: repeat-x;
+  }
+  .nv-gap[data-rule='wave'] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='6'%3E%3Cpath d='M0 3C4 0 4 0 8 3S12 6 16 3' fill='none' stroke='%2324211c' stroke-opacity='.55' stroke-width='1.2'/%3E%3C/svg%3E");
+    background-size: 16px 6px;
+    background-repeat: repeat-x;
+  }
+  .nv.is-v .nv-gap[data-rule='line'] {
+    background-size: 1px 100%;
+  }
+  .nv.is-v .nv-gap[data-rule='dots'] {
+    background-image: linear-gradient(to bottom, var(--rule) 50%, transparent 0);
+    background-size: 3px 6px;
+    background-repeat: repeat-y;
+  }
+  .nv.is-v .nv-gap[data-rule='wave'] {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='16'%3E%3Cpath d='M3 0C0 4 0 4 3 8S6 12 3 16' fill='none' stroke='%2324211c' stroke-opacity='.55' stroke-width='1.2'/%3E%3C/svg%3E");
+    background-size: 6px 16px;
+    background-repeat: repeat-y;
+  }
+
+  /* a document quoted in the story (Sky's student record): framed and centred, lines unindented */
+  .nv-box {
+    margin: 0;
+    border: 1px solid color-mix(in srgb, var(--ink) 70%, transparent);
+  }
+  .nv-box .nv-p {
+    text-indent: 0;
+  }
+  .nv.is-h .nv-box {
+    width: fit-content;
+    max-width: 100%;
+    margin: 0.5em auto;
+    padding: 0.4em 1.4em;
+  }
+  /* frame + padding across the columns = exactly one pitch, so the grid holds after it */
+  .nv.is-v .nv-box {
+    padding-block: calc((var(--lh) - 2px) / 2);
+    padding-inline: 1em;
+    inline-size: fit-content;
+    max-inline-size: 100%;
+    margin-inline: auto;
   }
   .nv-title {
     margin: 0;
@@ -719,7 +822,8 @@
   .nv[lang='en'] .nv-p {
     text-indent: 2em;
   }
-  .nv[lang='th'] .nv-p.is-center {
+  .nv[lang='th'] .nv-p.is-center,
+  .nv[lang='th'] .nv-box .nv-p {
     text-indent: 0;
   }
 

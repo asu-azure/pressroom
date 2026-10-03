@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { chapters, chapterOf, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, tcyPieces } from './novel';
-import type { NovelSection } from './types';
+import { chapters, chapterOf, groupBoxes, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, rowsFor, tcyPieces } from './novel';
+import type { NovelBlock, NovelPara, NovelSection } from './types';
 
 const sec = (sort_key: string, body: unknown[], lang = 'ja'): NovelSection =>
   ({ id: sort_key, work_id: 'w', lang, sort_key, title: ` ${sort_key} `, body }) as NovelSection;
@@ -18,6 +18,24 @@ describe('normalizeBlock', () => {
     }
     expect(normalizeBlock({ t: 'p', text: 'a', align: 'left' })).toEqual({ t: 'p', text: 'a' });
   });
+
+  it('keeps the print typography', () => {
+    expect(normalizeBlock({ t: 'p', text: 'ชื่อ: ทาม', box: true, italic: true })).toEqual({ t: 'p', text: 'ชื่อ: ทาม', box: true, italic: true });
+    expect(normalizeBlock({ t: 'gap', rule: 'wave' })).toEqual({ t: 'gap', rule: 'wave' });
+    expect(normalizeBlock({ t: 'gap', rule: 'zigzag' })).toEqual({ t: 'gap' });
+    const runs = [{ text: 'ชื่อ:', b: true }, { text: ' ทาม', i: true, size: 1.5 }];
+    expect(normalizeBlock({ t: 'p', text: 'ชื่อ: ทาม', runs })).toEqual({ t: 'p', text: 'ชื่อ: ทาม', runs });
+  });
+
+  it('drops runs that do not spell the text, and sizes that are not one', () => {
+    expect(normalizeBlock({ t: 'p', text: 'abc', runs: [{ text: 'ab', i: true }] })).toEqual({ t: 'p', text: 'abc' });
+    expect(normalizeBlock({ t: 'p', text: 'abc', runs: [{ text: 'a' }, { text: '' }, { text: 'bc' }] })).toEqual({ t: 'p', text: 'abc' });
+    expect(normalizeBlock({ t: 'p', text: 'ab', runs: [{ text: 'a', size: 40 }, { text: 'b', size: 'x', i: 'yes' }] })).toEqual({
+      t: 'p',
+      text: 'ab',
+      runs: [{ text: 'a' }, { text: 'b' }],
+    });
+  });
 });
 
 describe('normalizeSections', () => {
@@ -30,6 +48,34 @@ describe('normalizeSections', () => {
     expect(out.map((s) => s.sort_key)).toEqual(['a', 'b']);
     expect(out[1].title).toBe('b');
     expect(out[1].body).toEqual([{ t: 'p', text: 'x' }, { t: 'gap' }, { t: 'p', text: 'y' }]);
+  });
+
+  it('keeps a rule through the collapse, and a section may end on one', () => {
+    const [s] = normalizeSections([
+      sec('a', [{ t: 'p', text: 'x' }, { t: 'gap' }, { t: 'gap', rule: 'line' }, { t: 'p', text: 'y' }, { t: 'gap', rule: 'dots' }, { t: 'gap' }]),
+    ]);
+    expect(s.body).toEqual([{ t: 'p', text: 'x' }, { t: 'gap', rule: 'line' }, { t: 'p', text: 'y' }, { t: 'gap', rule: 'dots' }]);
+  });
+});
+
+describe('groupBoxes', () => {
+  const p = (text: string, box = false): NovelBlock => (box ? { t: 'p', text, box } : { t: 'p', text });
+  it('frames consecutive boxed paragraphs together and keeps body indexes', () => {
+    const body = [p('a'), p('name', true), p('nick', true), { t: 'gap' } as NovelBlock, p('answer', true), p('b')];
+    const g = groupBoxes(body);
+    expect(g.map((x) => (x.box ? x.items.map((it) => it.i) : x.i))).toEqual([0, [1, 2], 3, [4], 5]);
+  });
+});
+
+describe('rowsFor', () => {
+  const para = (sizes: number[]): NovelPara => ({ t: 'p', text: sizes.map(() => 'a').join(''), runs: sizes.map((size) => ({ text: 'a', size })) });
+  it('widens a line by whole pitches to hold its largest run', () => {
+    expect(rowsFor({ t: 'p', text: 'a' }, 1.85)).toBe(1);
+    expect(rowsFor(para([0.8]), 1.85)).toBe(1);
+    expect(rowsFor(para([1.29]), 1.85)).toBe(2);
+    expect(rowsFor(para([1, 2.4]), 1.85)).toBe(2);
+    expect(rowsFor(para([3]), 1.85)).toBe(3);
+    expect(rowsFor(para([5.14]), 1.9)).toBe(4);
   });
 });
 

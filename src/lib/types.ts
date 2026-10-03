@@ -117,10 +117,30 @@ export interface Work {
 export type BookFormat = 'manga' | 'novel' | 'illust';
 
 /** One block of a novel section's text (supabase/novel.sql). */
+/** A stretch of a paragraph set differently: italic, bold, or larger (size in em of the text). */
+export interface NovelRun {
+  text: string;
+  i?: boolean;
+  b?: boolean;
+  size?: number;
+}
+
 export type NovelBlock =
-  | { t: 'p'; text: string; align?: 'center' | 'end'; bold?: boolean }
+  | {
+      t: 'p';
+      text: string;
+      align?: 'center' | 'end';
+      bold?: boolean;
+      italic?: boolean;
+      /** framed, like a document quoted in the story; consecutive boxed paragraphs share one frame */
+      box?: boolean;
+      /** partial styling; the runs' texts join to exactly `text` */
+      runs?: NovelRun[];
+    }
   | { t: 'img'; path: string; w: number; h: number; alt?: string } // path in the pages bucket
-  | { t: 'gap' }; // a blank line the author left on purpose
+  | { t: 'gap'; rule?: 'line' | 'dots' | 'wave' }; // a blank line the author left on purpose — or a drawn scene break
+
+export type NovelPara = Extract<NovelBlock, { t: 'p' }>;
 
 /** A work's prose in one language, one row per section (novel_sections). */
 export interface NovelSection {
