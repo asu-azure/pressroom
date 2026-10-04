@@ -89,6 +89,9 @@
   transform-origin: 50% 0;
   transform-style: preserve-3d;
   will-change: transform;
+  /* above the hook: the pin is in the wall behind the charm, and a charm swung up to it must cover it
+     (the hook stays above the chain, whose first bead comes out from under the pin's head; Jun, 4 Oct) */
+  z-index: 2;
 }
 
 /* the jump ring: a metal ring turned edge-on through the hole, so the plate
