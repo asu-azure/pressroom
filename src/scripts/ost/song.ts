@@ -20,6 +20,7 @@ import { ScoreClock } from './clock';
 import type { Mood } from '../../data/songs';
 import { dangle } from '../dangle';
 import { punch } from '../mv';
+import { initRoom } from '../music/classroom';
 import { applyCopy, readCopyPayload } from '../../lib/siteCopyClient';
 import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../../lib/lang';
 
@@ -42,6 +43,8 @@ interface SongPayload {
   moods: Mood[];
   /** the movement whose strong accents launch falling stars, or -1 */
   highlight: number;
+  /** the night classroom's cues (songs.ts) */
+  roomCues: { movement: number; pose: 'window' | 'skyTime' }[];
   movements: { name: string; t: number }[];
   lyrics: Line[];
   hits: [number, number][];
@@ -91,6 +94,20 @@ export function initSongPage() {
   let hitIdx = 0;
 
   audio.addEventListener('error', () => (audioOK = false));
+
+  // --- the night classroom (components/music/Classroom.astro): the MV on its screen -------------
+  // The MP3 and the video never play together: either one starting stops the other.
+  const roomEl = root.querySelector<HTMLElement>('[data-room]');
+  const room = roomEl
+    ? initRoom(roomEl, song, {
+        audioTime: () => clock.now(),
+        audioPlaying: () => clock.playing,
+        playAudio: () => play(),
+        onVideoPlay: () => {
+          if (clock.playing) pause();
+        },
+      })
+    : null;
 
   // --- copy / language (same contract as /asu) ------------------------------
   const bundle = readCopyPayload();
@@ -329,7 +346,7 @@ export function initSongPage() {
       }
       audio.play().catch(() => (audioOK = false));
     }
-    pauseVideo();
+    room?.audioStarted(); // one player at a time: the video stops, the screen shows the cards
     clock.start();
     syncHits(clock.now());
     setPlaying(true);
@@ -340,6 +357,7 @@ export function initSongPage() {
     clock.stop();
     audio.pause();
     setPlaying(false);
+    room?.wake();
   }
   function toggle() {
     if (clock.playing) pause();
@@ -347,6 +365,7 @@ export function initSongPage() {
   }
   const seek = (t: number) => {
     t = Math.max(0, Math.min(duration - 0.05, t));
+    if (room?.seek(t)) return; // the video is the one playing: it takes the seek
     clock.set(t);
     try {
       audio.currentTime = t;
@@ -427,22 +446,6 @@ export function initSongPage() {
     navigator.mediaSession.setActionHandler('seekto', (d) => d.seekTime != null && seek(d.seekTime));
   }
 
-  // --- MV: click to load, one player at a time -------------------------------------
-  // A song without a video has no frame; pauseVideo() is then a no-op.
-  const frameBox = root.querySelector<HTMLElement>('[data-yt]');
-  let iframe: HTMLIFrameElement | null = null;
-  function pauseVideo() {
-    iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-  }
-  frameBox?.querySelector('[data-yt-play]')?.addEventListener('click', () => {
-    if (clock.playing) pause();
-    iframe = document.createElement('iframe');
-    iframe.src = `https://www.youtube-nocookie.com/embed/${frameBox.dataset.yt}?autoplay=1&rel=0&enablejsapi=1&playsinline=1`;
-    iframe.title = 'Music video';
-    iframe.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
-    iframe.allowFullscreen = true;
-    frameBox.replaceChildren(iframe);
-  });
 
   // --- the scan and the two views -----------------------------------------------
   let scanning = false;

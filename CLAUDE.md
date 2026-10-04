@@ -446,8 +446,18 @@ and script for every song; the song arrives as the `#song-data` payload), two vi
 - **MV**: click-to-load YouTube facade; `mv.youtube` in `songs.ts` is a **stand-in cut** — swap it and
   the `ost.mvKicker` copy when the final MV is up. Either player pauses the other. A song with no
   `mv` has no video section.
-- **The rabbit choir is gone** (Jun, 4 Oct). A night classroom with the MV projected on a screen
-  takes its place (planned).
+- **The rabbit choir is gone** (Jun, 4 Oct). In its place, under the player: **the night classroom**
+  (`src/components/music/Classroom.astro` + `src/scripts/music/classroom.ts`). Seen from the back of a
+  dark classroom, the four friends (silhouettes from behind) watch a pull-down screen. ▶ MV loads a
+  YouTube IFrame API player on the screen (nothing from YouTube before that click); ♪ plays the MP3 and
+  the screen shows each movement's card (`public/ost/<slug>/cards/NN.webp`). The room's light, the
+  window and the chalkboard follow the movement; heads nod on the accents, each with its own lag; the
+  `roomCues` in `songs.ts` turn heads (XIV: to the window, where stars fall; XV: Sky and Time to each
+  other — a proposal). The MP3 and the video never play together. The SVG is placeholder art; the
+  classes listed at the top of the component are the contract for Asu's drawing.
+- **Cover:** F2 of `music-repo/_work/cover_options` (Jun, 4 Oct) → `src/assets/ost/starfall-cover.jpg`;
+  the screen's poster is the MV's title frame (`starfall-screen.jpg`). The old Thai-lettered covers are
+  gone from this branch.
 - The MP3 (9.9 MB) is `preload="metadata"`; the full download starts when a visitor reaches for PLAY.
   `?t=<sec>` starts the clock there. Mini transport appears when the player is out of view.
 

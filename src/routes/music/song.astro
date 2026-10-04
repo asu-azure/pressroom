@@ -24,6 +24,7 @@ import { songKeychain, songData, songArt, songLength, fmtTime as fmt } from '../
 import { loadCopy, COPY_PAYLOAD_ID } from '../../lib/siteCopy';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../../lib/lang';
 import { cacheShell } from '../../lib/cache';
+import Classroom from '../../components/music/Classroom.astro';
 import '../../styles/keychain.css';
 
 export const prerender = false;
@@ -52,7 +53,7 @@ const lastRoman = roman(movements.at(-1)!.name);
 const [kc, head, poster, og] = await Promise.all([
   songKeychain(song, Astro.site, 900),
   getImage({ src: songArt(song), width: 560, format: 'webp', quality: 80 }),
-  getImage({ src: songArt(song, 'day'), width: 1600, format: 'webp', quality: 74 }),
+  getImage({ src: songArt(song, 'poster'), width: 1600, format: 'webp', quality: 74 }),
   getImage({ src: songArt(song), width: 1200, format: 'jpg', quality: 82 }),
 ]);
 const ogImage = new URL(og.src, Astro.site).href;
@@ -64,6 +65,7 @@ const payload = {
   mv: song.mv ?? null,
   moods: song.moods ?? [],
   highlight: song.highlight ?? -1,
+  roomCues: song.roomCues ?? [],
   movements: movements.map((m) => ({ name: m.name, t: m.t })),
   lyrics: data.lyrics,
   hits: data.hits,
@@ -173,6 +175,13 @@ const payload = {
         </div>
       </section>
 
+      <!-- ============ THE NIGHT CLASSROOM: the MV on the screen ============ -->
+      <section class="ost__room" aria-labelledby="ost-room-h">
+        <h2 class="mono ost__roomK" id="ost-room-h" data-i18n={`${p}.mvKicker`}>{t[`${p}.mvKicker`]}</h2>
+        <p class="ost__roomNote" data-i18n={`${p}.mvNote`}>{t[`${p}.mvNote`]}</p>
+        <Classroom poster={poster.src} cards={`/ost/${song.slug}/cards`} youtube={song.mv?.youtube} t={t} />
+      </section>
+
       <!-- the song list — one song for now; each opens onto its movements -->
       <section class="spread spread--paper ost__notes" aria-labelledby="ost-notes-h">
         <div class="paper-grid" aria-hidden="true"></div>
@@ -211,24 +220,6 @@ const payload = {
           </li>
         </ol>
       </section>
-
-      <!-- ============ MUSIC VIDEO ============ -->
-      {song.mv && (
-      <section class="ost__mvid" aria-labelledby="ost-mv-h">
-        <h2 class="mono ost__mvidK" id="ost-mv-h" data-i18n={`${p}.mvKicker`}>{t[`${p}.mvKicker`]}</h2>
-        <p class="ost__mvidNote" data-i18n={`${p}.mvNote`}>{t[`${p}.mvNote`]}</p>
-        {/* Click-to-load: no YouTube script, cookie or request until the visitor
-            asks for the video. Privacy-enhanced domain; the JS API is on only so
-            the page can pause the video when its own player starts. */}
-        <div class="ost__frame" data-yt={song.mv.youtube}>
-          <button class="ost__poster" type="button" data-yt-play aria-label="Play the music video">
-            <img src={poster.src} alt="" loading="lazy" decoding="async" />
-            <span class="ost__posterPlay" aria-hidden="true"></span>
-            <span class="mono ost__posterK">MV ▶ YOUTUBE</span>
-          </button>
-        </div>
-      </section>
-      )}
 
       <footer class="ost__credits">
         <p class="mono" data-i18n={`${p}.credits`}>{t[`${p}.credits`]}</p>
@@ -629,52 +620,16 @@ const payload = {
   .ost__mv.is-now .ost__mvBar { transform: scaleX(var(--mp, 0)); }
   .ost__mv.is-now .ost__mvTime::before { content: '▶ NOW  '; color: var(--accent); }
 
-  /* ---------------- MV ---------------- */
-  .ost__mvid {
-    padding: clamp(3.5rem, 9vh, 6rem) var(--pad);
+  /* ---------------- the night classroom ---------------- */
+  .ost__room {
+    padding: clamp(1rem, 4vh, 3rem) var(--pad) clamp(3.5rem, 9vh, 6rem);
     max-width: calc(1240px + var(--pad) * 2);
     margin: 0 auto;
     display: grid;
     gap: 0.6rem;
   }
-  .ost__mvidK { font-size: 0.7rem; letter-spacing: 0.22em; color: #e8a31a; }
-  .ost__mvidNote { color: var(--fg-dim); font-size: 0.92rem; margin-bottom: 1rem; }
-  .ost__frame {
-    position: relative;
-    width: min(100%, 1080px);
-    aspect-ratio: 16 / 9;
-    border: 1px solid var(--line-strong);
-    border-radius: 12px;
-    overflow: hidden;
-    background: #000;
-  }
-  .ost__frame :global(iframe) { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-  .ost__poster { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: pointer; }
-  .ost__poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 38%; filter: brightness(0.75); transition: filter 0.4s var(--ease); }
-  .ost__poster:hover img { filter: brightness(0.9); }
-  .ost__posterPlay {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 4.6rem;
-    height: 4.6rem;
-    translate: -50% -50%;
-    border-radius: 50%;
-    background: rgba(12, 12, 13, 0.6);
-    border: 1px solid rgba(244, 241, 234, 0.6);
-    backdrop-filter: blur(6px);
-  }
-  .ost__posterPlay::after {
-    content: '';
-    position: absolute;
-    left: 38%;
-    top: 30%;
-    width: 32%;
-    height: 40%;
-    background: #f4f1ea;
-    clip-path: polygon(0 0, 100% 50%, 0 100%);
-  }
-  .ost__posterK { position: absolute; left: 1rem; bottom: 0.9rem; font-size: 0.6rem; letter-spacing: 0.16em; color: #f4f1ea; }
+  .ost__roomK { font-size: 0.7rem; letter-spacing: 0.22em; color: #e8a31a; }
+  .ost__roomNote { color: var(--fg-dim); font-size: 0.92rem; margin-bottom: 1rem; }
 
   .ost__credits {
     display: flex;

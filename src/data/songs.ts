@@ -21,8 +21,9 @@ export interface Song {
   data?: string;
   /** public path of the MP3 */
   audio?: string;
-  /** stems in src/assets/ost/: the printed art (night) and the video poster (day) */
-  art?: { night: string; day: string };
+  /** stems in src/assets/ost/: the square cover (keychain print, playlist, share card, lock screen)
+   *  and the 16:9 picture the classroom's screen shows before anything plays */
+  art?: { cover: string; poster: string };
   /** copy-key prefix for the song's own words (`ost` for STARFALL: its keys predate the catalogue) */
   copy?: string;
   /** the music video: YouTube id, and where the song's t = 0 falls in the video (s) */
@@ -33,6 +34,9 @@ export interface Song {
   highlight?: number;
   /** the album name the lock screen shows (Media Session) */
   album?: string;
+  /** the night classroom's cues: in this movement the heads turn to the window, or Sky and Time
+   *  to each other (scripts/music/classroom.ts) */
+  roomCues?: { movement: number; pose: 'window' | 'skyTime' }[];
 }
 
 export const SONGS: Song[] = [
@@ -42,7 +46,8 @@ export const SONGS: Song[] = [
     title: { ja: 'ナガレボシ', en: 'STARFALL' },
     data: 'starfall',
     audio: '/ost/starfall.mp3',
-    art: { night: 'starfall-night', day: 'starfall-day' },
+    // cover F2 of music-repo/_work/cover_options (Jun, 4 Oct); the poster is the MV's own title frame
+    art: { cover: 'starfall-cover', poster: 'starfall-screen' },
     copy: 'ost',
     // A stand-in cut until the premiere is scheduled — swap for the final id.
     mv: { youtube: 'YmjVI7A2gIs', offset: 0 },
@@ -67,6 +72,12 @@ export const SONGS: Song[] = [
     ],
     highlight: 13, // XIV. Starfall
     album: '扉の向こうはヒマワリ畑 OST',
+    // a proposal for Jun to change: all four look out at the falling stars in XIV, and in
+    // XV. Sunrise Sky and Time turn to each other
+    roomCues: [
+      { movement: 13, pose: 'window' },
+      { movement: 14, pose: 'skyTime' },
+    ],
   },
   { slug: 'coming-1', status: 'coming' },
   { slug: 'coming-2', status: 'coming' },

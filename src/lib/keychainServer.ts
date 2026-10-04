@@ -35,7 +35,7 @@ const pick = <T>(map: Record<string, T>, dir: string, stem: string, ext: string)
 };
 
 export const songData = (song: Song): SongData => pick(DATA, '../data/ost', song.data!, 'json');
-export const songArt = (song: Song, which: 'night' | 'day' = 'night'): ImageMetadata =>
+export const songArt = (song: Song, which: 'cover' | 'poster' = 'cover'): ImageMetadata =>
   pick(ART, '../assets/ost', song.art![which], 'jpg');
 
 export const fmtTime = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;

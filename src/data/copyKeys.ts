@@ -122,7 +122,7 @@ export const SECTIONS: CopySection[] = [
   { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
   { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
   { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the player.' },
-  { id: 'ostMv',      page: 'ost', label: 'Music video', note: 'The label and note on the video block.' },
+  { id: 'ostMv',      page: 'ost', label: 'The night classroom', note: 'The heading and note above the classroom, the buttons on its screen, and the chalk on its board.' },
   { id: 'ostCredits', page: 'ost', label: 'Credits', note: 'The closing lines of the page.' },
 
   { id: 'actFilm',    page: 'lookbook', label: 'Act I — Film', note: 'Letterboxed opening, four cycling photographs.' },
@@ -583,16 +583,35 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'ost.mvKicker', section: 'ostMv', label: 'Label', type: 'line',
-    hint: 'Change this when the final video is up.',
-    defaults: { en: 'MUSIC VIDEO — WORK IN PROGRESS', th: 'มิวสิกวิดีโอ (กำลังทำ)', ja: 'ミュージックビデオ（制作中）' },
+    hint: 'Above the classroom.',
+    defaults: { en: 'MUSIC VIDEO · PREMIERE 10.10 21:00 JST', th: 'มิวสิกวิดีโอ · ฉายรอบแรก 10.10 21:00 (เวลาญี่ปุ่น)', ja: 'ミュージックビデオ · 10.10 21:00 プレミア公開' },
   },
   {
     key: 'ost.mvNote', section: 'ostMv', label: 'Note', type: 'line',
     defaults: {
-      en: 'A stand-in cut while the final video is being made.',
-      th: 'เวอร์ชันชั่วคราว ระหว่างที่ตัวจริงยังทำไม่เสร็จ',
-      ja: '完成版を制作中のため、仮のバージョンです。',
+      en: 'A night classroom, the four of them watching. Press play on the screen; the room follows the song.',
+      th: 'ห้องเรียนตอนกลางคืน สี่คนนั่งดูอยู่ กดเล่นที่จอได้เลย ห้องจะเปลี่ยนไปตามเพลง',
+      ja: '夜の教室で、四人が見ている。スクリーンの再生を押すと、教室も曲に合わせて変わっていく。',
     },
+  },
+  {
+    key: 'room.playMv', section: 'ostMv', label: 'Screen — play the video', type: 'line',
+    defaults: { en: 'WATCH THE MV', th: 'ดู MV', ja: 'MVを観る' },
+  },
+  {
+    key: 'room.audioOnly', section: 'ostMv', label: 'Screen — just the song', type: 'line',
+    hint: 'Plays the song alone; the screen shows each movement\'s card.',
+    defaults: { en: 'JUST THE SONG', th: 'ฟังเพลงอย่างเดียว', ja: '曲だけ聴く' },
+  },
+  {
+    key: 'room.board', section: 'ostMv', label: 'Chalkboard before it starts', type: 'line',
+    hint: 'Latin letters look best in the chalk. Once the song plays, the board shows the movement.',
+    defaults: { en: 'NOW SHOWING', th: 'NOW SHOWING', ja: 'NOW SHOWING' },
+  },
+  {
+    key: 'room.boardNum', section: 'ostMv', label: 'Chalkboard, the big line', type: 'line',
+    hint: 'Above the line before it. Can be left empty.',
+    defaults: { en: 'XVI', th: 'XVI', ja: 'XVI' },
   },
   {
     key: 'ost.credits', section: 'ostCredits', label: 'Credit line', type: 'line',
