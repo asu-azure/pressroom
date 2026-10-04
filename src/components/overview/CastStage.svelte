@@ -760,6 +760,7 @@
   .cs-crew__role span + span {
     color: var(--cs-faint);
     letter-spacing: 0.08em;
+    text-wrap: balance; /* 「13歳・中学1年 → 16歳・高校1年」 breaks in two even halves, not one orphan 年 */
   }
 
   /* ---- narrow screens: print and line side by side, the words under them ---- */
