@@ -723,7 +723,8 @@ and script for every song; the song arrives as the `#song-data` payload), two vi
     visitor touched it in the last 4 s or the mouse is over it. A card before anything has played
     starts **the video** there; afterwards it seeks whatever is current. The liner-notes entries do the
     same but start the song.
-  - `mv.youtube` is the scheduled premiere (`XpEp6WpBBC8`) — it won't play before 10.10 21:00 JST. To
+  - `mv.youtube` is the premiere Jun uploaded with v07j (`AFSvZn9lL0Q`, 4 Oct; it replaced `XpEp6WpBBC8`, the old choir and
+    credits) — it won't play before 10.10 21:00 JST. To
     test the sync, swap in any embeddable id locally (`M7lc1UVf-VE`, the IFrame API's sample) and swap
     it back. A song with no `mv` has no video, just the strip.
 - **Cover:** F2 of `music-repo/_work/cover_options` (Jun, 4 Oct) → `src/assets/ost/starfall-cover.jpg`;
