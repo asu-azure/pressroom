@@ -32,7 +32,7 @@ import type { Lang } from '../lib/lang';
  *
  * ⚠ A new section or slot with no `page` will not appear in the Studio at all.
  */
-export type PageId = 'asu' | 'home' | 'lookbook';
+export type PageId = 'asu' | 'home' | 'ost' | 'lookbook';
 
 export interface PageGroup {
   id: PageId;
@@ -57,6 +57,12 @@ export const PAGE_GROUPS: PageGroup[] = [
     label: 'THE SHELF',
     href: '/',
     note: 'The bookshelf everyone lands on, and the banner under it that leads here.',
+  },
+  {
+    id: 'ost',
+    label: 'THE SOUNDTRACK',
+    href: '/ost',
+    note: 'The CD-single page for the song. Only live while music is switched on (PUBLIC_MUSIC).',
   },
   {
     id: 'lookbook',
@@ -105,6 +111,12 @@ export const SECTIONS: CopySection[] = [
   { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
 
   // --- /lookbook — the six acts, in their own scroll order
+  { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
+  { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
+  { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the player.' },
+  { id: 'ostMv',      page: 'ost', label: 'Music video', note: 'The label and note on the video block.' },
+  { id: 'ostCredits', page: 'ost', label: 'Credits', note: 'The closing lines of the page.' },
+
   { id: 'actFilm',    page: 'lookbook', label: 'Act I — Film', note: 'Letterboxed opening, four cycling photographs.' },
   { id: 'actScatter', page: 'lookbook', label: 'Act II — Scatter', note: 'Words that blow apart as you scroll.' },
   { id: 'actChar',    page: 'lookbook', label: 'Act III — Character', note: 'The double-exposure character study.' },
@@ -443,6 +455,144 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'contact.back', section: 'contact', label: 'Back-to-shelf link', type: 'line',
+    hint: 'The arrow is added automatically.',
+    defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
+  },
+
+  // ---------------- /ost — the soundtrack ----------------
+  {
+    key: 'ost.kicker', section: 'ostHero', label: 'Small label', type: 'line',
+    hint: 'Uppercase mono, above the title.',
+    defaults: { en: 'SOUNDTRACK · 扉の向こうはヒマワリ畑', th: 'เพลงประกอบ · 扉の向こうはヒマワリ畑', ja: 'サウンドトラック · 扉の向こうはヒマワリ畑' },
+  },
+  {
+    key: 'ost.lede', section: 'ostHero', label: 'Short paragraph', type: 'line',
+    hint: 'One sentence under the title.',
+    defaults: {
+      en: 'A nocturne in sixteen movements, from a clear afternoon to the night the stars fall.',
+      th: 'บทเพลงราตรีสิบหกท่อน ตั้งแต่บ่ายวันฟ้าใสจนถึงคืนที่ดาวร่วง',
+      ja: '晴れた午後から、星が降る夜までの十六の楽章。',
+    },
+  },
+  {
+    key: 'ost.scan', section: 'ostHero', label: 'Scan button', type: 'line',
+    defaults: { en: 'SCAN', th: 'สแกน', ja: 'スキャン' },
+  },
+  {
+    key: 'ost.scanHint', section: 'ostHero', label: 'Hint under the button', type: 'line',
+    defaults: {
+      en: 'Tap the sound wave on the keychain to open the playlist.',
+      th: 'แตะคลื่นเสียงบนพวงกุญแจ เพื่อเปิดเพลย์ลิสต์',
+      ja: 'キーホルダーの音の波をタップすると、プレイリストが開きます。',
+    },
+  },
+  {
+    key: 'ost.playlist', section: 'ostList', label: 'Small label', type: 'line',
+    hint: 'Above the title in the player.',
+    defaults: { en: 'PLAYLIST', th: 'เพลย์ลิสต์', ja: 'プレイリスト' },
+  },
+  {
+    key: 'ost.scanned', section: 'ostList', label: 'After a scan', type: 'line',
+    hint: 'Flashes briefly when the playlist opens from the QR or a scan.',
+    defaults: { en: 'SCANNED', th: 'สแกนแล้ว', ja: 'スキャン完了' },
+  },
+  {
+    key: 'ost.keychain', section: 'ostList', label: 'Back to the keychain', type: 'line',
+    hint: 'The arrow is added automatically.',
+    defaults: { en: 'KEYCHAIN', th: 'พวงกุญแจ', ja: 'キーホルダー' },
+  },
+  {
+    key: 'ost.notesKicker', section: 'ostNotes', label: 'Booklet heading', type: 'line',
+    defaults: { en: 'LINER NOTES', th: 'บันทึกประกอบเพลง', ja: 'ライナーノーツ' },
+  },
+  {
+    key: 'ost.notesHint', section: 'ostNotes', label: 'Hint under the heading', type: 'line',
+    defaults: { en: 'Tap a movement to play from there.', th: 'แตะท่อนไหน ก็เริ่มเล่นจากตรงนั้น', ja: '楽章を押すと、そこから再生します。' },
+  },
+  {
+    key: 'ost.m1', section: 'ostNotes', label: 'Movement I', type: 'line',
+    defaults: { en: 'A melody long forgotten comes back on a single piano.', th: 'ทำนองที่เคยลืมไป กลับมาอีกครั้งด้วยเปียโนหลังเดียว', ja: '忘れていた旋律が、ピアノひとつで戻ってくる。' },
+  },
+  {
+    key: 'ost.m2', section: 'ostNotes', label: 'Movement II', type: 'line',
+    defaults: { en: 'A clear sky; the strings rise out of silence.', th: 'ฟ้าใส เครื่องสายค่อย ๆ ดังขึ้นจากความเงียบ', ja: '晴れた空。弦が静けさの中から立ちのぼる。' },
+  },
+  {
+    key: 'ost.m3', section: 'ostNotes', label: 'Movement III', type: 'line',
+    defaults: { en: 'Building, little by little, toward the hook.', th: 'ค่อย ๆ ไต่ระดับขึ้นไปหาท่อนฮุก', ja: 'フックへ向けて、少しずつ高まっていく。' },
+  },
+  {
+    key: 'ost.m4', section: 'ostNotes', label: 'Movement IV', type: 'line',
+    defaults: { en: 'The motif: G, A♭, G — the heart of the piece.', th: 'โมทีฟหลัก ซอล ลาแฟลต ซอล หัวใจของเพลงนี้', ja: 'モチーフ。ソ、ラ♭、ソ——この曲の心臓。' },
+  },
+  {
+    key: 'ost.m5', section: 'ostNotes', label: 'Movement V', type: 'line',
+    defaults: { en: 'The tempo climbs; something wakes.', th: 'จังหวะเร่งขึ้น บางอย่างตื่นขึ้นมา', ja: 'テンポが上がり、何かが目を覚ます。' },
+  },
+  {
+    key: 'ost.m6', section: 'ostNotes', label: 'Movement VI', type: 'line',
+    defaults: { en: 'A riff that runs through the night roads.', th: 'ริฟฟ์ที่พุ่งผ่านถนนยามค่ำคืน', ja: '夜の道を駆け抜けるリフ。' },
+  },
+  {
+    key: 'ost.m7', section: 'ostNotes', label: 'Movement VII', type: 'line',
+    defaults: { en: 'A short lament, borrowed from Chopin’s Nocturne Op. 48.', th: 'บทรำพึงสั้น ๆ ที่หยิบยืมมาจากนอคเทิร์น Op. 48 ของโชแปง', ja: 'ショパンの夜想曲 作品48 を借りた、短い嘆き。' },
+  },
+  {
+    key: 'ost.m8', section: 'ostNotes', label: 'Movement VIII', type: 'line',
+    defaults: { en: 'The motif stacks up, one instrument over the next.', th: 'โมทีฟซ้อนขึ้นไปทีละเครื่อง', ja: 'モチーフが、楽器から楽器へと積み上がる。' },
+  },
+  {
+    key: 'ost.m9', section: 'ostNotes', label: 'Movement IX', type: 'line',
+    defaults: { en: 'The choir comes in: guided by the stars.', th: 'คณะประสานเสียงเข้ามา มีดาวนำทาง', ja: '合唱が入る。星を頼りに。' },
+  },
+  {
+    key: 'ost.m10', section: 'ostNotes', label: 'Movement X', type: 'line',
+    defaults: { en: '8-bit game sounds bring those days back.', th: 'เสียงเกม 8 บิตพาวันวานกลับมา', ja: '8ビットの音が、あの頃を連れてくる。' },
+  },
+  {
+    key: 'ost.m11', section: 'ostNotes', label: 'Movement XI', type: 'line',
+    defaults: { en: 'Quiet winter lights; the choir, almost a whisper.', th: 'แสงไฟฤดูหนาวที่เงียบงัน เสียงประสานแผ่วราวกระซิบ', ja: '静かな冬の灯り。合唱はささやくように。' },
+  },
+  {
+    key: 'ost.m12', section: 'ostNotes', label: 'Movement XII', type: 'line',
+    defaults: { en: 'An agitato that comes in like a storm.', th: 'ท่อนอะจิตาโตที่โหมเข้ามาราวพายุ', ja: '嵐のように押し寄せるアジタート。' },
+  },
+  {
+    key: 'ost.m13', section: 'ostNotes', label: 'Movement XIII', type: 'line',
+    defaults: { en: 'Two bars for the piano alone.', th: 'สองห้องที่เปียโนได้เดี่ยวเต็มที่', ja: 'ピアノひとりきりの、二小節。' },
+  },
+  {
+    key: 'ost.m14', section: 'ostNotes', label: 'Movement XIV', type: 'line',
+    defaults: { en: 'The stars fall — the biggest chorus of all.', th: 'ดาวร่วง ท่อนฮุกที่ยิ่งใหญ่ที่สุด', ja: '星が降る。いちばん大きなサビ。' },
+  },
+  {
+    key: 'ost.m15', section: 'ostNotes', label: 'Movement XV', type: 'line',
+    defaults: { en: 'The key turns major, and the night breaks.', th: 'เปลี่ยนเป็นคีย์เมเจอร์ แล้วฟ้าก็สาง', ja: '長調に変わり、夜が明ける。' },
+  },
+  {
+    key: 'ost.m16', section: 'ostNotes', label: 'Movement XVI', type: 'line',
+    defaults: { en: 'A quiet ending after the dawn.', th: 'ตอนจบเงียบ ๆ หลังรุ่งสาง', ja: '夜明けのあとの、静かな終わり。' },
+  },
+  {
+    key: 'ost.mvKicker', section: 'ostMv', label: 'Label', type: 'line',
+    hint: 'Change this when the final video is up.',
+    defaults: { en: 'MUSIC VIDEO — WORK IN PROGRESS', th: 'มิวสิกวิดีโอ (กำลังทำ)', ja: 'ミュージックビデオ（制作中）' },
+  },
+  {
+    key: 'ost.mvNote', section: 'ostMv', label: 'Note', type: 'line',
+    defaults: {
+      en: 'A stand-in cut while the final video is being made.',
+      th: 'เวอร์ชันชั่วคราว ระหว่างที่ตัวจริงยังทำไม่เสร็จ',
+      ja: '完成版を制作中のため、仮のバージョンです。',
+    },
+  },
+  {
+    key: 'ost.credits', section: 'ostCredits', label: 'Credit line', type: 'line',
+    hint: 'Alias only — never a real name.',
+    defaults: { en: 'MUSIC & ILLUSTRATION — ASU AZURE', th: 'ดนตรีและภาพประกอบ — ASU AZURE', ja: '音楽・イラスト — ASU AZURE' },
+  },
+  {
+    key: 'ost.back', section: 'ostCredits', label: 'Back-to-shelf link', type: 'line',
     hint: 'The arrow is added automatically.',
     defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
   },

@@ -6,8 +6,13 @@
   import { i18n } from '../../lib/i18n.svelte';
   import { assemble } from '../../scripts/text';
   import WorkCard from './WorkCard.svelte';
+  import KeyChain from './KeyChain.svelte';
   import LangBar from './LangBar.svelte';
   import type { Work } from '../../lib/types';
+  import type { KeychainData } from '../../lib/keychain';
+
+  /** The soundtrack keychain, when music is on (index.astro builds its art and QR). */
+  let { ost = null }: { ost?: { data: KeychainData; length: string; movements: number } | null } = $props();
 
   gsap.registerPlugin(ScrollTrigger);
   const reduced =
@@ -118,6 +123,12 @@
           <WorkCard work={card.work} coverUrl={card.coverUrl} pageCount={card.pageCount} index={i} />
         </div>
       {/each}
+      {#if ost}
+        <!-- The soundtrack hangs at the end of the shelf, after the books. -->
+        <div use:rise={cards.length}>
+          <KeyChain data={ost.data} length={ost.length} movements={ost.movements} />
+        </div>
+      {/if}
 
       <!-- The author card that used to close this grid is gone: the artist
            teaser now sits directly below the shelf and says the same thing with

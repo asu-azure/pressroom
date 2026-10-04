@@ -3,7 +3,6 @@ import { Image } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
-import NowPlaying from '../components/NowPlaying.astro';
 import { MUSIC } from '../lib/features';
 import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
@@ -20,6 +19,19 @@ const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
 
 cacheShell(Astro);
+
+// The soundtrack keychain at the end of the shelf (KeyChain.svelte), when music is on.
+// Imported only then, so with music off the build carries none of its art or data. The
+// env read is spelled out (not MUSIC) so the build folds it to a constant and drops the imports.
+const ost = import.meta.env.PUBLIC_MUSIC === 'true'
+  ? await (async () => {
+      const [{ soundtrackKeychain, songLength }, { default: song }] = await Promise.all([
+        import('../lib/keychainServer'),
+        import('../data/ost/starfall.json'),
+      ]);
+      return { data: await soundtrackKeychain(Astro.site, 480), length: songLength(), movements: song.movements.length };
+    })()
+  : null;
 ---
 
 <Base>
@@ -63,15 +75,11 @@ cacheShell(Astro);
 
     <Showcase />
 
-    {/* The book's theme song as a moving score — the way in to /ost, and the
-        note-playing from the music videos brought onto the shelf. */}
-    {MUSIC && <NowPlaying />}
-
     {/* The shelf is a client:only island, so until it hydrates the fallback
         holds its place: aspect-locked blanks the size of real cards, which keeps
         the teaser below from jumping when the books arrive. */}
     <div id="shelf">
-      <Library client:only="svelte">
+      <Library client:only="svelte" ost={ost}>
         <div slot="fallback" class="shelf-skel" aria-hidden="true">
           {Array.from({ length: 6 }, () => <span class="shelf-skel__card" />)}
         </div>

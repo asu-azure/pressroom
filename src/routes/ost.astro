@@ -1,742 +1,703 @@
 ---
 /**
- * /ost — 「扉の向こう」 Main Theme, played as a moving score.
+ * /ost — 「ナガレボシ · STARFALL」, the soundtrack, as a keychain you scan.
  *
- * The notes on screen are not an animation drawn to look like the song: they
- * are exported from the same source that rendered the MP3 (src/data/ost/), so
- * every head reaches the playhead the moment it sounds. The page owns its own
- * look — Shibuya editorial paper for most of the song, Akihabara neon for the
- * 8-bit duet, a night stage for the final chorus — and leaves the rest of the
- * site's theme alone.
+ * Two views on one page:
+ *   KEY   an acrylic keychain hangs in the night (scripts/dangle.ts). Its sound
+ *         wave is a code: tap it (or SCAN) and a viewfinder reads it, then the
+ *         page opens out of the scanned point into —
+ *   LIST  the playlist: the player (movement, karaoke choir lines), the song
+ *         with its sixteen movements, the music video, the credits.
+ * The QR printed on the keychain's back is real and opens /ost?scan=1, which is
+ * the LIST view arriving "scanned" — so a printed keychain works the same way.
  *
- * Static: no database, nothing author-edited, so it is prerendered.
- * Sound is opt-in: nothing plays until the visitor presses a button.
+ * Timing is data, not animation: src/data/ost/starfall.json is imported from the
+ * MV player's build of the mix (scripts/import-ost.mjs). Words around it are
+ * author copy (the 'ost' group in copyKeys.ts), so this is server-rendered like
+ * /asu. Only exists when PUBLIC_MUSIC=true (astro.config.mjs injects the route).
  */
+import { getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
-import '../styles/ost-fonts.css';
-import ost from '../data/ost/perd-pratu.json';
-import { stamp, stampStatic } from '../data/showcase';
+import song from '../data/ost/starfall.json';
+import nightArt from '../assets/ost/starfall-night.jpg';
+import dayArt from '../assets/ost/starfall-day.jpg';
+import { keychainHtml } from '../lib/keychain';
+import { soundtrackKeychain, songLength } from '../lib/keychainServer';
+import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
+import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
+import { cacheShell } from '../lib/cache';
+import '../styles/keychain.css';
 
-export const prerender = true;
+export const prerender = false;
 
-const sections = ost.sections as [number, number, string, string][];
-const dur = ost.duration;
+/** The music video. A stand-in cut for now — swap this id for the final one. */
+const MV_YOUTUBE_ID = 'YmjVI7A2gIs';
+
+const copy = await loadCopy();
+const t = copy[DEFAULT_LANG];
+cacheShell(Astro);
+
+// Arriving from the QR (or a shared playlist link) opens the playlist directly.
+const scanned = Astro.url.searchParams.has('scan');
+
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-// the MP3 runs 234.2 s (the last chord rings past the final note-off)
-const audioLen = 234;
-const totalNotes = ost.rh.length + ost.lh.length + ost.chip.length + ost.arp.length + ost.str.length;
+const movements = song.movements;
+const dur = song.duration;
+const ends = movements.map((m, i) => movements[i + 1]?.t ?? dur);
+const roman = (name: string) => name.split('.')[0];
+const title = (name: string) => name.split('. ').slice(1).join('. ');
 
-// Poster barcode: notes per bar, one bar of the song per stripe.
-const bars = ost.bars as number[];
-const density = bars.map((b, i) => {
-  const e = bars[i + 1] ?? dur;
-  let n = 0;
-  for (const k of ['rh', 'lh', 'chip', 'str'] as const) for (const r of ost[k] as number[][]) if (r[0] >= b && r[0] < e) n++;
-  return n;
-});
-const dMax = Math.max(...density);
-const secOfBar = (bar: number) => {
-  let s = 0;
-  for (let i = 0; i < sections.length; i++) if (sections[i][1] <= bar) s = i;
-  return s;
-};
-const CHORUS = new Set([4, 8, 11]);
-
-// Sunflower: five petals (the book's title) around a phyllotaxis head.
-const GOLD = Math.PI * (3 - Math.sqrt(5));
-const seeds = Array.from({ length: 150 }, (_, i) => {
-  const r = 3.1 * Math.sqrt(i + 1);
-  const a = i * GOLD;
-  return { x: +(r * Math.cos(a)).toFixed(2), y: +(r * Math.sin(a)).toFixed(2), s: +(0.9 + (i / 150) * 1.4).toFixed(2) };
-});
-
-const specs: [string, string][] = [
-  ['TEMPO', '♩ = 126'],
-  ['KEY', 'F MIN ⇄ A♭ MAJ'],
-  ['LENGTH', fmt(audioLen)],
-  ['BARS', String(bars.length - 1)],
-  ['NOTES', totalNotes.toLocaleString('en-US')],
-  ['CAST', 'PIANO × BAND × 8BIT'],
-];
-
-// Liner notes, one line per chapter (JA / EN).
-const liner: string[][] = [
-  ['ピアノひとりでサビを弾いて、ゆっくり扉を開ける。', 'Solo piano plays the hook first, easing the door open.'],
-  ['8ビットとギターがベートーヴェンの熱情ソナタを刻む。バンドが入る。', 'Chip and guitar run the Appassionata figure. The band arrives.'],
-  ['16分で扉をノックするようなAメロ。', 'A verse that knocks on the door in sixteenths.'],
-  ['小節線の手前から食って、上へ上へ。', 'Every long note arrives early and climbs.'],
-  ['16小節、同じ小節はひとつもない。11小節目でバンドが消える。', 'Sixteen bars, none repeated. The band drops out at bar 11.'],
-  ['1小節だけのベートーヴェン。気づいた人だけのごほうび。', 'One bar of Beethoven, for whoever catches it.'],
-  ['2番。後半でメロディが一段上がる。', 'Second verse; the second half sits higher.'],
-  ['もう一度、上り坂。', 'The climb again.'],
-  ['2回目のサビ。', 'Second chorus.'],
-  ['ピアノが黙って、弦のスピッカートが熱情を引き継ぐ。', 'The piano rests; spiccato strings carry the Appassionata.'],
-  ['8ビットとピアノの共演。ピアノがいちばん目立つところ。', 'Chip versus piano, where the piano is loudest of all.'],
-  ['大サビ。いちばん高いE♭6。', 'Final chorus, up to the top E♭6.'],
-  ['プレストの旋律だけを借りて、最後はA♭add9で止まる。', 'Only the Presto’s top line, ending on a held A♭add9.'],
-];
+const [kc, head, poster, og] = await Promise.all([
+  soundtrackKeychain(Astro.site, 900),
+  getImage({ src: nightArt, width: 560, format: 'webp', quality: 80 }),
+  getImage({ src: dayArt, width: 1600, format: 'webp', quality: 74 }),
+  getImage({ src: nightArt, width: 1200, format: 'jpg', quality: 82 }),
+]);
+const ogImage = new URL(og.src, Astro.site).href;
 ---
 
 <Base
-  title="扉の向こう — Main Theme · Pressroom"
-  description="「扉の向こう、ひまわりの5枚の花びら」主題曲。流れる楽譜で聴く。 The main theme of Beyond the Door, played as a moving score."
-  topbar={false}
+  title={`${song.title.ja} — ${song.title.en} · Pressroom OST`}
+  description="The soundtrack of 扉の向こうはヒマワリ畑 — a nocturne in sixteen movements, by Asu Azure."
+  image={ogImage}
 >
-  <main class="ost" id="ost" data-mode="paper" data-state="gate" data-no-sfx>
-    <section class="ost-stage" id="ost-stage" aria-label="扉の向こう — moving score">
-      {/* ---------------- background layers ---------------- */}
-      <div class="ost-bg" aria-hidden="true">
-        <div class="ost-grid"></div>
-        <div class="ost-mega"><span id="ost-mega">イントロ</span></div>
-        <svg class="ost-flower" id="ost-flower" viewBox="-100 -100 200 200">
-          <defs>
-            <pattern id="ost-dots" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
-              <circle cx="2.5" cy="2.5" r="1.25" fill="currentColor"></circle>
-            </pattern>
-          </defs>
-          <g class="ost-flower__petals">
-            {[0, 1, 2, 3, 4].map((k) => (
-              <g transform={`rotate(${k * 72})`}>
-                <path d="M0 -34 C 22 -44, 26 -78, 0 -97 C -26 -78, -22 -44, 0 -34 Z" fill="url(#ost-dots)" stroke="currentColor" stroke-width="1.2"></path>
-              </g>
-            ))}
-          </g>
-          <circle r="36" fill="none" stroke="currentColor" stroke-width="1.2"></circle>
-          <g class="ost-flower__seeds">
-            {seeds.map((d) => <circle cx={d.x} cy={d.y} r={d.s} fill="currentColor"></circle>)}
-          </g>
-        </svg>
-        <div class="ost-ma" id="ost-ma">間</div>
-        <div class="ost-crt"></div>
-      </div>
+  <nav class="ost__langs mono" aria-label="Language">
+    {LANGS.map((l) => (
+      <button type="button" data-lang={l} aria-pressed={l === DEFAULT_LANG ? 'true' : 'false'}>
+        {LANG_LABEL[l]}
+      </button>
+    ))}
+  </nav>
 
-      <canvas class="ost-canvas" id="ost-canvas" aria-hidden="true"></canvas>
+  <main class="ost" id="ost" data-no-sfx data-art={head.src} data-state={scanned ? 'list' : 'key'} data-fresh={scanned ? '' : undefined}>
+    <div class="ost__sky" aria-hidden="true"></div>
+    <canvas class="ost__stars" aria-hidden="true"></canvas>
 
-      {/* ---------------- HUD ---------------- */}
-      <header class="ost-top">
-        <div class="ost-top__l">
-          <a class="ost-back" href="/" data-vt="back"><span aria-hidden="true">←</span> SHELF</a>
-          <span class="ost-cat">PRSS-0001 <b class="ost-jp">扉の向こう</b></span>
-        </div>
-        <div class="ost-sec" aria-live="polite">
-          <span class="ost-sec__n" id="ost-sec-n">01 / 13</span>
-          <span class="ost-sec__ja ost-jp" id="ost-sec-ja">イントロ</span>
-          <span class="ost-sec__en" id="ost-sec-en">INTRO</span>
-        </div>
-        <div class="ost-chord">
-          <span class="ost-chord__k">CHORD</span>
-          <span class="ost-chord__now" id="ost-chord">—</span>
-          <span class="ost-chord__next">NEXT <b id="ost-chord-next">—</b></span>
-        </div>
-      </header>
+    <!-- ============ KEY: the keychain ============ -->
+    <section class="ost__key" data-view="key" aria-label="Keychain">
+      <div class="ost__keyGrid">
+        <div class="kc__stage ost__kcStage" data-kc-stage set:html={keychainHtml(kc)} />
 
-      <aside class="ost-side" aria-hidden="true">
-        <span class="ost-jp">扉の向こう</span> ━ BEYOND THE DOOR ━ ♩=126 ━ F MINOR ⇄ A♭ MAJOR ━ PRESSROOM OST 001
-      </aside>
-
-      <div class="ost-akiba" aria-hidden="true">
-        <div class="ost-akiba__row">
-          <span class="ost-akiba__p1">1P PIANO</span>
-          <span class="ost-akiba__bar"><i id="ost-hp1"></i></span>
-          <span class="ost-akiba__vs">VS</span>
-          <span class="ost-akiba__bar ost-akiba__bar--r"><i id="ost-hp2"></i></span>
-          <span class="ost-akiba__p2">2P 8BIT</span>
-        </div>
-        <div class="ost-akiba__row ost-akiba__row--2">
-          <span>SCORE <b id="ost-score">0000000</b></span>
-          <span class="ost-akiba__stage">STAGE 11 ★ 共演</span>
-          <span>COMBO <b id="ost-combo">×0</b></span>
-        </div>
-      </div>
-
-      <div class="ost-bottom">
-        <ol class="ost-chapters" id="ost-chapters">
-          {sections.map(([t, , en, ja], i) => {
-            const end = sections[i + 1]?.[0] ?? dur;
-            return (
-              <li style={`flex-grow:${(end - t).toFixed(2)}`}>
-                <button type="button" data-seek={t} aria-label={`${ja} ${en} ${fmt(t)}`}>
-                  <span class="ost-chapters__fill"></span>
-                  <span class="ost-chapters__lbl"><b>{String(i + 1).padStart(2, '0')}</b> <span class="ost-jp">{ja}</span></span>
-                </button>
-              </li>
-            );
-          })}
-        </ol>
-        <div class="ost-ctl">
-          <button type="button" class="ost-play" id="ost-play" aria-label="Play / pause">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M7 4.5v15l12.5-7.5z"></path><g class="i-pause"><rect x="6" y="4.5" width="4" height="15"></rect><rect x="14" y="4.5" width="4" height="15"></rect></g></svg>
+        <div class="ost__keyInfo">
+          <p class="mono ost__kicker" data-i18n="ost.kicker">{t['ost.kicker']}</p>
+          <h1 class="ost__title" data-title>
+            <span class="ost__titleJa" data-mv-converge>{song.title.ja}</span>
+            <span class="mono ost__titleEn">{song.title.en}</span>
+          </h1>
+          <p class="ost__lede" data-i18n="ost.lede">{t['ost.lede']}</p>
+          <button class="ost__scanBtn mono" type="button" data-scan>
+            <span class="ost__scanIcon" aria-hidden="true"></span>
+            <span data-i18n="ost.scan">{t['ost.scan']}</span>
           </button>
-          <span class="ost-time"><b id="ost-time">0:00.0</b> / {fmt(audioLen)}</span>
-          <span class="ost-bar">BAR <b id="ost-bar">001</b>/{bars.length - 1}</span>
-          <span class="ost-beats" id="ost-beats" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-          <span class="ost-vu" id="ost-vu" aria-hidden="true">{Array.from({ length: 16 }, () => <i></i>)}</span>
-          <button type="button" class="ost-mute" id="ost-mute" aria-pressed="false">SOUND <b>ON</b></button>
+          <p class="mono ost__scanHint" data-i18n="ost.scanHint">{t['ost.scanHint']}</p>
         </div>
       </div>
+    </section>
 
-      <div class="ost-wipe" id="ost-wipe" aria-hidden="true"></div>
-      <div class="ost-banner" id="ost-banner" aria-hidden="true"></div>
+    <!-- the viewfinder that reads the code -->
+    <div class="ost__finder" data-finder aria-hidden="true">
+      <span></span><span></span><span></span><span></span>
+      <i class="ost__finderLine"></i>
+    </div>
 
-      {/* ---------------- end card ---------------- */}
-      <div class="ost-end" id="ost-end" hidden>
-        <p class="ost-end__ja ost-jp">おしまい</p>
-        <p class="ost-end__en">THANK YOU FOR LISTENING</p>
-        <div class="ost-end__ctl">
-          <button type="button" id="ost-replay">↺ REPLAY</button>
-          <a href="/" data-vt="back">← BACK TO THE SHELF</a>
+    <!-- ============ LIST: the playlist ============ -->
+    <div class="ost__pl" data-view="list">
+      <section class="ost__plHead" aria-label="Player">
+        <div class="ost__plTop">
+          <button class="mono ost__toKey" type="button" data-to-key>
+            <span aria-hidden="true">←</span> <span data-i18n="ost.keychain">{t['ost.keychain']}</span>
+          </button>
+          <p class="mono ost__scanned"><span aria-hidden="true">✓</span> <span data-i18n="ost.scanned">{t['ost.scanned']}</span></p>
         </div>
-      </div>
 
-      {/* ---------------- gate: a CD-single jacket ---------------- */}
-      <div class="ost-gate" id="ost-gate">
-        <div class="gate-grid" aria-hidden="true"></div>
+        <div class="ost__plGrid">
+          <img class="ost__plArt" src={head.src} alt="" width="560" height="560" />
+          <div class="ost__plInfo">
+            <p class="mono ost__kicker" data-i18n="ost.playlist">{t['ost.playlist']}</p>
+            <h2 class="ost__title ost__title--list" data-title>
+              <span class="ost__titleJa">{song.title.ja}</span>
+              <span class="mono ost__titleEn">{song.title.en}</span>
+            </h2>
+
+            <div class="ost__transport">
+              <button class="ost__play mono" type="button" data-play aria-pressed="false">
+                <span class="ost__playIcon" aria-hidden="true"></span>
+                <span data-play-label>PLAY</span>
+              </button>
+              <span class="mono ost__time"><span data-time>0:00</span> / {fmt(dur)}</span>
+            </div>
+
+            <div
+              class="ost__scrub"
+              data-scrub
+              role="slider"
+              tabindex="0"
+              aria-label="Position"
+              aria-valuemin="0"
+              aria-valuemax={Math.round(dur)}
+              aria-valuenow="0"
+              aria-valuetext="0:00"
+            >
+              <span class="ost__scrubFill" data-fill></span>
+              {movements.map((m) => (
+                <span class="ost__tick" style={`left:${((m.t / dur) * 100).toFixed(3)}%`} title={m.name}></span>
+              ))}
+              <span class="ost__knob" data-knob></span>
+            </div>
+
+            <div class="ost__now" aria-live="polite">
+              <p class="mono ost__nowK"><span data-now-num>{roman(movements[0].name)}</span> / XVI</p>
+              <p class="ost__nowName" data-now-name>{title(movements[0].name)}</p>
+              <div class="ost__lyric" data-lyric hidden>
+                <p class="ost__lyricJa authored" data-lyric-ja lang="ja"></p>
+                <p class="ost__lyricTh" data-lyric-th lang="th"></p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- the song list — one song for now; each opens onto its movements -->
+      <section class="spread spread--paper ost__notes" aria-labelledby="ost-notes-h">
+        <div class="paper-grid" aria-hidden="true"></div>
         <span class="crop crop--tl" aria-hidden="true"></span>
         <span class="crop crop--br" aria-hidden="true"></span>
-
-        <div class="gate-obi" aria-hidden="true">
-          <span class="gate-obi__cat">PRSS-0001</span>
-          <span class="gate-obi__t ost-jp">扉の向こう</span>
-          <span class="gate-obi__s ost-jp">初回限定 WEB盤</span>
-          <span class="gate-obi__p">¥0</span>
-        </div>
-
-        <h1 class="gate-title">
-          <span class="gate-title__ja ost-jp" lang="ja">{[...'扉の向こう'].map((c) => <span class="gch">{c}</span>)}</span>
-          <span class="gate-title__sub ost-jp">『扉の向こう、ひまわりの５枚の花びら』主題曲</span>
-          <span class="gate-title__en">
-            <span class="gl">BEYOND</span>
-            <span class="gl">THE DOOR</span>
-            <span class="gl gl--o">MAIN THEME</span>
-          </span>
-        </h1>
-
-        <dl class="gate-spec">
-          {specs.map(([k, v]) => (
-            <div>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
+        <header class="ost__notesHead">
+          <h2 class="mono ost__notesK" id="ost-notes-h" data-i18n="ost.notesKicker">{t['ost.notesKicker']}</h2>
+          <p class="mono ost__notesHint" data-i18n="ost.notesHint">{t['ost.notesHint']}</p>
+        </header>
+        <ol class="ost__songs">
+          <li class="ost__song">
+            <div class="ost__songRow">
+              <span class="mono ost__songNo">01</span>
+              <img class="ost__songArt" src={head.src} alt="" width="56" height="56" loading="lazy" />
+              <span class="ost__songTitle"><b>{song.title.ja}</b> <span class="mono">{song.title.en}</span></span>
+              <span class="mono ost__songLen">{songLength()}</span>
             </div>
-          ))}
-        </dl>
-
-        <div class="gate-code" aria-hidden="true">
-          <div class="gate-code__bars">
-            {density.slice(0, -1).map((d, i) => {
-              const s = secOfBar(i + 1);
-              const cls = s === 10 ? 'is-chip' : CHORUS.has(s) ? 'is-chorus' : s === 9 ? 'is-lv' : '';
-              return <i class={cls} style={`height:${(12 + (d / dMax) * 88).toFixed(1)}%`}></i>;
-            })}
-          </div>
-          <div class="gate-code__lbl">
-            {sections.filter(([, bar], i) => i === 0 || bar - sections[i - 1][1] > 2).map(([, bar]) => (
-              <span style={`left:${(((bar - 1) / (bars.length - 1)) * 100).toFixed(2)}%`}>{bar}</span>
-            ))}
-          </div>
-          <span class="gate-code__cap">SCORE DENSITY / 1 STRIPE = 1 BAR</span>
-        </div>
-
-        <div class="gate-sticker" aria-hidden="true"><span>NEW!</span><small>全曲</small></div>
-
-        <picture class="gate-stamp" aria-hidden="true">
-          <source srcset={stampStatic.src} media="(prefers-reduced-motion: reduce)" />
-          <img src={stamp.src} alt="" width={stamp.width} height={stamp.height} decoding="async" />
-        </picture>
-
-        <div class="gate-go">
-          <button type="button" class="gate-play" id="gate-play">
-            <svg class="gate-play__ring" viewBox="0 0 200 200" aria-hidden="true">
-              <defs><path id="ring-path" d="M100,100 m-82,0 a82,82 0 1,1 164,0 a82,82 0 1,1 -164,0"></path></defs>
-              <text><textPath href="#ring-path">PLAY WITH SOUND ✦ 音を出して再生 ✦ PLAY WITH SOUND ✦ 音を出して再生 ✦</textPath></text>
-            </svg>
-            <span class="gate-play__core"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12.5-7.5z"></path></svg></span>
-            <span class="sr">音を出して再生 — play with sound</span>
-          </button>
-          <div class="gate-go__side">
-            <span class="gate-load" id="gate-load">4.7 MB · MP3</span>
-            <button type="button" class="gate-muted" id="gate-muted">無音で観る — WATCH MUTED</button>
-            <span class="gate-hint">HEADPHONES RECOMMENDED ／ SPACE ▶❚❚ · ← → 5s · M</span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    {/* ---------------- liner notes ---------------- */}
-    <section class="ost-notes" aria-labelledby="notes-h">
-      <div class="notes-head">
-        <span class="notes-k">LINER NOTES ／ ライナーノーツ</span>
-        <h2 id="notes-h"><span class="ost-jp">扉の向こう</span><em>Main Theme</em></h2>
-        <p class="notes-lede">
-          <span class="ost-jp">ピアノとバンド、ときどき8ビット。画面の音符は、音源を作ったのと同じデータから描いているので、再生線に触れた瞬間に鳴る。</span>
-          <span>Piano and band, with the odd 8-bit cameo. The notes on screen come from the same data that rendered the audio, so each one sounds the moment it touches the line.</span>
-        </p>
-      </div>
-
-      <ol class="notes-list">
-        {sections.map(([t, bar, en, ja], i) => (
-          <li>
-            <button type="button" data-seek={t} data-top>
-              <span class="nl-t">{fmt(t)}</span>
-              <span class="nl-b">BAR {String(bar).padStart(3, '0')}</span>
-              <span class="nl-ja ost-jp">{ja}</span>
-              <span class="nl-en">{en}</span>
-              <span class="nl-d">
-                <span class="ost-jp">{liner[i][0]}</span>
-                <span>{liner[i][1]}</span>
-              </span>
-            </button>
+            <ol class="ost__list">
+              {movements.map((m, i) => (
+                <li>
+                  <button class="ost__mv" type="button" data-seek={m.t} data-mv={i}>
+                    <span class="ost__mvNum serif">{roman(m.name)}</span>
+                    <span class="ost__mvBody">
+                      <span class="ost__mvName">
+                        {title(m.name)}
+                        {'sub' in m && m.sub && <em class="ost__mvSub">{m.sub}</em>}
+                      </span>
+                      <span class="ost__mvNote" data-i18n={`ost.m${i + 1}`}>{t[`ost.m${i + 1}`]}</span>
+                    </span>
+                    <span class="mono ost__mvTime">{fmt(m.t)}–{fmt(ends[i])}</span>
+                    <span class="ost__mvBar" aria-hidden="true"></span>
+                  </button>
+                </li>
+              ))}
+            </ol>
           </li>
-        ))}
-      </ol>
+        </ol>
+      </section>
 
-      <dl class="notes-credits">
-        <div><dt>MUSIC</dt><dd>Asu Azure <small>(arranged with Claude)</small></dd></div>
-        <div><dt>QUOTES</dt><dd>L. v. Beethoven — Piano Sonata No. 23 “Appassionata”, III</dd></div>
-        <div><dt>SOUNDS</dt><dd>Splendid Grand Piano · VSCO 2 CE · Big Rusty Drums · Virtuosity Drums · chiptune synth</dd></div>
-        <div><dt>TYPE</dt><dd>Bravura (notation) · DotGothic16 · Noto Sans JP · Stack Sans · Space Grotesk · JetBrains Mono</dd></div>
-      </dl>
-    </section>
+      <!-- ============ MUSIC VIDEO ============ -->
+      <section class="ost__mvid" aria-labelledby="ost-mv-h">
+        <h2 class="mono ost__mvidK" id="ost-mv-h" data-i18n="ost.mvKicker">{t['ost.mvKicker']}</h2>
+        <p class="ost__mvidNote" data-i18n="ost.mvNote">{t['ost.mvNote']}</p>
+        {/* Click-to-load: no YouTube script, cookie or request until the visitor
+            asks for the video. Privacy-enhanced domain; the JS API is on only so
+            the page can pause the video when its own player starts. */}
+        <div class="ost__frame" data-yt={MV_YOUTUBE_ID}>
+          <button class="ost__poster" type="button" data-yt-play aria-label="Play the music video">
+            <img src={poster.src} alt="" loading="lazy" decoding="async" />
+            <span class="ost__posterPlay" aria-hidden="true"></span>
+            <span class="mono ost__posterK">MV ▶ YOUTUBE</span>
+          </button>
+        </div>
+      </section>
 
-    <audio id="ost-audio" src="/ost/perd-pratu.mp3" preload="metadata"></audio>
+      <footer class="ost__credits">
+        <p class="mono" data-i18n="ost.credits">{t['ost.credits']}</p>
+        <a class="mono ost__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.back">{t['ost.back']}</span></a>
+      </footer>
+    </div>
+
+    <!-- Mini transport: appears once the player is out of view while a song is going. -->
+    <div class="ost__mini" data-mini hidden>
+      <button class="ost__miniBtn" type="button" data-play aria-pressed="false" aria-label="Play / pause">
+        <span class="ost__playIcon" aria-hidden="true"></span>
+      </button>
+      <span class="ost__miniName" data-mini-name>{movements[0].name}</span>
+      <span class="mono ost__miniTime" data-mini-time>0:00</span>
+    </div>
+
+    <audio data-audio src="/ost/starfall.mp3" preload="metadata"></audio>
   </main>
+
+  <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
 </Base>
 
+<script>
+  import { initStarfall } from '../scripts/ost/starfall';
+  initStarfall();
+</script>
+
 <style is:global>
-  /* ============================================================
-     /ost — its own palette. Everything reads these five tokens, and
-     [data-mode] swaps them, so a scene change is one attribute write.
-     ============================================================ */
-  .ost {
-    --o-bg: #f1ece2;
-    --o-fg: #0d0d0e;
-    --o-dim: rgba(13, 13, 14, 0.52);
-    --o-line: rgba(13, 13, 14, 0.1);
-    --o-accent: #2742f0;
-    --o-hot: #e8a31a;
-    --o-panel: rgba(239, 238, 233, 0.82);
-    --o-jp: 'OST JP', 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
-    --o-dot: 'OST Dot', 'JetBrains Mono', monospace;
-    position: relative;
-    z-index: 1;
-    color: var(--o-fg);
-    background: var(--o-bg);
-    transition: background-color 0.35s var(--ease), color 0.35s var(--ease);
+  /* ---- the scan → playlist transition (same-document view transition) ----
+     The playlist opens out of the scanned code in a widening circle; the art
+     and the title fly from the keychain to the playlist header. --scan-x/y are
+     set on <html> by starfall.ts just before the transition. */
+  html[data-vt='scan']::view-transition-old(root) { animation: ost-vt-out 0.8s cubic-bezier(0.7, 0, 0.3, 1) both; }
+  html[data-vt='scan']::view-transition-new(root) { animation: ost-vt-in 0.8s cubic-bezier(0.7, 0, 0.3, 1) both; }
+  html[data-vt='unscan']::view-transition-old(root) { animation: ost-vt-shut 0.6s cubic-bezier(0.7, 0, 0.3, 1) both; z-index: 2; }
+  html[data-vt='unscan']::view-transition-new(root) { animation: none; }
+  ::view-transition-group(ost-art),
+  ::view-transition-group(ost-title) { animation-duration: 0.8s; animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1); }
+  @keyframes ost-vt-out { to { opacity: 0.35; scale: 0.97; } }
+  @keyframes ost-vt-in {
+    from { clip-path: circle(0 at var(--scan-x, 50%) var(--scan-y, 50%)); }
+    to { clip-path: circle(150vmax at var(--scan-x, 50%) var(--scan-y, 50%)); }
   }
-  .ost[data-mode='ink'] {
-    --o-bg: #0c0c0d; --o-fg: #f4f1ea; --o-dim: rgba(244, 241, 234, 0.5); --o-line: rgba(244, 241, 234, 0.08);
-    --o-accent: #5a72ff; --o-hot: #e8a31a; --o-panel: rgba(12, 12, 13, 0.8);
-  }
-  .ost[data-mode='akiba'] {
-    --o-bg: #07060c; --o-fg: #e9fdff; --o-dim: rgba(60, 242, 255, 0.6); --o-line: rgba(60, 242, 255, 0.09);
-    --o-accent: #ff3fa4; --o-hot: #f7ff3c; --o-panel: rgba(7, 6, 12, 0.8);
-  }
-  .ost[data-mode='night'] {
-    --o-bg: #0a0d1d; --o-fg: #ffffff; --o-dim: rgba(255, 255, 255, 0.52); --o-line: rgba(255, 255, 255, 0.07);
-    --o-accent: #ffb629; --o-hot: #ffb629; --o-panel: rgba(10, 13, 29, 0.8);
-  }
-  .ost-jp { font-family: var(--o-jp); }
-  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-  /* ---------------- stage ---------------- */
-  .ost-stage {
-    position: relative;
-    height: 100svh;
-    min-height: 560px;
-    overflow: hidden;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-  }
-  .ost[data-mode='night'] .ost-stage {
-    background: radial-gradient(120% 90% at 70% 110%, #1b2356 0%, transparent 60%), radial-gradient(90% 60% at 10% -10%, #221a3d 0%, transparent 55%);
-  }
-  .ost-bg, .ost-canvas { position: absolute; inset: 0; }
-  .ost-canvas { width: 100%; height: 100%; z-index: 2; }
-  .ost-grid {
-    position: absolute; inset: 0;
-    background-image: linear-gradient(90deg, var(--o-line) 1px, transparent 1px);
-    background-size: calc(100% / 12) 100%;
-  }
-  .ost-mega {
-    position: absolute; left: 0; right: 0; top: 50%;
-    transform: translateY(-50%);
-    text-align: center;
-    font-family: var(--o-jp);
-    font-weight: 900;
-    font-size: min(34vw, 46vh);
-    line-height: 1;
-    white-space: nowrap;
-    color: transparent;
-    -webkit-text-stroke: 1.5px var(--o-line);
-    opacity: 1;
-  }
-  .ost-mega span { display: inline-block; }
-  .ost[data-mode='akiba'] .ost-mega { -webkit-text-stroke-color: rgba(255, 63, 164, 0.16); font-family: var(--o-dot); font-weight: 400; }
-  .ost-flower {
-    position: absolute;
-    right: -6vmin; bottom: -14vmin;
-    width: 62vmin; height: 62vmin;
-    color: var(--o-hot);
-    opacity: 0;
-    transform: scale(0.6) rotate(-40deg);
-  }
-  .ost-ma {
-    position: absolute; inset: 0;
-    display: grid; place-items: center;
-    font-family: var(--o-jp); font-weight: 900;
-    font-size: min(60vh, 60vw);
-    color: var(--o-fg);
-    opacity: 0;
-    line-height: 1;
-  }
-  .ost-crt {
-    position: absolute; inset: 0; opacity: 0;
-    background:
-      repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 1px, transparent 1px 3px),
-      radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
-    transition: opacity 0.3s;
-    z-index: 3;
-  }
-  .ost[data-mode='akiba'] .ost-crt { opacity: 1; }
-
-  /* ---------------- HUD ---------------- */
-  .ost-top {
-    position: absolute; z-index: 5; top: 0; left: 0; right: 0;
-    display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 1rem;
-    padding: clamp(14px, 2.2vw, 28px) clamp(16px, 2.6vw, 36px);
-  }
-  .ost-top__l { display: flex; flex-direction: column; gap: 0.5rem; }
-  .ost-back { font-weight: 600; letter-spacing: 0.16em; }
-  .ost-back:hover { color: var(--o-accent); }
-  .ost-cat { color: var(--o-dim); }
-  .ost-cat b { font-weight: 900; color: var(--o-fg); letter-spacing: 0.1em; margin-left: 0.4em; }
-  .ost-sec { display: grid; justify-items: center; text-align: center; }
-  .ost-sec__n { color: var(--o-dim); }
-  .ost-sec__ja {
-    font-weight: 900; font-size: clamp(1.9rem, 4.2vw, 3.4rem); line-height: 1.05; letter-spacing: 0.02em;
-    overflow: hidden; display: block; padding: 0.04em 0.1em;
-  }
-  .ost-sec__ja .ch { display: inline-block; }
-  .ost-sec__en { font-weight: 600; letter-spacing: 0.3em; color: var(--o-accent); }
-  .ost-chord { justify-self: end; display: grid; justify-items: end; gap: 0.1rem; }
-  .ost-chord__k { color: var(--o-dim); }
-  .ost-chord__now { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: clamp(1.4rem, 2.6vw, 2.2rem); letter-spacing: 0; line-height: 1.1; }
-  .ost-chord__next { color: var(--o-dim); }
-  .ost-chord__next b { color: var(--o-fg); font-family: 'Space Grotesk', sans-serif; font-size: 0.95rem; letter-spacing: 0; }
-
-  .ost-side {
-    position: absolute; z-index: 5; right: clamp(10px, 1.4vw, 20px); top: 50%;
-    transform: translateY(-50%);
-    writing-mode: vertical-rl;
-    color: var(--o-dim); letter-spacing: 0.24em; font-size: 0.62rem; white-space: nowrap;
-  }
-  .ost-side .ost-jp { color: var(--o-fg); font-weight: 900; }
-
-  .ost-akiba {
-    position: absolute; z-index: 6; left: 50%; top: clamp(96px, 15vh, 150px);
-    transform: translateX(-50%);
-    width: min(760px, 92vw);
-    font-family: var(--o-dot); font-size: clamp(0.8rem, 1.4vw, 1.05rem); letter-spacing: 0.06em;
-    color: #e9fdff; text-shadow: 2px 0 #ff3fa4, -2px 0 #3cf2ff;
-    display: none; gap: 0.35rem;
-  }
-  .ost[data-mode='akiba'] .ost-akiba { display: grid; }
-  .ost-akiba__row { display: grid; grid-template-columns: auto 1fr auto 1fr auto; align-items: center; gap: 0.7rem; }
-  .ost-akiba__row--2 { grid-template-columns: 1fr auto 1fr; }
-  .ost-akiba__row--2 > :last-child { text-align: right; }
-  .ost-akiba__row--2 b { color: #f7ff3c; font-weight: 400; }
-  .ost-akiba__stage { color: #f7ff3c; animation: ost-blink 1s steps(2) infinite; }
-  .ost-akiba__p1 { color: #3cf2ff; }
-  .ost-akiba__p2 { color: #ff3fa4; }
-  .ost-akiba__vs { color: #f7ff3c; font-size: 1.4em; }
-  .ost-akiba__bar { height: 12px; border: 2px solid currentColor; padding: 2px; display: block; }
-  .ost-akiba__bar i { display: block; height: 100%; width: 50%; background: #3cf2ff; transition: width 0.2s steps(6); }
-  .ost-akiba__bar--r { transform: scaleX(-1); }
-  .ost-akiba__bar--r i { background: #ff3fa4; }
-  @keyframes ost-blink { 50% { opacity: 0.35; } }
-
-  .ost-bottom {
-    position: absolute; z-index: 5; left: 0; right: 0; bottom: 0;
-    padding: 0 clamp(16px, 2.6vw, 36px) clamp(12px, 2vw, 24px);
-    display: grid; gap: 0.6rem;
-  }
-  .ost-chapters { list-style: none; margin: 0; padding: 0; display: flex; gap: 3px; }
-  .ost-chapters li { flex-basis: 0; min-width: 0; }
-  .ost-chapters button {
-    position: relative; width: 100%; height: 34px; padding: 0 0 0 6px;
-    border: 0; border-top: 2px solid var(--o-fg); background: transparent; color: var(--o-fg);
-    font: inherit; text-align: left; cursor: pointer; overflow: hidden;
-  }
-  .ost-chapters__fill {
-    position: absolute; left: 0; top: -2px; height: 6px; width: 100%;
-    background: var(--o-accent); transform-origin: left; transform: scaleX(0);
-  }
-  .ost-chapters__lbl { position: relative; display: block; padding-top: 8px; white-space: nowrap; font-size: 0.64rem; }
-  .ost-chapters__lbl b { font-weight: 600; color: var(--o-dim); }
-  .ost-chapters li.is-now button { border-top-color: var(--o-accent); }
-  .ost-chapters li.is-now .ost-chapters__lbl { color: var(--o-accent); }
-  .ost-chapters button:hover .ost-chapters__lbl { color: var(--o-accent); }
-  .ost-chapters button:focus-visible { outline: 2px solid var(--o-accent); outline-offset: 2px; }
-
-  .ost-ctl { display: flex; align-items: center; gap: clamp(0.6rem, 1.6vw, 1.6rem); flex-wrap: wrap; }
-  .ost-play {
-    width: 46px; height: 46px; border-radius: 50%; border: 0; cursor: pointer;
-    background: var(--o-fg); color: var(--o-bg); display: grid; place-items: center;
-  }
-  .ost-play svg { width: 18px; height: 18px; fill: currentColor; }
-  .ost-play .i-pause { display: none; }
-  .ost[data-state='play'] .ost-play .i-pause { display: inline; }
-  .ost[data-state='play'] .ost-play .i-play { display: none; }
-  .ost-time b, .ost-bar b { font-weight: 600; color: var(--o-fg); font-variant-numeric: tabular-nums; }
-  .ost-time, .ost-bar { color: var(--o-dim); }
-  .ost-beats { display: inline-flex; gap: 6px; }
-  .ost-beats i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--o-fg); }
-  .ost-beats i.on { background: var(--o-hot); border-color: var(--o-hot); }
-  .ost-beats i.on:first-child { background: var(--o-accent); border-color: var(--o-accent); }
-  .ost-vu { display: inline-flex; align-items: flex-end; gap: 2px; height: 22px; }
-  .ost-vu i { width: 4px; height: 100%; background: var(--o-fg); transform-origin: bottom; transform: scaleY(0.08); }
-  .ost-vu i:nth-child(n + 12) { background: var(--o-hot); }
-  .ost-mute {
-    margin-left: auto; border: 1.5px solid var(--o-fg); background: transparent; color: var(--o-fg);
-    font: inherit; padding: 0.45rem 0.8rem; border-radius: 999px; cursor: pointer; letter-spacing: 0.14em;
-  }
-  .ost-mute b { color: var(--o-accent); }
-  .ost-mute[aria-pressed='true'] b { color: var(--o-dim); }
-
-  .ost-wipe {
-    position: absolute; z-index: 9; top: -10%; bottom: -10%; left: 0; width: 38vw;
-    background: var(--o-accent);
-    transform: translateX(-250%) skewX(-14deg);
-    visibility: hidden;
-    pointer-events: none;
-  }
-  .ost-banner {
-    position: absolute; z-index: 10; left: 0; right: 0; top: 50%;
-    transform: translateY(-50%);
-    text-align: center; pointer-events: none;
-    font-family: var(--o-jp); font-weight: 900; font-size: clamp(2.4rem, 9vw, 7.5rem);
-    line-height: 1; color: var(--o-fg); opacity: 0;
-  }
-  .ost-banner small { display: block; font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 0.8rem; letter-spacing: 0.4em; margin-top: 0.8rem; color: var(--o-accent); }
-  .ost-banner.is-dot { font-family: var(--o-dot); font-weight: 400; color: #f7ff3c; text-shadow: 4px 0 #ff3fa4, -4px 0 #3cf2ff; }
-
-  .ost-stage.is-glitch .ost-top, .ost-stage.is-glitch .ost-bottom { animation: ost-jit 0.09s steps(2) 5; }
-  @keyframes ost-jit {
-    0% { transform: translate(3px, -1px); filter: drop-shadow(3px 0 #ff3fa4) drop-shadow(-3px 0 #3cf2ff); }
-    100% { transform: translate(-2px, 1px); }
-  }
-
-  .ost-end {
-    position: absolute; inset: 0; z-index: 12;
-    display: grid; place-content: center; justify-items: center; gap: 0.8rem; text-align: center;
-    background: var(--o-bg);
-  }
-  .ost-end[hidden] { display: none; }
-  .ost-end__ja { margin: 0; font-weight: 900; font-size: clamp(3.4rem, 13vw, 10rem); line-height: 1; }
-  .ost-end__en { margin: 0; letter-spacing: 0.4em; color: var(--o-dim); }
-  .ost-end__ctl { display: flex; gap: 1rem; margin-top: 1.2rem; flex-wrap: wrap; justify-content: center; }
-  .ost-end__ctl > * {
-    font: inherit; letter-spacing: 0.16em; padding: 0.8rem 1.3rem; border-radius: 999px; cursor: pointer;
-    border: 1.5px solid var(--o-fg); background: transparent; color: var(--o-fg);
-  }
-  .ost-end__ctl > button { background: var(--o-accent); border-color: var(--o-accent); color: #fff; }
-
-  /* ---------------- gate / jacket ---------------- */
-  .ost-gate {
-    position: absolute; inset: 0; z-index: 20;
-    background: #f1ece2; color: #0d0d0e;
-    display: grid;
-    grid-template-columns: clamp(56px, 6vw, 88px) auto 1fr auto;
-    grid-template-rows: 1fr auto auto;
-    column-gap: clamp(16px, 3vw, 48px);
-    padding: clamp(18px, 3vw, 44px) clamp(18px, 3vw, 44px) clamp(18px, 3vw, 40px) 0;
-    overflow: hidden;
-  }
-  .ost-gate[hidden] { display: none; }
-  .gate-grid {
-    position: absolute; inset: 0; pointer-events: none;
-    background-image: linear-gradient(90deg, rgba(13, 13, 14, 0.07) 1px, transparent 1px), linear-gradient(rgba(13, 13, 14, 0.05) 1px, transparent 1px);
-    background-size: calc(100% / 12) 100%, 100% 48px;
-  }
-  .ost-gate .crop { position: absolute; width: 22px; height: 22px; }
-  .ost-gate .crop--tl { top: 12px; right: 12px; border-top: 1.5px solid #0d0d0e; border-right: 1.5px solid #0d0d0e; }
-  .ost-gate .crop--br { bottom: 12px; right: 12px; border-bottom: 1.5px solid #0d0d0e; border-right: 1.5px solid #0d0d0e; }
-  .gate-obi {
-    grid-row: 1 / -1; grid-column: 1;
-    margin: calc(-1 * clamp(18px, 3vw, 44px)) 0 calc(-1 * clamp(18px, 3vw, 40px));
-    background: #2742f0; color: #fff;
-    writing-mode: vertical-rl;
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 1.4rem 0; letter-spacing: 0.2em; font-size: 0.72rem;
-    position: relative; z-index: 1;
-  }
-  .gate-obi__t { font-weight: 900; font-size: clamp(1.2rem, 2.2vw, 1.8rem); letter-spacing: 0.3em; }
-  .gate-obi__s { font-weight: 700; background: #e8a31a; color: #0d0d0e; padding: 0.7rem 0.2rem; letter-spacing: 0.15em; }
-  .gate-obi__p { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 1.1rem; text-orientation: upright; letter-spacing: 0; }
-
-  .gate-title { grid-column: 2 / 4; grid-row: 1; margin: 0; display: flex; gap: clamp(16px, 3vw, 48px); align-items: flex-start; position: relative; z-index: 1; min-height: 0; }
-  .gate-title__ja {
-    writing-mode: vertical-rl;
-    font-weight: 900; font-size: clamp(3rem, 10.2vh, 8.4rem); line-height: 1;
-    letter-spacing: -0.02em;
-    display: block;
-    white-space: nowrap;
-    /* an orthogonal (vertical) flow inside a flex row inside a grid row does not
-       report its height reliably; five characters at line-height 1 is 5em */
-    height: 4.96em;
-    flex: none;
-  }
-  .gate-title__ja .gch { display: inline-block; }
-  .gate-title__sub {
-    writing-mode: vertical-rl; font-weight: 700; font-size: clamp(0.72rem, 1.4vh, 0.95rem); letter-spacing: 0.3em;
-    color: rgba(13, 13, 14, 0.62); border-left: 1.5px solid #0d0d0e; padding-left: 0.6rem;
-  }
-  .gate-title__en {
-    display: grid; align-self: end;
-    font-family: 'Stack Sans Headline', 'Space Grotesk', sans-serif;
-    font-size: clamp(2.6rem, min(8.4vw, 12vh), 8.6rem); line-height: 0.86; letter-spacing: -0.02em; text-transform: uppercase;
-  }
-  .gate-title__en .gl { display: block; overflow: hidden; }
-  .gate-title__en .gl--o { color: transparent; -webkit-text-stroke: 2px #0d0d0e; font-size: 0.62em; margin-top: 0.12em; }
-
-  .gate-spec {
-    grid-column: 4; grid-row: 1; align-self: start; margin: 0; position: relative; z-index: 1;
-    display: grid; gap: 0.45rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.12em;
-    border-top: 2px solid #0d0d0e; padding-top: 0.7rem; min-width: 12rem;
-  }
-  .gate-spec div { display: grid; grid-template-columns: 5.5rem auto; border-bottom: 1px solid rgba(13, 13, 14, 0.14); padding-bottom: 0.4rem; }
-  .gate-spec dt { color: rgba(13, 13, 14, 0.5); }
-  .gate-spec dd { margin: 0; font-weight: 600; }
-
-  .gate-code { grid-column: 2 / -1; grid-row: 2; position: relative; margin-top: 1rem; z-index: 1; }
-  .gate-code__bars { display: flex; align-items: flex-end; gap: 1px; height: clamp(34px, 7vh, 64px); }
-  .gate-code__bars i { flex: 1; background: #0d0d0e; transform-origin: bottom; }
-  .gate-code__bars i.is-chorus { background: #2742f0; }
-  .gate-code__bars i.is-chip { background: #ff3fa4; }
-  .gate-code__bars i.is-lv { background: #e8a31a; }
-  .gate-code__lbl { position: relative; height: 1.1rem; font-family: 'JetBrains Mono', monospace; font-size: 0.58rem; color: rgba(13, 13, 14, 0.55); }
-  .gate-code__lbl span { position: absolute; top: 0.2rem; border-left: 1px solid #0d0d0e; padding-left: 3px; }
-  .gate-code__cap { position: absolute; right: 0; top: -1.2rem; font-family: 'JetBrains Mono', monospace; font-size: 0.58rem; letter-spacing: 0.14em; color: rgba(13, 13, 14, 0.55); }
-
-  .gate-go { grid-column: 2 / -1; grid-row: 3; display: flex; align-items: center; gap: clamp(16px, 3vw, 40px); margin-top: 0.8rem; position: relative; z-index: 2; }
-  .gate-play { position: relative; width: clamp(112px, 15vh, 150px); aspect-ratio: 1; border: 0; background: none; padding: 0; cursor: pointer; color: #0d0d0e; flex: none; }
-  .gate-play__ring { position: absolute; inset: 0; width: 100%; height: 100%; animation: ost-spin 14s linear infinite; }
-  .gate-play__ring text { font-family: 'JetBrains Mono', 'OST JP', monospace; font-size: 13.6px; letter-spacing: 0.1em; fill: currentColor; font-weight: 600; }
-  .gate-play__core {
-    position: absolute; inset: 22%; border-radius: 50%; background: #2742f0; color: #fff;
-    display: grid; place-items: center; transition: transform 0.4s var(--ease), background 0.3s;
-  }
-  .gate-play__core svg { width: 34%; fill: currentColor; margin-left: 6%; }
-  .gate-play:hover .gate-play__core, .gate-play:focus-visible .gate-play__core { transform: scale(1.1); background: #0d0d0e; }
-  .gate-play:focus-visible { outline: 2px solid #2742f0; outline-offset: 4px; border-radius: 50%; }
-  @keyframes ost-spin { to { transform: rotate(360deg); } }
-  .gate-go__side { display: grid; gap: 0.55rem; justify-items: start; font-family: 'JetBrains Mono', monospace; font-size: 0.68rem; letter-spacing: 0.14em; }
-  .gate-load { color: #2742f0; font-weight: 600; }
-  .gate-muted { font: inherit; letter-spacing: inherit; background: none; border: 0; border-bottom: 1.5px solid #0d0d0e; padding: 0.2rem 0; cursor: pointer; color: #0d0d0e; }
-  .gate-muted .ost-jp, .gate-muted { font-family: 'JetBrains Mono', 'OST JP', monospace; }
-  .gate-muted:hover { color: #2742f0; border-color: #2742f0; }
-  .gate-hint { color: rgba(13, 13, 14, 0.5); font-size: 0.6rem; }
-
-  .gate-sticker {
-    position: absolute; z-index: 3; right: clamp(24px, 4vw, 64px); top: 42%;
-    width: clamp(78px, 9vw, 112px); aspect-ratio: 1;
-    display: grid; place-content: center; text-align: center;
-    background: #e8a31a; color: #0d0d0e;
-    clip-path: polygon(50% 0%, 61% 12%, 77% 5%, 80% 21%, 96% 23%, 90% 38%, 100% 50%, 90% 62%, 96% 77%, 80% 79%, 77% 95%, 61% 88%, 50% 100%, 39% 88%, 23% 95%, 20% 79%, 4% 77%, 10% 62%, 0% 50%, 10% 38%, 4% 23%, 20% 21%, 23% 5%, 39% 12%);
-    font-family: 'Stack Sans Headline', 'Space Grotesk', sans-serif; font-size: clamp(1rem, 1.6vw, 1.4rem); line-height: 1;
-    transform: rotate(12deg);
-    animation: ost-wiggle 2.4s ease-in-out infinite;
-  }
-  .gate-sticker small { font-family: var(--o-jp); font-weight: 900; font-size: 0.55em; margin-top: 0.25em; }
-  @keyframes ost-wiggle { 50% { transform: rotate(4deg) scale(1.06); } }
-  .gate-stamp { position: absolute; z-index: 3; right: clamp(20px, 3vw, 44px); bottom: clamp(20px, 4vh, 44px); width: clamp(64px, 8vw, 104px); }
-  .gate-stamp img { width: 100%; height: auto; display: block; }
-
-  @media (max-width: 860px), (max-aspect-ratio: 1/1) {
-    .ost-gate {
-      grid-template-columns: 44px 1fr;
-      grid-template-rows: repeat(4, max-content);
-      align-content: start;
-      column-gap: 16px;
-      row-gap: 1.4rem;
-      overflow-y: auto;
-    }
-    .gate-obi { font-size: 0.6rem; }
-    .gate-obi__t { font-size: 1.1rem; }
-    .gate-title { min-height: max-content; grid-column: 2; grid-row: 1; display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: end; }
-    .gate-title__ja { font-size: min(9.4vh, 16vw); }
-    .gate-title__en { font-size: clamp(1.9rem, 9.6vw, 3.4rem); align-self: flex-end; }
-    .gate-title__sub {
-      grid-column: 1 / -1; grid-row: 2;
-      writing-mode: horizontal-tb; border-left: 0; border-top: 1.5px solid #0d0d0e;
-      padding: 0.5rem 0 0; letter-spacing: 0.12em;
-    }
-    .gate-spec { grid-column: 2; grid-row: 4; min-width: 0; }
-    .gate-code { grid-column: 2; grid-row: 3; margin-top: 0.6rem; }
-    .gate-code__lbl span:nth-child(n + 2):nth-child(-n + 4) { display: none; }
-    .gate-go { grid-column: 2; grid-row: 2; flex-wrap: nowrap; margin-top: 0; gap: 14px; }
-    .gate-play { width: 104px; }
-    .gate-hint { display: none; }
-    .gate-sticker { right: 14px; top: 14px; width: 70px; }
-    .gate-stamp { display: none; }
-  }
-  @media (max-width: 720px) {
-    .ost-top { grid-template-columns: 1fr auto; }
-    .ost-sec { grid-column: 1 / -1; grid-row: 2; }
-    .ost-chord { grid-column: 2; grid-row: 1; }
-    .ost-side { display: none; }
-    .ost-chapters__lbl .ost-jp { display: none; }
-    .ost-vu, .ost-bar { display: none; }
-    .ost-flower { width: 90vmin; height: 90vmin; }
-    .ost-akiba { top: 176px; font-size: 0.66rem; }
-    .ost-akiba__row { gap: 0.4rem; }
-  }
-
-  /* ---------------- liner notes ---------------- */
-  .ost-notes {
-    position: relative;
-    background: #f1ece2; color: #0d0d0e;
-    padding: clamp(56px, 9vw, 140px) clamp(16px, 5vw, 80px) clamp(56px, 8vw, 120px);
-    border-top: 2px solid #0d0d0e;
-  }
-  .notes-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); gap: 2rem 4rem; align-items: end; margin-bottom: clamp(32px, 5vw, 72px); }
-  .notes-k { grid-column: 1 / -1; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.24em; color: rgba(13, 13, 14, 0.55); }
-  .notes-head h2 { margin: 0; font-weight: 900; font-size: clamp(2.6rem, 7vw, 6rem); line-height: 0.95; }
-  .notes-head h2 em { display: block; font-family: 'Fraunces', serif; font-style: italic; font-weight: 400; font-size: 0.42em; color: #2742f0; margin-top: 0.25em; }
-  .notes-lede { margin: 0; display: grid; gap: 0.8rem; font-size: 0.95rem; line-height: 1.8; }
-  .notes-lede > span:last-child { font-family: 'Fraunces', serif; color: rgba(13, 13, 14, 0.7); }
-  .notes-list { list-style: none; margin: 0; padding: 0; border-top: 2px solid #0d0d0e; }
-  .notes-list li { border-bottom: 1px solid rgba(13, 13, 14, 0.18); }
-  .notes-list button {
-    width: 100%; display: grid; grid-template-columns: 4.5rem 6rem 7.5rem 10rem 1fr; gap: 1rem; align-items: baseline;
-    padding: 1.05rem 0; background: none; border: 0; text-align: left; color: inherit; font: inherit; cursor: pointer;
-    transition: background 0.25s var(--ease), padding 0.35s var(--ease);
-  }
-  .notes-list button:hover, .notes-list button:focus-visible { background: rgba(39, 66, 240, 0.07); padding-left: 0.8rem; }
-  .nl-t, .nl-b, .nl-en { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; letter-spacing: 0.14em; }
-  .nl-t { font-weight: 600; color: #2742f0; }
-  .nl-b, .nl-en { color: rgba(13, 13, 14, 0.55); }
-  .nl-ja { font-weight: 900; font-size: 1.35rem; }
-  .nl-d { display: grid; gap: 0.2rem; font-size: 0.9rem; line-height: 1.6; }
-  .nl-d > span:last-child { font-family: 'Fraunces', serif; color: rgba(13, 13, 14, 0.62); }
-  .notes-credits { margin: clamp(40px, 6vw, 80px) 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.4rem 3rem; }
-  .notes-credits div { border-top: 1.5px solid #0d0d0e; padding-top: 0.6rem; }
-  .notes-credits dt { font-family: 'JetBrains Mono', monospace; font-size: 0.66rem; letter-spacing: 0.2em; color: rgba(13, 13, 14, 0.55); }
-  .notes-credits dd { margin: 0.35rem 0 0; font-size: 0.92rem; line-height: 1.55; }
-  .notes-credits small { color: rgba(13, 13, 14, 0.55); }
-  @media (max-width: 860px) {
-    .notes-head { grid-template-columns: 1fr; }
-    .notes-list button { grid-template-columns: 3.4rem 1fr; }
-    .nl-b, .nl-en { display: none; }
-    .nl-d { grid-column: 2; }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .gate-play__ring, .gate-sticker, .ost-akiba__stage { animation: none; }
+  @keyframes ost-vt-shut {
+    from { clip-path: circle(150vmax at 50% 50%); }
+    to { clip-path: circle(0 at var(--scan-x, 50%) var(--scan-y, 50%)); }
   }
 </style>
 
-<script>
-  import { initOst } from '../scripts/ost/main';
-  initOst();
-</script>
+<style>
+  /* Sky colours are registered so the gradient can glide between movements. */
+  @property --sky-a { syntax: '<color>'; inherits: true; initial-value: #141820; }
+  @property --sky-b { syntax: '<color>'; inherits: true; initial-value: #0c0c0d; }
+
+  .ost {
+    --sky-a: #121a33;
+    --sky-b: #07080f;
+    transition: --sky-a 2.4s var(--ease), --sky-b 2.4s var(--ease);
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+  }
+  .ost[data-state='key'] [data-view='list'],
+  .ost[data-state='list'] [data-view='key'] { display: none; }
+
+  .ost__langs {
+    position: fixed;
+    top: var(--chrome-top, 4.2rem);
+    right: clamp(0.6rem, 2vw, 1.4rem);
+    z-index: 40;
+    display: flex;
+    gap: 0.25rem;
+  }
+  .ost__langs button {
+    padding: 0.3rem 0.55rem;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    border: 1px solid var(--line);
+    color: var(--fg-dim);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+  }
+  .ost__langs button[aria-pressed='true'] { color: var(--fg); border-color: var(--accent); }
+
+  /* the night behind both views */
+  .ost__sky {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(120% 80% at 70% 0%, var(--sky-a), transparent 70%),
+      linear-gradient(180deg, var(--sky-a), var(--sky-b));
+  }
+  .ost__stars {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+  }
+
+  /* ---------------- KEY ---------------- */
+  .ost__key {
+    min-height: 100svh;
+    display: grid;
+    align-items: center;
+    padding: calc(var(--topbar-h, 3.6rem) + clamp(1rem, 4vh, 3rem)) var(--pad) clamp(2rem, 6vh, 4rem);
+  }
+  .ost__keyGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: clamp(2rem, 5vw, 5rem);
+    align-items: center;
+    max-width: 1240px;
+    width: 100%;
+    margin: 0 auto;
+  }
+  .ost__kcStage {
+    --kc-w: 46cqi;
+    --kc-chain: 16cqi;
+    aspect-ratio: 0.92;
+    width: min(100%, 34rem);
+    justify-self: center;
+  }
+  .ost__keyInfo { display: grid; gap: 1.1rem; justify-items: start; }
+  .ost__kicker { font-size: 0.62rem; letter-spacing: 0.18em; color: #8fb2ff; }
+  .ost__title { display: grid; gap: 0.5rem; line-height: 1; view-transition-name: ost-title; }
+  .ost__titleJa {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(3rem, 7.5vw, 6.2rem);
+    letter-spacing: 0.02em;
+    line-height: 1.05;
+    color: #f4f1ea;
+    text-shadow: 0 0 40px rgba(143, 178, 255, 0.35);
+  }
+  .ost__titleEn { font-size: clamp(0.72rem, 1.2vw, 0.9rem); letter-spacing: 0.62em; color: var(--fg-dim); }
+  .ost__lede { max-width: 38ch; color: var(--fg-dim); font-size: clamp(0.95rem, 1.4vw, 1.08rem); line-height: 1.7; }
+  .ost__scanBtn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8em;
+    margin-top: 0.4rem;
+    padding: 0.9em 1.7em;
+    border: 1px solid rgba(143, 178, 255, 0.6);
+    border-radius: 999px;
+    background: rgba(39, 66, 240, 0.18);
+    color: #f4f1ea;
+    font-size: 0.74rem;
+    letter-spacing: 0.22em;
+    cursor: pointer;
+    transition: background 0.25s var(--ease), border-color 0.25s var(--ease);
+  }
+  .ost__scanBtn:hover { background: var(--accent); border-color: var(--accent); }
+  /* a tiny viewfinder glyph */
+  .ost__scanIcon {
+    width: 1.1em;
+    height: 1.1em;
+    background:
+      linear-gradient(currentColor, currentColor) 0 0 / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 0 / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 0 / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 0 / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 0 100% / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 0 100% / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 100% / 35% 2px no-repeat,
+      linear-gradient(currentColor, currentColor) 100% 100% / 2px 35% no-repeat,
+      linear-gradient(currentColor, currentColor) 50% 50% / 100% 1px no-repeat;
+  }
+  .ost__scanHint { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--fg-faint); }
+
+  /* the viewfinder: four corners that close on the code, and a reading line */
+  .ost__finder {
+    position: fixed;
+    left: var(--fx, 0);
+    top: var(--fy, 0);
+    width: var(--fw, 0);
+    height: var(--fh, 0);
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0;
+    scale: 1.8;
+    transition: opacity 0.18s linear, scale 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .ost__finder.is-on { opacity: 1; scale: 1; }
+  .ost__finder > span {
+    position: absolute;
+    width: 22%;
+    height: 45%;
+    border: 2px solid #8fb2ff;
+    filter: drop-shadow(0 0 6px rgba(143, 178, 255, 0.8));
+  }
+  .ost__finder > span:nth-child(1) { left: -8%; top: -30%; border-right: 0; border-bottom: 0; }
+  .ost__finder > span:nth-child(2) { right: -8%; top: -30%; border-left: 0; border-bottom: 0; }
+  .ost__finder > span:nth-child(3) { left: -8%; bottom: -30%; border-right: 0; border-top: 0; }
+  .ost__finder > span:nth-child(4) { right: -8%; bottom: -30%; border-left: 0; border-top: 0; }
+  .ost__finderLine {
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    left: 0;
+    width: 2px;
+    background: #8fb2ff;
+    box-shadow: 0 0 12px 3px rgba(143, 178, 255, 0.7);
+    opacity: 0;
+  }
+  .ost__finder.is-reading .ost__finderLine { animation: ost-read 0.5s cubic-bezier(0.45, 0, 0.55, 1) both; }
+  @keyframes ost-read {
+    0% { left: 0; opacity: 1; }
+    100% { left: 100%; opacity: 1; }
+  }
+
+  /* ---------------- LIST: player ---------------- */
+  .ost__plHead {
+    position: relative;
+    /* the site header is fixed over the page */
+    padding: calc(var(--topbar-h, 3.6rem) + clamp(1rem, 3vh, 2rem)) var(--pad) clamp(3rem, 8vh, 5rem);
+    max-width: calc(1240px + var(--pad) * 2);
+    margin: 0 auto;
+    min-height: calc(92svh - var(--topbar-h, 0px));
+  }
+  .ost__plTop { display: flex; align-items: center; gap: 1.2rem; margin-bottom: clamp(1.5rem, 4vh, 3rem); }
+  .ost__toKey {
+    padding: 0.55em 1em;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: none;
+    color: var(--fg-dim);
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+  }
+  .ost__toKey:hover { color: var(--fg); border-color: var(--accent); }
+  .ost__scanned { font-size: 0.6rem; letter-spacing: 0.2em; color: #7be0a0; opacity: 0; }
+  .ost[data-fresh] .ost__scanned { animation: ost-scanned 2.4s ease both; }
+  @keyframes ost-scanned { 0%, 100% { opacity: 0; } 12%, 70% { opacity: 1; } }
+
+  .ost__plGrid {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(1.5rem, 4vw, 4rem);
+    align-items: center;
+  }
+  .ost__plArt {
+    width: min(100%, 26rem);
+    height: auto;
+    aspect-ratio: 1;
+    justify-self: center;
+    border-radius: 14px;
+    box-shadow: 0 30px 80px -30px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(255, 255, 255, 0.12);
+    view-transition-name: ost-art;
+  }
+  .ost__plInfo { display: grid; gap: 1rem; }
+  .ost__title--list .ost__titleJa { font-size: clamp(2.4rem, 5.5vw, 4.4rem); }
+
+  .ost__transport { display: flex; align-items: center; gap: 1.1rem; margin-top: 0.4rem; }
+  .ost__play {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7em;
+    padding: 0.85em 1.6em;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.72rem;
+    letter-spacing: 0.16em;
+    cursor: pointer;
+    transition: background 0.25s var(--ease), transform 0.2s var(--ease);
+  }
+  .ost__play:hover { background: #3b55ff; }
+  .ost__play:active { transform: scale(0.97); }
+  .ost__playIcon {
+    width: 0.7em;
+    height: 0.8em;
+    background: currentColor;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+  [aria-pressed='true'] > .ost__playIcon {
+    clip-path: polygon(0 0, 36% 0, 36% 100%, 0 100%, 0 0, 64% 0, 100% 0, 100% 100%, 64% 100%, 64% 0);
+  }
+  .ost__time { font-size: 0.7rem; letter-spacing: 0.12em; color: var(--fg-dim); }
+
+  .ost__scrub { position: relative; height: 26px; cursor: pointer; touch-action: none; outline: none; }
+  .ost__scrub::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 2px;
+    background: var(--line-strong);
+  }
+  .ost__scrubFill {
+    position: absolute;
+    left: 0;
+    top: calc(50% - 1px);
+    height: 2px;
+    width: 100%;
+    background: linear-gradient(90deg, #8fb2ff, #e8a31a);
+    transform-origin: 0 50%;
+    transform: scaleX(var(--p, 0));
+  }
+  .ost__tick { position: absolute; top: calc(50% - 5px); width: 1px; height: 10px; background: rgba(244, 241, 234, 0.35); }
+  .ost__knob {
+    position: absolute;
+    top: calc(50% - 6px);
+    left: calc(var(--p, 0) * 100% - 6px);
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #f4f1ea;
+    box-shadow: 0 0 12px rgba(143, 178, 255, 0.7);
+  }
+  .ost__scrub:focus-visible .ost__knob { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .ost__now { min-height: 8.5rem; }
+  .ost__nowK { font-size: 0.6rem; letter-spacing: 0.2em; color: #e8a31a; }
+  .ost__nowName { margin-top: 0.35rem; font-family: var(--font-serif); font-size: clamp(1.5rem, 2.8vw, 2.2rem); line-height: 1.15; color: #f4f1ea; }
+  .ost__lyric { margin-top: 0.9rem; }
+  .ost__lyricJa { font-size: clamp(1.1rem, 2vw, 1.45rem); letter-spacing: 0.08em; line-height: 2.1; }
+  .ost__lyricJa :global(span) {
+    background: linear-gradient(90deg, #ffd27a calc(var(--k, 0) * 100%), rgba(244, 241, 234, 0.4) calc(var(--k, 0) * 100%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .ost__lyricJa :global(rt) { font-size: 0.5em; letter-spacing: 0.1em; color: rgba(244, 241, 234, 0.55); }
+  .ost__lyricTh { margin-top: 0.2rem; color: var(--fg-dim); font-size: 0.95rem; }
+
+  /* ---------------- LIST: songs + movements ---------------- */
+  .ost__notes { position: relative; padding: clamp(3.5rem, 9vh, 6rem) var(--pad); }
+  .ost__notesHead { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto 1.6rem; display: grid; gap: 0.4rem; }
+  .ost__notesK { font-size: 0.7rem; letter-spacing: 0.22em; color: var(--accent); }
+  .ost__notesHint { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--fg-dim); }
+  .ost__songs { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 0; list-style: none; }
+  .ost__songRow {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 0.4rem;
+    border-top: 2px solid var(--fg);
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .ost__songNo { font-size: 0.66rem; color: var(--accent); letter-spacing: 0.12em; }
+  .ost__songArt { width: 3.2rem; height: 3.2rem; border-radius: 6px; object-fit: cover; }
+  .ost__songTitle b { font-family: var(--font-display); font-weight: 900; font-size: 1.3rem; }
+  .ost__songTitle span { margin-left: 0.5em; font-size: 0.62rem; letter-spacing: 0.4em; color: var(--fg-dim); }
+  .ost__songLen { font-size: 0.66rem; color: var(--fg-dim); }
+  .ost__list {
+    margin: 0;
+    padding: 0 0 0 clamp(0rem, 4vw, 4.4rem);
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: clamp(1.5rem, 4vw, 3.5rem);
+  }
+  .ost__mv {
+    position: relative;
+    width: 100%;
+    display: grid;
+    grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+    gap: 0.2rem 1rem;
+    align-items: baseline;
+    padding: 1rem 0.2rem 1.1rem;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.3s var(--ease);
+  }
+  .ost__mv:hover { background: rgba(39, 66, 240, 0.05); }
+  .ost__mvNum { font-size: 1.4rem; color: var(--fg-faint); transition: color 0.3s var(--ease); }
+  .ost__mvBody { display: grid; gap: 0.25rem; }
+  .ost__mvName { font-family: var(--font-display); font-weight: 600; font-size: 1.02rem; }
+  .ost__mvSub { margin-left: 0.5em; font-family: var(--font-serif); font-weight: 400; font-size: 0.85em; color: var(--fg-dim); }
+  .ost__mvNote { color: var(--fg-dim); font-size: 0.9rem; line-height: 1.6; }
+  .ost__mvTime { font-size: 0.58rem; letter-spacing: 0.1em; color: var(--fg-faint); white-space: nowrap; }
+  .ost__mvBar {
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    height: 2px;
+    width: 100%;
+    background: var(--accent);
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+  }
+  .ost__mv.is-now .ost__mvNum { color: var(--accent); }
+  .ost__mv.is-now .ost__mvBar { transform: scaleX(var(--mp, 0)); }
+  .ost__mv.is-now .ost__mvTime::before { content: '▶ NOW  '; color: var(--accent); }
+
+  /* ---------------- MV ---------------- */
+  .ost__mvid {
+    padding: clamp(3.5rem, 9vh, 6rem) var(--pad);
+    max-width: calc(1240px + var(--pad) * 2);
+    margin: 0 auto;
+    display: grid;
+    gap: 0.6rem;
+  }
+  .ost__mvidK { font-size: 0.7rem; letter-spacing: 0.22em; color: #e8a31a; }
+  .ost__mvidNote { color: var(--fg-dim); font-size: 0.92rem; margin-bottom: 1rem; }
+  .ost__frame {
+    position: relative;
+    width: min(100%, 1080px);
+    aspect-ratio: 16 / 9;
+    border: 1px solid var(--line-strong);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+  }
+  .ost__frame :global(iframe) { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .ost__poster { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: pointer; }
+  .ost__poster img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 38%; filter: brightness(0.75); transition: filter 0.4s var(--ease); }
+  .ost__poster:hover img { filter: brightness(0.9); }
+  .ost__posterPlay {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 4.6rem;
+    height: 4.6rem;
+    translate: -50% -50%;
+    border-radius: 50%;
+    background: rgba(12, 12, 13, 0.6);
+    border: 1px solid rgba(244, 241, 234, 0.6);
+    backdrop-filter: blur(6px);
+  }
+  .ost__posterPlay::after {
+    content: '';
+    position: absolute;
+    left: 38%;
+    top: 30%;
+    width: 32%;
+    height: 40%;
+    background: #f4f1ea;
+    clip-path: polygon(0 0, 100% 50%, 0 100%);
+  }
+  .ost__posterK { position: absolute; left: 1rem; bottom: 0.9rem; font-size: 0.6rem; letter-spacing: 0.16em; color: #f4f1ea; }
+
+  .ost__credits {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: clamp(2rem, 5vh, 3rem) var(--pad);
+    border-top: 1px solid var(--line);
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-dim);
+  }
+  .ost__back:hover { color: var(--accent); }
+
+  .ost__mini {
+    position: fixed;
+    left: 50%;
+    bottom: max(1rem, env(safe-area-inset-bottom));
+    z-index: 50;
+    translate: -50% 0;
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.45rem 1.1rem 0.45rem 0.45rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: rgba(12, 12, 13, 0.82);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
+  .ost__mini[hidden] { display: none; }
+  .ost__miniBtn { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border: 0; border-radius: 50%; background: var(--accent); color: #fff; cursor: pointer; }
+  .ost__miniName { font-family: var(--font-serif); font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ost__miniTime { font-size: 0.62rem; letter-spacing: 0.1em; color: var(--fg-dim); }
+
+  @media (max-width: 900px) {
+    .ost__keyGrid,
+    .ost__plGrid { grid-template-columns: minmax(0, 1fr); }
+    .ost__kcStage { width: min(100%, 22rem); }
+    .ost__plArt { width: min(70%, 18rem); }
+    .ost__list { grid-template-columns: minmax(0, 1fr); padding-left: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ost { transition: none; }
+  }
+</style>

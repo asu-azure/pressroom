@@ -16,9 +16,12 @@ const musicRoutes = {
   name: 'pressroom-music-routes',
   hooks: {
     'astro:config:setup': ({ injectRoute }) => {
-      if (music) injectRoute({ pattern: '/ost', entrypoint: './src/routes/ost.astro' });
+      if (!music) return;
+      injectRoute({ pattern: '/ost', entrypoint: './src/routes/ost.astro' });
+      // the 扉の向こう moving score, kept unlisted (see the file's header)
+      injectRoute({ pattern: '/ost/tobira', entrypoint: './src/routes/ost-tobira.astro' });
     },
-    // public/ost/ holds the placeholder MP3; with music off it must not ship.
+    // public/ost/ holds the songs' MP3s; with music off they must not ship.
     // Removed from both the client dir and the Vercel static output, whichever
     // this hook runs before or after the adapter's copy.
     'astro:build:done': ({ dir }) => {
