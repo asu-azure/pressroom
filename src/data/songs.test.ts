@@ -46,15 +46,15 @@ describe('the song catalogue', () => {
         });
       });
 
-      it('points its highlight and room cues at real movements', () => {
-        const n = data.movements.length;
-        if (song.highlight != null) expect(song.highlight).toBeLessThan(n);
-        for (const c of song.roomCues ?? []) expect(c.movement).toBeLessThan(n);
+      it('points its highlight at a real movement', () => {
+        if (song.highlight != null) expect(song.highlight).toBeLessThan(data.movements.length);
       });
 
-      it('has one projector card per movement for the classroom', () => {
+      it('has one card per movement, and its small copy for the strip under the video', () => {
         const dir = join(root, 'public/ost', song.slug, 'cards');
-        expect(readdirSync(dir).filter((f) => f.endsWith('.webp'))).toHaveLength(data.movements.length);
+        const cards = readdirSync(dir).filter((f) => f.endsWith('.webp'));
+        expect(cards).toHaveLength(data.movements.length);
+        for (const f of cards) expect(existsSync(join(dir, 'thumb', f)), `thumb/${f}`).toBe(true);
       });
     });
   }

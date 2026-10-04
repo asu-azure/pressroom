@@ -691,10 +691,12 @@ and script for every song; the song arrives as the `#song-data` payload), two vi
    (`html[data-vt='scan']`) opens the playlist in a circle out of the scanned point while the
    printed art flies to the playlist cover (`ost-art`) and the title to its title (`ost-title`).
    `history.pushState('?scan=1')`, so Back returns to the keychain (`unscan` shuts the circle).
-3. **LIST** — the playlist: art, title, PLAY, scrubber with movement ticks, now playing (movement +
-   karaoke choir line: JA with ruby and a per-chunk wipe, TH under it), the song list opening onto
-   its 16 movements with liner notes (click seeks), the MV, the credits, the way back to the rack.
-   `?scan=1` renders this view server-side (the QR's landing) with a brief SCANNED flash.
+3. **LIST** — the playlist: a compact line (small cover, title, PLAY for the song alone, scrubber
+   with movement ticks), then **the MV, wide** (column width, never taller than 80svh), the 16
+   movement cards under it, now playing (movement + karaoke choir line: JA with ruby and a per-chunk
+   wipe, TH under it), the song list opening onto its 16 movements with liner notes (click seeks), the
+   credits, the way back to the rack. `?scan=1` renders this view server-side (the QR's landing) with
+   a brief SCANNED flash.
 
 - **Sky per movement** in the LIST view (the song's `moods`, registered `@property` colours); the KEY view stays
   night. Stars are one fixed 2D canvas; accents brighten it; in **XIV. Starfall** strong accents
@@ -702,20 +704,30 @@ and script for every song; the song arrives as the `#song-data` payload), two vi
 - Every word around it is author copy — the `ost` page group in `copyKeys.ts` (keychain, playlist
   header, liner notes, MV, credits), trilingual, previewable in the Studio. So the page is
   `prerender = false` + `loadCopy()` + `cacheShell()`, like `/asu`.
-- **MV**: click-to-load YouTube facade; `mv.youtube` in `songs.ts` is a **stand-in cut** — swap it and
-  the `ost.mvKicker` copy when the final MV is up. Either player pauses the other. A song with no
-  `mv` has no video section.
-- **The rabbit choir is gone** (Jun, 4 Oct). In its place, under the player: **the night classroom**
-  (`src/components/music/Classroom.astro` + `src/scripts/music/classroom.ts`). Seen from the back of a
-  dark classroom, the four friends (silhouettes from behind) watch a pull-down screen. ▶ MV loads a
-  YouTube IFrame API player on the screen (nothing from YouTube before that click); ♪ plays the MP3 and
-  the screen shows each movement's card (`public/ost/<slug>/cards/NN.webp`). The room's light, the
-  window and the chalkboard follow the movement; heads nod on the accents, each with its own lag; the
-  `roomCues` in `songs.ts` turn heads (XIV: to the window, where stars fall; XV: Sky and Time to each
-  other — a proposal). The MP3 and the video never play together. The SVG is placeholder art; the
-  classes listed at the top of the component are the contract for Asu's drawing.
+- **The MV is the page's big thing** (Jun, 4 Oct: the night classroom with the four silhouettes
+  "didn't work" and is gone, like the rabbit choir before it). Click-to-load: the poster is the MV's
+  title frame, and ▶ sits above the title lettered across its middle; nothing loads from YouTube
+  before that press. Then a YouTube IFrame API player (`src/scripts/music/youtube.ts`, youtube-nocookie)
+  and **the page's one clock follows the video**: ScoreClock eases toward the player's time
+  (`clock.toward`), which YouTube reports in steps, so between reports it runs on; after a seek it
+  holds a moment, because the player still reports the old place. So the cards, karaoke, scrubber,
+  sky, falling stars and mini transport all follow the video with no code of their own.
+  - **Two sources, never together** (`source` in `song.ts`): PLAY (`data-play-song`) is always the song
+    alone — pressed while the video plays, the video pauses and the MP3 goes on from the same moment;
+    pressing play inside the YouTube player takes over from the MP3 the same way. The mini
+    transport's button (`data-play-any`) pauses / resumes whichever is current. Seeks go to the
+    current one.
+  - **The card strip**: one card per movement (`public/ost/<slug>/cards/NN.webp`, the MV's own section
+    cards, and the 384×216 copies the strip loads, `cards/thumb/` — `node scripts/card-thumbs.mjs
+    <slug>`). The one playing is lit with a progress bar, and the strip scrolls itself to it unless the
+    visitor touched it in the last 4 s or the mouse is over it. A card before anything has played
+    starts **the video** there; afterwards it seeks whatever is current. The liner-notes entries do the
+    same but start the song.
+  - `mv.youtube` is the scheduled premiere (`XpEp6WpBBC8`) — it won't play before 10.10 21:00 JST. To
+    test the sync, swap in any embeddable id locally (`M7lc1UVf-VE`, the IFrame API's sample) and swap
+    it back. A song with no `mv` has no video, just the strip.
 - **Cover:** F2 of `music-repo/_work/cover_options` (Jun, 4 Oct) → `src/assets/ost/starfall-cover.jpg`;
-  the screen's poster is the MV's title frame (`starfall-screen.jpg`). The old Thai-lettered covers are
+  the video's poster is the MV's title frame (`starfall-screen.jpg`). The old Thai-lettered covers are
   gone from this branch.
 - The MP3 (9.9 MB) is `preload="metadata"`; the full download starts when a visitor reaches for PLAY.
   `?t=<sec>` starts the clock there. Mini transport appears when the player is out of view.

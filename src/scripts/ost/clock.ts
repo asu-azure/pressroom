@@ -43,8 +43,14 @@ export class ScoreClock {
   /** ease toward what the audio element says; call once per frame while it plays */
   follow(audio: HTMLAudioElement) {
     if (!this.playing || audio.paused) return;
-    const diff = audio.currentTime - this.now();
-    if (Math.abs(diff) > 0.08) this.set(audio.currentTime);
+    this.toward(audio.currentTime);
+  }
+
+  /** the same easing toward any player's reported time (the song page's YouTube video) */
+  toward(t: number) {
+    if (!this.playing) return;
+    const diff = t - this.now();
+    if (Math.abs(diff) > 0.08) this.set(t);
     else this.base += diff * 0.06;
   }
 }

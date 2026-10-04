@@ -10,17 +10,20 @@
  * The view is in the URL (?scan=1), so Back returns to the keychain and the QR
  * on the real keychain lands straight on the playlist.
  *
- * LIST view: one clock (ScoreClock, shared with /ost/tobira) follows the MP3 and
- * drives everything from the imported timeline — the movement on show, the lit
- * liner-notes entry, the choir line and its karaoke wipe, the sky colour, and
- * the stars, which in XIV. Starfall fall on the accents of the mix.
+ * LIST view: one clock (ScoreClock, shared with /ost/tobira) follows whichever is
+ * playing, the MP3 or the music video (scripts/music/youtube.ts), and drives
+ * everything from the imported timeline — the movement on show, the lit card
+ * under the video and liner-notes entry, the choir line and its karaoke wipe,
+ * the sky colour, and the stars, which in XIV. Starfall fall on the accents of
+ * the mix. The two never play together: either one starting stops the other,
+ * and the song carries on from the same moment.
  * Nothing plays until the visitor asks; if the audio fails the clock runs on.
  */
 import { ScoreClock } from './clock';
 import type { Mood } from '../../data/songs';
 import { dangle } from '../dangle';
 import { punch } from '../mv';
-import { initRoom } from '../music/classroom';
+import { mountMv, YT_PLAYING, type MvPlayer } from '../music/youtube';
 import { applyCopy, readCopyPayload } from '../../lib/siteCopyClient';
 import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../../lib/lang';
 
@@ -43,8 +46,6 @@ interface SongPayload {
   moods: Mood[];
   /** the movement whose strong accents launch falling stars, or -1 */
   highlight: number;
-  /** the night classroom's cues (songs.ts) */
-  roomCues: { movement: number; pose: 'window' | 'skyTime' }[];
   movements: { name: string; t: number }[];
   lyrics: Line[];
   hits: [number, number][];
@@ -68,7 +69,8 @@ export function initSongPage() {
 
   const audio = q<HTMLAudioElement>('[data-audio]');
   const kcStage = q('[data-kc-stage]');
-  const playBtns = [...root.querySelectorAll<HTMLButtonElement>('[data-play]')];
+  const songBtn = q<HTMLButtonElement>('[data-play-song]');
+  const anyBtn = q<HTMLButtonElement>('[data-play-any]');
   const playLabel = q('[data-play-label]');
   const timeEl = q('[data-time]');
   const scrub = q('[data-scrub]');
@@ -78,6 +80,8 @@ export function initSongPage() {
   const lyricJa = q('[data-lyric-ja]');
   const lyricTh = q('[data-lyric-th]');
   const entries = [...root.querySelectorAll<HTMLButtonElement>('[data-mv]')];
+  const strip = q('[data-cards]');
+  const cards = [...strip.querySelectorAll<HTMLButtonElement>('[data-card]')];
   const mini = q('[data-mini]');
   const miniName = q('[data-mini-name]');
   const miniTime = q('[data-mini-time]');
@@ -95,19 +99,27 @@ export function initSongPage() {
 
   audio.addEventListener('error', () => (audioOK = false));
 
-  // --- the night classroom (components/music/Classroom.astro): the MV on its screen -------------
-  // The MP3 and the video never play together: either one starting stops the other.
-  const roomEl = root.querySelector<HTMLElement>('[data-room]');
-  const room = roomEl
-    ? initRoom(roomEl, song, {
-        audioTime: () => clock.now(),
-        audioPlaying: () => clock.playing,
-        playAudio: () => play(),
-        onVideoPlay: () => {
-          if (clock.playing) pause();
-        },
-      })
-    : null;
+  // --- the music video: while it plays, the clock follows it instead of the MP3 -------------
+  const screen = root.querySelector<HTMLElement>('[data-screen]');
+  const video = song.mv; // { youtube id, offset: the song's 0:00 in the video }
+  const offset = video?.offset ?? 0;
+  let mv: MvPlayer | null = null;
+  let source: 'audio' | 'video' = 'audio';
+  // YouTube reports its time in steps (a few times a second): between reports it runs on
+  let ytSeen = -1;
+  let ytSeenAt = 0;
+  const videoTime = () => {
+    const r = mv!.time();
+    const at = performance.now();
+    if (r !== ytSeen) {
+      ytSeen = r;
+      ytSeenAt = at;
+    }
+    const run = mv!.state() === YT_PLAYING ? Math.min(1, (at - ytSeenAt) / 1000) : 0;
+    return Math.max(0, r + run - offset);
+  };
+  // right after a seek the player can still report the old place for a moment: hold the clock
+  let hold = { t: 0, until: 0 };
 
   // --- copy / language (same contract as /asu) ------------------------------
   const bundle = readCopyPayload();
@@ -208,6 +220,16 @@ export function initSongPage() {
     return i;
   };
 
+  // the strip keeps the card playing in view, unless the visitor is looking through it
+  let stripTouched = 0;
+  for (const ev of ['pointerdown', 'wheel', 'touchstart', 'keydown'] as const)
+    strip.addEventListener(ev, () => (stripTouched = performance.now()), { passive: true });
+  const showCard = (i: number, animate: boolean) => {
+    const c = cards[i];
+    if (!c || !listView() || performance.now() - stripTouched < 4000 || strip.matches(':hover')) return;
+    strip.scrollTo({ left: c.offsetLeft - (strip.clientWidth - c.offsetWidth) / 2, behavior: animate && !reduced ? 'smooth' : 'auto' });
+  };
+
   const setMovement = (i: number, animate: boolean) => {
     if (i === cur) return;
     cur = i;
@@ -222,6 +244,8 @@ export function initSongPage() {
       nowName.classList.add('is-in');
     }
     entries.forEach((e, k) => e.classList.toggle('is-now', k === i));
+    cards.forEach((c, k) => c.classList.toggle('is-now', k === i));
+    showCard(i, animate);
     paintSky();
   };
   // the playlist follows the song's moods; the keychain hangs in the night
@@ -289,24 +313,36 @@ export function initSongPage() {
     miniTime.textContent = fmt(t);
     const m0 = movements[cur].t;
     const m1 = movements[cur + 1]?.t ?? duration;
-    entries[cur]?.style.setProperty('--mp', ((t - m0) / (m1 - m0)).toFixed(4));
+    const mp = ((t - m0) / (m1 - m0)).toFixed(4);
+    entries[cur]?.style.setProperty('--mp', mp);
+    cards[cur]?.style.setProperty('--mp', mp);
   };
 
   // --- transport -----------------------------------------------------------------
-  const setPlaying = (on: boolean) => {
-    playBtns.forEach((b) => b.setAttribute('aria-pressed', String(on)));
-    playLabel.textContent = on ? 'PAUSE' : 'PLAY';
-    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = on ? 'playing' : 'paused';
+  // PLAY is the song alone; the mini transport's button is whatever is playing
+  const setPlaying = () => {
+    const songOn = clock.playing && source === 'audio';
+    songBtn.setAttribute('aria-pressed', String(songOn));
+    playLabel.textContent = songOn ? 'PAUSE' : 'PLAY';
+    anyBtn.setAttribute('aria-pressed', String(clock.playing));
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = clock.playing ? 'playing' : 'paused';
   };
 
   const frame = () => {
     raf = 0;
-    if (audioOK) clock.follow(audio);
+    if (source === 'video') {
+      if (mv?.ready && clock.playing) {
+        const vt = videoTime();
+        if (performance.now() > hold.until || Math.abs(vt - hold.t) < 1.5) clock.toward(vt);
+      }
+    } else if (audioOK) clock.follow(audio);
     let t = clock.now();
     if (t >= duration) {
       t = duration;
-      pause();
-      clock.set(0);
+      if (source === 'audio') {
+        pause();
+        clock.set(0);
+      }
     }
     // accents: sky glow everywhere, falling stars in XIV
     while (hitIdx < hits.length && hits[hitIdx][0] <= t) {
@@ -335,7 +371,14 @@ export function initSongPage() {
     if (hitIdx < 0) hitIdx = hits.length;
   };
 
+  /** the song alone (the MP3), from where the clock stands — a video playing stops there */
   function play() {
+    if (source === 'video') {
+      mv?.pause();
+      source = 'audio';
+      clock.stop();
+      if (clock.now() >= duration - 0.05) clock.set(0);
+    }
     started = true;
     audio.preload = 'auto';
     if (audioOK) {
@@ -346,55 +389,105 @@ export function initSongPage() {
       }
       audio.play().catch(() => (audioOK = false));
     }
-    room?.audioStarted(); // one player at a time: the video stops, the screen shows the cards
     clock.start();
     syncHits(clock.now());
-    setPlaying(true);
-    playBtns.forEach((b) => punch(b));
+    setPlaying();
+    punch(songBtn);
     kick();
   }
   function pause() {
     clock.stop();
     audio.pause();
-    setPlaying(false);
-    room?.wake();
+    if (source === 'video') mv?.pause();
+    setPlaying();
   }
-  function toggle() {
-    if (clock.playing) pause();
-    else play();
+
+  /** the music video, from `at` (song time): the player is made on the first press */
+  async function startVideo(at: number) {
+    if (!video || !screen) return;
+    if (source === 'audio' && clock.playing) {
+      clock.stop();
+      audio.pause();
+    }
+    source = 'video';
+    screen.dataset.on = '';
+    setPlaying();
+    if (mv) {
+      mv.seek(at + offset);
+      mv.play();
+      return;
+    }
+    mv = await mountMv(q('[data-video]'), video.youtube, at + offset, onVideo);
   }
+  function onVideo(state: number) {
+    if (state === YT_PLAYING) {
+      // the visitor may have pressed play inside the player itself: it takes over from the MP3
+      if (source === 'audio' && clock.playing) audio.pause();
+      source = 'video';
+      started = true;
+      clock.stop();
+      clock.set(videoTime());
+      clock.start();
+      syncHits(clock.now());
+      showMini();
+    } else if (source === 'video') {
+      // paused, buffering, ended: the clock stops where the video is
+      clock.stop();
+      if (mv?.ready) clock.set(Math.min(videoTime(), duration));
+    }
+    setPlaying();
+    kick();
+  }
+
   const seek = (t: number) => {
     t = Math.max(0, Math.min(duration - 0.05, t));
-    if (room?.seek(t)) return; // the video is the one playing: it takes the seek
     clock.set(t);
-    try {
-      audio.currentTime = t;
-    } catch {
-      /* not loaded yet — play() applies it */
+    if (source === 'video' && mv) {
+      mv.seek(t + offset);
+      hold = { t, until: performance.now() + 1200 };
+    } else {
+      try {
+        audio.currentTime = t;
+      } catch {
+        /* not loaded yet — play() applies it */
+      }
     }
     syncHits(t);
     update(t, true);
     drawSky(t);
   };
+  /** a press on a movement: there, in whatever is playing; nothing yet: the MV for a card, else the song */
+  const jump = (t: number, toVideo: boolean) => {
+    if (source === 'video') {
+      seek(t);
+      mv?.play();
+    } else if (!started && toVideo && video) {
+      seek(t);
+      void startVideo(t);
+    } else {
+      seek(t);
+      if (!clock.playing) play();
+    }
+  };
 
-  playBtns.forEach((b) => b.addEventListener('click', toggle));
+  songBtn.addEventListener('click', () => (clock.playing && source === 'audio' ? pause() : play()));
+  anyBtn.addEventListener('click', () => {
+    if (clock.playing) pause();
+    else if (source === 'video') mv?.play();
+    else play();
+  });
+  root.querySelector('[data-play-mv]')?.addEventListener('click', () => void startVideo(clock.now() >= duration - 0.05 ? 0 : clock.now()));
   // Loading starts when a visitor reaches for play, not with the page.
   const warm = () => (audio.preload = 'auto');
-  playBtns.forEach((b) => {
-    b.addEventListener('pointerenter', warm, { once: true });
-    b.addEventListener('focus', warm, { once: true });
-  });
+  songBtn.addEventListener('pointerenter', warm, { once: true });
+  songBtn.addEventListener('focus', warm, { once: true });
   audio.addEventListener('ended', () => {
     pause();
     seek(0);
   });
 
-  entries.forEach((e) =>
-    e.addEventListener('click', () => {
-      seek(+e.dataset.seek!);
-      if (!clock.playing) play();
-    }),
-  );
+  entries.forEach((e) => e.addEventListener('click', () => jump(+e.dataset.seek!, false)));
+  cards.forEach((c) => c.addEventListener('click', () => jump(+c.dataset.seek!, true)));
 
   // scrubber: pointer + keyboard
   const fromPointer = (e: PointerEvent) => {
@@ -418,7 +511,7 @@ export function initSongPage() {
     else if (e.key === 'ArrowLeft') seek(clock.now() - step);
     else if (e.key === 'Home') seek(0);
     else if (e.key === 'End') seek(duration - 1);
-    else if (e.key === ' ' || e.key === 'Enter') toggle();
+    else if (e.key === ' ' || e.key === 'Enter') anyBtn.click();
     else return;
     e.preventDefault();
   });
@@ -441,7 +534,7 @@ export function initSongPage() {
       album: song.album,
       artwork: art ? [{ src: new URL(art, location.href).href, sizes: '1000x1000', type: 'image/webp' }] : [],
     });
-    navigator.mediaSession.setActionHandler('play', play);
+    navigator.mediaSession.setActionHandler('play', () => (source === 'video' ? mv?.play() : play()));
     navigator.mediaSession.setActionHandler('pause', pause);
     navigator.mediaSession.setActionHandler('seekto', (d) => d.seekTime != null && seek(d.seekTime));
   }

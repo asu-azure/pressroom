@@ -121,8 +121,8 @@ export const SECTIONS: CopySection[] = [
 
   { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
   { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
-  { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the player.' },
-  { id: 'ostMv',      page: 'ost', label: 'The night classroom', note: 'The heading and note above the classroom, the buttons on its screen, and the chalk on its board.' },
+  { id: 'ostMv',      page: 'ost', label: 'The music video', note: 'The line above the video, the button on it, and the note under it.' },
+  { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the video.' },
   { id: 'ostCredits', page: 'ost', label: 'Credits', note: 'The closing lines of the page.' },
 
   { id: 'actFilm',    page: 'lookbook', label: 'Act I — Film', note: 'Letterboxed opening, four cycling photographs.' },
@@ -601,35 +601,25 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'ost.mvKicker', section: 'ostMv', label: 'Label', type: 'line',
-    hint: 'Above the classroom.',
-    defaults: { en: 'MUSIC VIDEO · PREMIERE 10.10 21:00 JST', th: 'มิวสิกวิดีโอ · ฉายรอบแรก 10.10 21:00 (เวลาญี่ปุ่น)', ja: 'ミュージックビデオ · 10.10 21:00 プレミア公開' },
+    hint: 'Above the video.',
+    defaults: { en: 'MUSIC VIDEO', th: 'มิวสิกวิดีโอ', ja: 'ミュージックビデオ' },
   },
   {
     key: 'ost.mvNote', section: 'ostMv', label: 'Note', type: 'line',
     defaults: {
-      en: 'A night classroom, the four of them watching. Press play on the screen; the room follows the song.',
-      th: 'ห้องเรียนตอนกลางคืน สี่คนนั่งดูอยู่ กดเล่นที่จอได้เลย ห้องจะเปลี่ยนไปตามเพลง',
-      ja: '夜の教室で、四人が見ている。スクリーンの再生を押すと、教室も曲に合わせて変わっていく。',
+      en: 'The cards and the words below follow the video. Press a card to go to its movement.',
+      th: 'การ์ดกับเนื้อเพลงข้างล่างจะเลื่อนตามวิดีโอ กดการ์ดใบไหนก็ข้ามไปท่อนนั้นได้',
+      ja: '下のカードと歌詞は、映像に合わせて進みます。カードを押すと、その楽章へ。',
     },
   },
   {
-    key: 'room.playMv', section: 'ostMv', label: 'Screen — play the video', type: 'line',
+    key: 'ost.mvPlay', section: 'ostMv', label: 'The button on the video', type: 'line',
     defaults: { en: 'WATCH THE MV', th: 'ดู MV', ja: 'MVを観る' },
   },
   {
-    key: 'room.audioOnly', section: 'ostMv', label: 'Screen — just the song', type: 'line',
-    hint: 'Plays the song alone; the screen shows each movement\'s card.',
+    key: 'ost.songOnly', section: 'ostList', label: 'Beside PLAY', type: 'line',
+    hint: 'PLAY plays the song alone, without the video (a video playing stops, the song goes on from there).',
     defaults: { en: 'JUST THE SONG', th: 'ฟังเพลงอย่างเดียว', ja: '曲だけ聴く' },
-  },
-  {
-    key: 'room.board', section: 'ostMv', label: 'Chalkboard before it starts', type: 'line',
-    hint: 'Latin letters look best in the chalk. Once the song plays, the board shows the movement.',
-    defaults: { en: 'NOW SHOWING', th: 'NOW SHOWING', ja: 'NOW SHOWING' },
-  },
-  {
-    key: 'room.boardNum', section: 'ostMv', label: 'Chalkboard, the big line', type: 'line',
-    hint: 'Above the line before it. Can be left empty.',
-    defaults: { en: 'XVI', th: 'XVI', ja: 'XVI' },
   },
   {
     key: 'ost.credits', section: 'ostCredits', label: 'Credit line', type: 'line',

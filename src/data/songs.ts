@@ -22,7 +22,7 @@ export interface Song {
   /** public path of the MP3 */
   audio?: string;
   /** stems in src/assets/ost/: the square cover (keychain print, playlist, share card, lock screen)
-   *  and the 16:9 picture the classroom's screen shows before anything plays */
+   *  and the 16:9 picture the video shows before anyone presses play */
   art?: { cover: string; poster: string };
   /** copy-key prefix for the song's own words (`ost` for STARFALL: its keys predate the catalogue) */
   copy?: string;
@@ -34,9 +34,6 @@ export interface Song {
   highlight?: number;
   /** the album name the lock screen shows (Media Session) */
   album?: string;
-  /** the night classroom's cues: in this movement the heads turn to the window, or Sky and Time
-   *  to each other (scripts/music/classroom.ts) */
-  roomCues?: { movement: number; pose: 'window' | 'skyTime' }[];
 }
 
 export const SONGS: Song[] = [
@@ -73,12 +70,6 @@ export const SONGS: Song[] = [
     ],
     highlight: 13, // XIV. Starfall
     album: '扉の向こうはヒマワリ畑 OST',
-    // a proposal for Jun to change: all four look out at the falling stars in XIV, and in
-    // XV. Sunrise Sky and Time turn to each other
-    roomCues: [
-      { movement: 13, pose: 'window' },
-      { movement: 14, pose: 'skyTime' },
-    ],
   },
   { slug: 'coming-1', status: 'coming' },
   { slug: 'coming-2', status: 'coming' },
