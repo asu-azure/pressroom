@@ -48,7 +48,7 @@ export const SONGS: Song[] = [
     copy: 'ost',
     // The MV as published (premiere 10 Oct 2026 21:00 JST). It starts on the song's own t = 0
     // (the final render's audio is v07i from its first sample), so the room needs no offset.
-    mv: { youtube: 'AFSvZn9lL0Q', offset: 0 },
+    mv: { youtube: 'dXiG141rI4w', offset: 0 },
     // Follows the MV's looks, darker for type.
     moods: [
       ['#241d16', '#0c0c0d', 'day'], // I     Prologue — memory
