@@ -3,11 +3,12 @@
   import { requireSession, watchSignOut } from '../../lib/authGuard';
   import Arranger from './Arranger.svelte';
   import PdfUploader from './PdfUploader.svelte';
+  import PreparedImport from './PreparedImport.svelte';
   import RichTextEditor from './RichTextEditor.svelte';
   import CoverCropper from './CoverCropper.svelte';
   import CharacterProfileEditor from './CharacterProfileEditor.svelte';
   import { toPageRec } from '../../lib/storagePaths';
-  import type { Work, PageRow, Chapter, Character, CoverCrop } from '../../lib/types';
+  import type { Work, PageRow, Chapter, Character, CoverCrop, BookFormat } from '../../lib/types';
 
   const CAST_COLORS = ['#2742f0', '#e8a31a', '#18c4d6', '#d6455f', '#6aa0ff', '#4caf7d', '#b06ad6'];
 
@@ -51,7 +52,29 @@
     cover_solo: true,
     tagsText: '',
     characters: [] as Character[],
+    // book info + series (supabase/book-info.sql)
+    book_lang: '',
+    translations: [] as string[],
+    formats: [] as BookFormat[],
+    release_label: '',
+    released_on: '', // YYYY-MM-DD, the first release (supabase/release-date.sql)
+    cwText: '', // content notes, one per line (Japanese items carry 、 — commas won't do)
+    series_title: '',
+    series_order: '',
+    series_kind: '' as '' | 'main' | 'side',
+    series_label: '',
   });
+
+  /** works.released_on exists (supabase/release-date.sql has been run). */
+  const hasReleaseDate = $derived(Boolean(work && 'released_on' in work));
+
+  /** Existing series names, so a second book joins the first by picking it. */
+  let seriesTitles = $state<string[]>([]);
+
+  /** Toggle a value in a list, keeping the order it was added in (formats read in that order). */
+  function toggleIn<T>(list: T[], v: T): T[] {
+    return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
+  }
 
   function addCharacter() {
     meta.characters = [
@@ -154,7 +177,19 @@
       cover_solo: work.cover_solo ?? true,
       tagsText: work.tags.join(', '),
       characters: (work.characters ?? []).map((c) => ({ ...c })),
+      book_lang: work.book_lang ?? '',
+      translations: [...(work.translations ?? [])],
+      formats: [...(work.formats ?? [])],
+      release_label: work.release_label ?? '',
+      released_on: work.released_on ?? '',
+      cwText: (work.content_warnings ?? []).join('\n'),
+      series_title: work.series_title ?? '',
+      series_order: work.series_order == null ? '' : String(work.series_order),
+      series_kind: work.series_kind ?? '',
+      series_label: work.series_label ?? '',
     };
+    const { data: titles } = await supabase.from('works').select('series_title').not('series_title', 'is', null);
+    seriesTitles = [...new Set((titles ?? []).map((r) => r.series_title as string))].sort();
     lockHint = work.password_hint ?? '';
   }
 
@@ -190,6 +225,18 @@
         characters: meta.characters
           .map((c) => ({ ...c, name: c.name.trim() }))
           .filter((c) => c.name),
+        book_lang: meta.book_lang || null,
+        translations: meta.translations.filter((c) => c !== meta.book_lang),
+        formats: meta.formats,
+        release_label: meta.release_label.trim() || null,
+        // only once release-date.sql has added the column (select * then carries
+        // it): naming a missing column would fail the whole save
+        ...(hasReleaseDate ? { released_on: meta.released_on || null } : {}),
+        content_warnings: meta.cwText.split('\n').map((t) => t.trim()).filter(Boolean),
+        series_title: meta.series_title.trim() || null,
+        series_order: meta.series_order.trim() === '' || !Number.isFinite(Number(meta.series_order)) ? null : Number(meta.series_order),
+        series_kind: meta.series_kind || null,
+        series_label: meta.series_label.trim() || null,
       })
       .eq('id', workId);
     if (err) {
@@ -238,6 +285,7 @@
   {:else if tab === 'pages'}
     <div class="we__pages">
       <PdfUploader {workId} {chapters} {pages} onDone={reload} />
+      <PreparedImport {workId} pageIds={pages.map((p) => p.id)} onDone={reload} />
       {#if pages.length || chapters.length}
         <Arranger
           {workId}
@@ -323,6 +371,93 @@
         <span class="mono">TAGS (COMMA-SEPARATED)</span>
         <input type="text" bind:value={meta.tagsText} placeholder="fantasy, one-shot, colour" />
       </label>
+
+      <!-- Book info — the overview's 奥付 row and content notes -->
+      <label class="we__field">
+        <span class="mono">BOOK LANGUAGE (WHAT THE PAGES ARE WRITTEN IN)</span>
+        <select bind:value={meta.book_lang}>
+          <option value="">—</option>
+          <option value="th">Thai · ไทย</option>
+          <option value="ja">Japanese · 日本語</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <div class="we__field">
+        <span class="mono">TRANSLATIONS READERS CAN SWITCH ON</span>
+        <div class="we__checks">
+          {#each [['ja', '日本語'], ['en', 'English'], ['th', 'ไทย']] as [code, name] (code)}
+            {#if code !== meta.book_lang}
+              <label class="we__check">
+                <input
+                  type="checkbox"
+                  checked={meta.translations.includes(code)}
+                  onchange={() => (meta.translations = toggleIn(meta.translations, code))}
+                />
+                <span class="mono">{name}</span>
+              </label>
+            {/if}
+          {/each}
+        </div>
+      </div>
+      <div class="we__field">
+        <span class="mono">FORMAT (SHOWN IN THE ORDER YOU TICK THEM)</span>
+        <div class="we__checks">
+          {#each [['manga', 'Manga 漫画'], ['novel', 'Novel 小説'], ['illust', 'Illustration']] as [code, name] (code)}
+            <label class="we__check">
+              <input
+                type="checkbox"
+                checked={meta.formats.includes(code as BookFormat)}
+                onchange={() => (meta.formats = toggleIn(meta.formats, code as BookFormat))}
+              />
+              <span class="mono">{name}</span>
+            </label>
+          {/each}
+        </div>
+      </div>
+      <label class="we__field">
+        <span class="mono">RELEASE (FREE TEXT — EVERY PRINTING, FIRST FIRST, JOINED BY ・)</span>
+        <input type="text" bind:value={meta.release_label} placeholder="2025年11月 Comic Avenue 10（初版）・2026年3月 Comic Square 9（再版）" />
+      </label>
+      <label class="we__field">
+        <span class="mono">FIRST RELEASE DATE / 初版 (ORDERS THE SHELF)</span>
+        {#if hasReleaseDate}
+          <input type="date" bind:value={meta.released_on} />
+        {:else}
+          <input type="date" disabled />
+          <span class="mono we__hint">RUN supabase/release-date.sql TO ENABLE</span>
+        {/if}
+      </label>
+      <label class="we__field we__field--wide">
+        <span class="mono">CONTENT NOTES / 内容に関する注意 (ONE PER LINE — SHOWN ABOVE THE READ BUTTON)</span>
+        <textarea rows="3" bind:value={meta.cwText} placeholder={'家庭内暴力\n自傷への言及'}></textarea>
+      </label>
+
+      <!-- Series — books sharing a series name link to each other -->
+      <label class="we__field we__field--wide">
+        <span class="mono">SERIES NAME (THE SAME NAME ON EACH BOOK JOINS THEM)</span>
+        <input type="text" bind:value={meta.series_title} list="we-series-titles" placeholder="扉の向こうはヒマワリ畑" />
+        <datalist id="we-series-titles">
+          {#each seriesTitles as t (t)}<option value={t}></option>{/each}
+        </datalist>
+      </label>
+      {#if meta.series_title.trim()}
+        <label class="we__field">
+          <span class="mono">ORDER IN THE SERIES (1, 2, 1.5 …)</span>
+          <input type="number" step="any" bind:value={meta.series_order} />
+        </label>
+        <label class="we__field">
+          <span class="mono">KIND</span>
+          <select bind:value={meta.series_kind}>
+            <option value="">—</option>
+            <option value="main">Main story · 本編</option>
+            <option value="side">Side story · 外伝</option>
+          </select>
+        </label>
+        <label class="we__field we__field--wide">
+          <span class="mono">ARC NAME (SHOWN ON THE SERIES CARD)</span>
+          <input type="text" bind:value={meta.series_label} placeholder="夜光虫編" />
+        </label>
+      {/if}
       <div class="we__field we__field--wide">
         <span class="mono">READING LOCK / 閲覧パスワード (READERS NEED THE PASSWORD; RLS ENFORCES IT)</span>
         <div class="we__lock" class:is-locked={work.read_locked}>
@@ -474,11 +609,23 @@
     align-items: center;
     gap: 0.6rem;
   }
-  .we__field--check input {
+  .we__field--check input,
+  .we__check input {
     width: 1.05rem;
     height: 1.05rem;
     flex-shrink: 0;
     accent-color: var(--accent);
+  }
+  .we__checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.2rem;
+  }
+  .we__check {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    cursor: pointer;
   }
   .we__coverBtn {
     justify-self: start;

@@ -115,6 +115,9 @@
      Noto below is the CJK-suffixed family name, which cannot collide with them. */
   --font-serif-authored: 'Fraunces', 'Ekkamai Vibe', 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'MS Mincho', Georgia, serif;
   --font-display-authored: 'Space Grotesk', 'Prompt', 'Yu Gothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Meiryo', system-ui, sans-serif;
+  /* The reader's typeset translations (TypesetLayer): mincho, like the dialogue
+     lettering of a Japanese manga. System faces only — same reason as above. */
+  --font-typeset: 'Yu Mincho', 'YuMincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'Source Han Serif JP', 'MS Mincho', serif;
   --font-display: 'Space Grotesk', 'Prompt', 'Noto Sans JP', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Ekkamai Vibe', 'Noto Sans JP', ui-monospace, monospace;
   --font-jp: 'Noto Sans JP', sans-serif;
@@ -1417,6 +1420,53 @@ body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top
   user-select: none;
   -webkit-user-drag: none;
 }
+/* The picture flying between its print and the lightbox (lightbox.ts). */
+.lb__fly {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 401;
+  object-fit: cover;
+  transform-origin: 50% 50%;
+  box-shadow: 0 30px 90px -30px rgba(0,0,0,0.9);
+  pointer-events: none;
+  will-change: transform;
+}
+/* Loupe over the artwork (lightbox.ts): fine pointers only, never on touch. */
+.lb__loupe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  background-color: #f1ece2;
+  background-repeat: no-repeat;
+  box-shadow:
+    0 0 0 1px rgba(244, 241, 234, 0.85),
+    0 0 0 6px rgba(12, 12, 13, 0.35),
+    0 0 0 7px rgba(244, 241, 234, 0.25),
+    0 18px 40px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s linear;
+  will-change: transform;
+}
+.lb__loupe.is-on { opacity: 1; }
+.lb__loupeK {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 14px);
+  translate: -50% 0;
+  padding: 0.25em 0.6em;
+  border-radius: 999px;
+  background: rgba(12, 12, 13, 0.8);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  color: var(--ink-fg);
+  white-space: nowrap;
+}
 .lb__hud {
   position: absolute;
   z-index: 2;
@@ -1447,6 +1497,14 @@ body[data-topbar] { --chrome-top: calc(var(--topbar-h) + env(safe-area-inset-top
 }
 .lb__btn:hover, .lb__btn:focus-visible { border-color: var(--accent); background: rgba(39,66,240,0.22); }
 .lb__close { top: clamp(1rem, 3vh, 2rem); right: var(--pad); }
+/* left of the close button; the label flips to COPIED for a moment (lightbox.ts) */
+.lb__share {
+  top: clamp(1rem, 3vh, 2rem);
+  right: calc(var(--pad) + 46px + 0.5rem);
+  padding: 0 1em;
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+}
 .lb__prev { left: var(--pad); top: 50%; translate: 0 -50%; }
 .lb__next { right: var(--pad); top: 50%; translate: 0 -50%; }
 @media (max-width: 760px) {

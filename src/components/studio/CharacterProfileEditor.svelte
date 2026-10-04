@@ -146,6 +146,24 @@
   function removeImage(i: number) {
     character.images = (character.images ?? []).filter((_, k) => k !== i);
   }
+
+  // --- Portrait: the card's picture on the book page (shown 4:5) ---
+  let portraitBusy = $state(false);
+  async function onPickPortrait(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    portraitBusy = true;
+    try {
+      character.portraitUrl = await uploadCastImage(file, workId, character.id);
+    } catch (err) {
+      console.error(err);
+      alert('Portrait upload failed. See console.');
+    } finally {
+      portraitBusy = false;
+    }
+  }
 </script>
 
 <div class="cpe" style={`--c:${character.color}`}>
@@ -168,6 +186,62 @@
       placeholder="PROTAGONIST"
     />
   </label>
+
+  <div class="cpe__row2">
+    <label class="cpe__field">
+      <span class="mono">AGE IN THIS BOOK (OPTIONAL, e.g. 13歳・中学1年)</span>
+      <input
+        type="text"
+        value={character.age ?? ''}
+        oninput={(e) => (character.age = (e.currentTarget as HTMLInputElement).value)}
+        placeholder="13歳・中学1年"
+      />
+    </label>
+    <label class="cpe__check">
+      <input
+        type="checkbox"
+        checked={Boolean(character.main)}
+        onchange={(e) => (character.main = (e.currentTarget as HTMLInputElement).checked)}
+      />
+      <span class="mono">MAIN CHARACTER — A FULL SCENE ON THE BOOK PAGE (NONE TICKED = THE FIRST TWO)</span>
+    </label>
+  </div>
+
+  <label class="cpe__field">
+    <span class="mono">THEIR LINE (ONE LINE FROM THE BOOK — SET VERTICALLY BESIDE THE PICTURE; KEEP IT SPOILER-FREE)</span>
+    <input
+      type="text"
+      value={character.quote ?? ''}
+      oninput={(e) => (character.quote = (e.currentTarget as HTMLInputElement).value)}
+      placeholder="俺はずっと、あいつを追いかけてる"
+    />
+  </label>
+
+  <div class="cpe__field">
+    <span class="mono">PORTRAIT (THE CARD'S PICTURE ON THE BOOK PAGE — CROPPED TO 4:5; EMPTY = THE FIRST GALLERY IMAGE)</span>
+    <div class="cpe__iconRow">
+      {#if character.portraitUrl}
+        <img class="cpe__portrait" src={character.portraitUrl} alt="Current portrait" />
+      {:else}
+        <span class="cpe__iconEmpty mono">NO PORTRAIT</span>
+      {/if}
+      <label class="mono cpe__pick">
+        {portraitBusy ? 'UPLOADING…' : character.portraitUrl ? 'REPLACE' : '+ CHOOSE IMAGE'}
+        <input type="file" accept="image/*" onchange={onPickPortrait} disabled={portraitBusy} />
+      </label>
+      {#if character.portraitUrl}
+        <button type="button" class="mono cpe__cancel" onclick={() => (character.portraitUrl = undefined)}>REMOVE</button>
+      {/if}
+    </div>
+    <label class="cpe__check">
+      <input
+        type="checkbox"
+        checked={character.portraitUrl ? Boolean(character.portraitMono) : character.portraitMono !== false}
+        onchange={(e) => (character.portraitMono = (e.currentTarget as HTMLInputElement).checked)}
+      />
+      <span class="mono">BLACK-AND-WHITE ART — TINT IT IN THE CHARACTER'S COLOUR (LEAVE OFF FOR COLOUR ART)</span>
+    </label>
+  </div>
 
   <div class="cpe__field">
     <span class="mono">FACE ICON (SQUARE — SHOWN ON THE ROSTER TILE)</span>
@@ -239,13 +313,24 @@
   </div>
 
   <div class="cpe__field">
-    <span class="mono">BIO / 紹介 (SHOWN IN THE CAST FILE — IMAGES LIVE IN THE GALLERY ABOVE)</span>
+    <span class="mono">BIO / 紹介 — SPOILER-FREE (SHOWN ON THE BOOK PAGE ABOVE THE SPOILER WARNING, AND IN THE CAST FILE)</span>
     <RichTextEditor
       value={character.bio ?? ''}
       {workId}
       allowImages={false}
       onChange={(html) => (character.bio = html)}
-      placeholder="Who are they? What's their role in the story? Write freely — readers open this from the book page."
+      placeholder="Who are they when the story starts? Nothing the book reveals later."
+    />
+  </div>
+
+  <div class="cpe__field">
+    <span class="mono">SPOILERS / 裏の顔 (OPTIONAL — IN THE CAST FILE BEHIND 「ネタバレを含むプロフィール」)</span>
+    <RichTextEditor
+      value={character.secret ?? ''}
+      {workId}
+      allowImages={false}
+      onChange={(html) => (character.secret = html)}
+      placeholder="What the book reveals about them."
     />
   </div>
 
@@ -253,6 +338,24 @@
 </div>
 
 <style>
+  .cpe__row2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: end;
+  }
+  .cpe__check {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.6875rem;
+  }
+  .cpe__portrait {
+    width: 4.8rem;
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
+    border: 1px solid var(--line);
+  }
   .cpe {
     display: grid;
     gap: 1rem;

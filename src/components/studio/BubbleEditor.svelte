@@ -1,5 +1,7 @@
 <script lang="ts">
-  import type { PageRec, Bubble, Character } from '../../lib/types';
+  import type { PageRec, Bubble, BubbleShape, Character } from '../../lib/types';
+  import { fitBubble } from '../../lib/typeset';
+  import TypesetLayer from '../reader/TypesetLayer.svelte';
 
   let {
     page,
@@ -26,6 +28,19 @@
   let grab = { dx: 0, dy: 0 };
 
   const selected = $derived(draft.find((b) => b.id === selectedId) ?? null);
+
+  // Typeset preview: the reader's own lettering over the page, boxes faded.
+  let preview = $state(false);
+  const fits = $derived(
+    new Map(draft.map((b) => [b.id, b.text.trim() ? fitBubble(b, page.width, page.height) : null])),
+  );
+  const selectedFit = $derived(selected ? (fits.get(selected.id) ?? null) : null);
+  const SHAPES: [BubbleShape, string][] = [
+    ['ellipse', 'ELLIPSE'],
+    ['round', 'ROUNDED'],
+    ['rect', 'RECT'],
+    ['none', 'NO FILL'],
+  ];
 
   function charOf(id: string | null): Character | null {
     return characters.find((c) => c.id === id) ?? null;
@@ -122,6 +137,21 @@
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape') onClose();
+    // Arrow keys nudge the selected box (Shift: resize) — fine placement over a balloon.
+    const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    const step = arrows[e.key];
+    if (step && selected && !(e.target as HTMLElement)?.closest('input, textarea, select')) {
+      e.preventDefault();
+      const d = 0.002;
+      if (e.shiftKey) {
+        selected.w = clamp(selected.w + step[0] * d, 0.02, 1 - selected.x);
+        selected.h = clamp(selected.h + step[1] * d, 0.02, 1 - selected.y);
+      } else {
+        selected.x = clamp(selected.x + step[0] * d, 0, 1 - selected.w);
+        selected.y = clamp(selected.y + step[1] * d, 0, 1 - selected.h);
+      }
+      return;
+    }
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
       const editing = (e.target as HTMLElement)?.closest('input, textarea, select');
       if (!editing) {
@@ -155,10 +185,15 @@
           onpointercancel={onPointerUp}
         >
           <img class="be__img" src={page.medUrl} alt={`Page ${pageNumber}`} draggable="false" />
+          {#if preview}
+            <TypesetLayer bubbles={draft} pw={page.width} ph={page.height} />
+          {/if}
           {#each draft as b, i (b.id)}
             <div
               class="be__box"
               class:is-selected={b.id === selectedId}
+              class:is-faint={preview}
+              class:is-overflow={fits.get(b.id)?.overflow}
               data-bubble={b.id}
               style={`left:${b.x * 100}%; top:${b.y * 100}%; width:${b.w * 100}%; height:${b.h * 100}%; --c:${colorOf(b.charId)}`}
             >
@@ -169,7 +204,11 @@
             </div>
           {/each}
         </div>
-        <p class="mono be__hint">DRAG ON THE PAGE TO BOX A BUBBLE · CLICK A BOX TO EDIT · DRAG TO MOVE · CORNER TO RESIZE</p>
+        <p class="mono be__hint">DRAG ON THE PAGE TO BOX A BUBBLE (THE BALLOON'S INSIDE, NOT THE TAIL) · CLICK A BOX TO EDIT · DRAG TO MOVE · CORNER TO RESIZE · ARROWS NUDGE, SHIFT+ARROWS RESIZE</p>
+        <label class="mono be__preview">
+          <input type="checkbox" bind:checked={preview} />
+          PREVIEW TYPESET — HOW READERS SEE IT IN THE BALLOONS
+        </label>
       </div>
 
       <!-- Inspector: ordered list + selected bubble fields -->
@@ -227,8 +266,64 @@
             </div>
             <div class="be__field">
               <span class="mono">TRANSLATION</span>
-              <textarea class="serif" rows="3" bind:value={selected.text} placeholder="English line…"></textarea>
+              <textarea class="serif" rows="3" bind:value={selected.text} placeholder="Translation…"></textarea>
             </div>
+            <!-- Typeset mode: how the line is lettered into the balloon -->
+            <div class="be__field">
+              <span class="mono">BALLOON</span>
+              <select
+                value={selected.shape ?? 'ellipse'}
+                onchange={(e) => {
+                  const v = (e.currentTarget as HTMLSelectElement).value as BubbleShape;
+                  selected.shape = v === 'ellipse' ? undefined : v;
+                }}
+              >
+                {#each SHAPES as [v, label] (v)}<option value={v}>{label}</option>{/each}
+              </select>
+            </div>
+            <label class="be__field be__field--check">
+              <input
+                type="checkbox"
+                checked={Boolean(selected.dark)}
+                onchange={(e) => (selected.dark = (e.currentTarget as HTMLInputElement).checked || undefined)}
+              />
+              <span class="mono">DARK BALLOON (LIGHT TEXT)</span>
+            </label>
+            <div class="be__field">
+              <span class="mono">DIRECTION</span>
+              <select
+                value={selected.dir ?? 'auto'}
+                onchange={(e) => {
+                  const v = (e.currentTarget as HTMLSelectElement).value;
+                  selected.dir = v === 'v' || v === 'h' ? v : undefined;
+                }}
+              >
+                <option value="auto">AUTO</option>
+                <option value="v">VERTICAL 縦</option>
+                <option value="h">HORIZONTAL 横</option>
+              </select>
+            </div>
+            <div class="be__field">
+              <span class="mono">SIZE ×{(selected.scale ?? 1).toFixed(2)}</span>
+              <input
+                type="range"
+                min="0.5"
+                max="1.6"
+                step="0.05"
+                value={selected.scale ?? 1}
+                oninput={(e) => {
+                  const v = Number((e.currentTarget as HTMLInputElement).value);
+                  selected.scale = v === 1 ? undefined : v;
+                }}
+              />
+            </div>
+            {#if selectedFit}
+              <p class="mono be__fit" class:is-overflow={selectedFit.overflow}>
+                {selectedFit.overflow
+                  ? 'TOO LONG — SHORTEN THE LINE OR ENLARGE THE BOX'
+                  : `${selectedFit.fs.toFixed(2)}% · ${selectedFit.lines.length} ${selectedFit.dir === 'v' ? 'COLUMNS' : 'LINES'}`}
+              </p>
+            {/if}
             <button class="mono be__del" onclick={() => removeBubble(selected.id)}>✕ DELETE BUBBLE</button>
           </div>
         {/if}
@@ -242,6 +337,32 @@
 </div>
 
 <style>
+  .be__preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.6rem;
+    cursor: pointer;
+  }
+  .be__box.is-faint {
+    opacity: 0.25;
+  }
+  .be__box.is-overflow {
+    outline: 2px solid #e5484d;
+    outline-offset: 1px;
+  }
+  .be__field--check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .be__fit {
+    font-size: 0.6rem;
+    color: var(--fg-dim);
+  }
+  .be__fit.is-overflow {
+    color: #e5484d;
+  }
   .be {
     position: fixed;
     inset: 0;

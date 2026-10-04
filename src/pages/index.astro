@@ -8,6 +8,8 @@ import { heroArt, stamp, stampStatic } from '../data/showcase';
 import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
 import { DEFAULT_LANG } from '../lib/lang';
 import { cacheShell } from '../lib/cache';
+import { supabaseServer } from '../lib/supabaseServer';
+import '../styles/shelf-ph.css';
 
 // Was prerendered. The artist teaser below the shelf is now author-edited copy,
 // and a static build would freeze it until the next deploy — the author would
@@ -33,13 +35,41 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
       return { data: await songKeychain(song, Astro.site, 480), length: songLength(song), movements: songData(song).movements.length };
     })()
   : null;
+
+// How many stages the shelf will hold, so its placeholder is already the final
+// height (no jump when the books arrive). A count only; a failure keeps 2.
+let bookCount = 2;
+try {
+  const { data } = await supabaseServer.rpc('library_cards');
+  if (Array.isArray(data)) bookCount = data.length;
+} catch {
+  /* the placeholder is a guess, never a blocker */
+}
+const shelfCount = bookCount + (ost ? 1 : 0);
 ---
 
 <Base>
   <main class="spread spread--ink lib-shell">
+    {/* The press run hides the photo before first paint so the plates can print
+        it from blank (src/scripts/press.ts). Only when motion is welcome and
+        WebGL exists; a 2.5 s failsafe hands the photo back if the module never
+        arrives, so the hero can never be left empty. */}
+    <script is:inline>
+      (function () {
+        try {
+          if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+          if (!document.createElement('canvas').getContext('webgl')) return;
+          var d = document.documentElement;
+          d.dataset.press = 'pending';
+          setTimeout(function () { delete d.dataset.press; }, 2500);
+        } catch (e) {}
+      })();
+    </script>
     <header class="lib-hero">
       {/* Faint art behind the masthead. Decorative, so it is hidden from
-          assistive tech; the scrim below keeps the type readable over it. */}
+          assistive tech; the scrim below keeps the type readable over it.
+          When the press run is live, a canvas prints over it and the scrim
+          moves into the shader (so the loupe can be lit). */}
       <div class="lib-hero__art" aria-hidden="true">
         <Image
           src={heroArt}
@@ -77,12 +107,18 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
     <Showcase />
 
     {/* The shelf is a client:only island, so until it hydrates the fallback
-        holds its place: aspect-locked blanks the size of real cards, which keeps
-        the teaser below from jumping when the books arrive. */}
+        holds its place: book-shaped blanks on a plank, the size of the real
+        stages, which keeps the teaser below from jumping when the books arrive. */}
     <div id="shelf">
-      <Library client:only="svelte" ost={ost}>
-        <div slot="fallback" class="shelf-skel" aria-hidden="true">
-          {Array.from({ length: 6 }, () => <span class="shelf-skel__card" />)}
+      <Library client:only="svelte" ost={ost} expect={shelfCount}>
+        <div slot="fallback" class="shelf-ph" aria-hidden="true">
+          <div class="shelf-ph__head"><span class="mono shelf-ph__k">01 — 本棚</span><span class="shelf-ph__rule"></span></div>
+          <p class="mono shelf-ph__hint">.</p>
+          <div class="shelf-ph__grid">
+            {Array.from({ length: shelfCount }, () => (
+              <div><span class="shelf-ph__stage"><span /></span><span class="shelf-ph__label" /></div>
+            ))}
+          </div>
         </div>
       </Library>
     </div>
@@ -136,6 +172,8 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
       <span class="mono">© ASU AZURE</span>
       <span class="lib-foot__links">
         <a class="mono" href="/asu">ASU AZURE ↗</a>
+        {/* which order to read the books in — also in the shelf's head row */}
+        <a class="mono" href="/timeline">TIMELINE · 時系列</a>
         {MUSIC && <a class="mono" href="/music">MUSIC ♪</a>}
         <a class="mono" href="https://x.com/asukonpeki">X — @ASUKONPEKI</a>
         <a class="mono lib-foot__studio" href="/studio">STUDIO ⌘</a>
@@ -153,8 +191,16 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
   import { decode } from '../scripts/text';
   import { applyCopy, readCopyPayload } from '../lib/siteCopyClient';
   import { DEFAULT_LANG, isLang, LANG_EVENT, LANG_STORAGE_KEY, type Lang } from '../lib/lang';
+  import { initPress } from '../scripts/press';
 
   gsap.registerPlugin(ScrollTrigger);
+
+  // --- the press run + loupe over the hero art (src/scripts/press.ts) -------
+  {
+    const hero = document.querySelector<HTMLElement>('.lib-hero');
+    if (hero) initPress(hero);
+    else delete document.documentElement.dataset.press;
+  }
 
   // --- artist teaser copy ---------------------------------------------------
   // The teaser is static Astro markup, so it cannot read the i18n rune that
@@ -260,13 +306,21 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
     // height actually changes.
     const shelf = document.querySelector('.lib-shell');
     if (shelf && 'ResizeObserver' in window) {
-      let last = 0;
+      // Coalesced: one refresh per frame at most, and only for a real change —
+      // each refresh re-measures every trigger (forced layout), and the shelf
+      // used to fire several as its placeholder, cards and images settled.
+      let last = shelf.getBoundingClientRect().height;
+      let queued = 0;
       const ro = new ResizeObserver(() => {
-        const h = shelf.getBoundingClientRect().height;
-        if (Math.abs(h - last) < 1) return;
-        last = h;
-        ScrollTrigger.refresh();
-        ScrollTrigger.update();
+        if (queued) return;
+        queued = requestAnimationFrame(() => {
+          queued = 0;
+          const h = shelf.getBoundingClientRect().height;
+          if (Math.abs(h - last) < 4) return;
+          last = h;
+          ScrollTrigger.refresh();
+          ScrollTrigger.update();
+        });
       });
       ro.observe(shelf);
     }
@@ -329,6 +383,70 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
         rgba(12, 12, 13, 0) 40%,
         rgba(12, 12, 13, 0.75) 100%
       );
+  }
+
+  /* --- The press run (src/scripts/press.ts) --------------------------------
+     The canvas takes over from the photo and draws the scrim itself, so the
+     CSS scrim is dropped while it runs. Everything here is added by script;
+     with no script the photo and scrim above are the whole story. */
+  :global(html[data-press]) .lib-hero__art img,
+  .lib-hero__art:global(.is-pressed) img { opacity: 0; }
+  .lib-hero__art:global(.is-pressed)::after { display: none; }
+  .lib-hero__art :global(.press__canvas) {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .lib-hero__art :global(.press__loupe) {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    width: 200px;
+    height: 200px;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .lib-hero__art :global(.press__loupe svg) { display: block; overflow: visible; }
+  .lib-hero__art :global(.press__ring) {
+    fill: none;
+    stroke: rgba(244, 241, 234, 0.85);
+    stroke-width: 1;
+  }
+  .lib-hero__art :global(.press__ring--outer) { stroke: rgba(244, 241, 234, 0.22); }
+  .lib-hero__art :global(.press__tick) {
+    stroke: rgba(22, 20, 15, 0.55);
+    stroke-width: 0.8;
+  }
+  .lib-hero__art :global(.press__read) {
+    position: absolute;
+    left: 172px;
+    top: 160px;
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.5rem 0.65rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 4px;
+    background: rgba(12, 12, 13, 0.78);
+    font-size: 0.56rem;
+    line-height: 1.55;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    color: var(--fg);
+  }
+  .lib-hero__art :global(.press__loupe.is-up .press__read) { top: 4px; }
+  .lib-hero__art :global(.press__loupe.is-left .press__read) { left: auto; right: 172px; }
+  .lib-hero__art :global(.press__k) { color: var(--accent); letter-spacing: 0.16em; }
+  .lib-hero__art :global(.press__read i) {
+    display: inline-block;
+    width: 0.5em;
+    height: 0.5em;
+    margin-right: 0.35em;
+    background: var(--c);
+    outline: 1px solid rgba(244, 241, 234, 0.3);
   }
 
   .lib-hero__kicker,
@@ -525,20 +643,6 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
 </style>
 
 <style>
-  /* --- shelf placeholder (matches .lib / .lib__grid in Library.svelte) ----- */
-  .shelf-skel {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 42vw), 1fr));
-    gap: clamp(1rem, 2.5vw, 2rem);
-    padding: 0 var(--pad) clamp(3rem, 8vh, 5rem);
-  }
-  .shelf-skel__card {
-    aspect-ratio: 4 / 5.4;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: var(--bg-soft);
-    animation: shelf-skel 1.4s ease-in-out infinite alternate;
-  }
-  @keyframes shelf-skel { to { opacity: 0.45; } }
+  /* shelf placeholder: styles/shelf-ph.css (shared with Library.svelte's loading state) */
 
 </style>

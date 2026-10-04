@@ -1,5 +1,10 @@
 <script lang="ts">
   import type { PageRec, Character } from '../../lib/types';
+  import { cropAttr, cropImgStyle } from '../../lib/coverCrop';
+  import { pictureOf } from '../../lib/cleanPage';
+  import { bust, LOAD_TIMEOUT } from '../../lib/readerUi';
+  import { i18n } from '../../lib/i18n.svelte';
+  import TypesetLayer from './TypesetLayer.svelte';
 
   let {
     page,
@@ -7,6 +12,7 @@
     eager = false,
     alt,
     translateOn = false,
+    typesetOn = false,
     characters = [],
     highlightId = null,
     onHighlight,
@@ -15,19 +21,74 @@
     sizes: string;
     eager?: boolean;
     alt: string;
+    /** Hotspots + tooltips (the translation as notes). */
     translateOn?: boolean;
+    /** The translation lettered into the balloons (TypesetLayer). */
+    typesetOn?: boolean;
     characters?: Character[];
     highlightId?: string | null;
     onHighlight?: (id: string | null) => void;
   } = $props();
 
-  let loaded = $state(false);
-  let imgEl = $state<HTMLImageElement | undefined>();
-  // Safari can skip the load event for memory-cached images (likely here — the
-  // reader preloads neighbours), leaving the fade-in stuck at opacity 0.
-  $effect(() => {
-    if (imgEl?.complete && imgEl.naturalWidth > 0) loaded = true;
+  // under a typeset translation, the page without lettering when there is one
+  const pic = $derived(pictureOf(page, typesetOn));
+
+  // --- Loading: never a black page. Until the picture is in, the page is paper
+  //     with the blurred thumbnail and a small loader; a failed load is retried
+  //     once with a cache-busting URL, then says so with a 「再読み込み」 button.
+  //     Each picture × attempt is its own <img> ({#key}), so a swap to the clean
+  //     page or a retry starts from 'loading' instead of inheriting 'ready'. ---
+  let attempt = $state(0); // 0: as stored; 1: the automatic retry; 2+: the reader's
+  let shownKey = '';
+  $effect.pre(() => {
+    // a new picture (the clean page swapped in, or out) starts its tries afresh
+    if (pic.med !== shownKey) {
+      shownKey = pic.med;
+      attempt = 0;
+    }
   });
+  const med = $derived(bust(pic.med, attempt));
+  const full = $derived(bust(pic.full, attempt));
+  let phase = $state<'loading' | 'ready' | 'error'>('loading');
+  let imgEl = $state<HTMLImageElement | undefined>();
+  let thumbOk = $state(true);
+
+  function ready() {
+    phase = 'ready';
+  }
+  function failed() {
+    if (attempt === 0) attempt = 1; // once, quietly
+    else phase = 'error';
+  }
+  function retry() {
+    attempt = Math.max(2, attempt + 1);
+  }
+  // A new <img> (picture or attempt): back to 'loading' — unless it is already
+  // in. Safari can skip the load event for a memory-cached image (the reader
+  // preloads neighbours), so `complete` is checked, and decode() resolves on its
+  // own once the picture is usable, whatever happened to the event. A request
+  // that never ends counts as a failure after LOAD_TIMEOUT (eager pictures only).
+  $effect(() => {
+    const el = imgEl;
+    if (!el) return;
+    if (el.complete && el.naturalWidth > 0) {
+      phase = 'ready';
+      return;
+    }
+    phase = 'loading';
+    let live = true;
+    el.decode?.().then(
+      () => live && el.naturalWidth > 0 && ready(),
+      () => {}, // a broken picture also fires `error`, which decides
+    );
+    // only for eager pictures: a lazy one (scroll mode, off screen) hasn't started
+    const timer = eager ? window.setTimeout(() => live && phase === 'loading' && failed(), LOAD_TIMEOUT) : 0;
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  });
+  const loaded = $derived(phase === 'ready');
   // Tap-to-open on touch (hover handles the desktop case via highlightId).
   let openId = $state<string | null>(null);
 
@@ -46,30 +107,64 @@
 <span
   class="si"
   class:si--blank={page.isBlank}
+  class:is-failed={phase === 'error'}
+  data-state={page.isBlank ? undefined : phase}
   data-page-id={page.isBlank ? undefined : page.id}
+  data-crop={page.crop ? cropAttr(page.crop) : undefined}
   style={`aspect-ratio: ${page.width} / ${page.height}; --pw: ${page.width}; --ph: ${page.height};`}
 >
+  {#snippet pictures(style: string | undefined)}
+    {#if thumbOk}
+      <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" {style} onerror={() => (thumbOk = false)} />
+    {/if}
+    {#key med}
+      <img
+        bind:this={imgEl}
+        class="si__img"
+        class:is-loaded={loaded}
+        src={med}
+        srcset={`${med} 900w, ${full} 1600w`}
+        {sizes}
+        {alt}
+        decoding="async"
+        loading={eager ? 'eager' : 'lazy'}
+        draggable="false"
+        onload={ready}
+        onerror={failed}
+        {style}
+      />
+    {/key}
+  {/snippet}
   {#if page.isBlank}
     <span class="mono si__blankMark" aria-hidden="true">◦</span>
   {:else}
-  <img class="si__thumb" src={page.thumbUrl} alt="" aria-hidden="true" draggable="false" />
-  <img
-    bind:this={imgEl}
-    class="si__img"
-    class:is-loaded={loaded}
-    src={page.medUrl}
-    srcset={`${page.medUrl} 900w, ${page.fullUrl} 1600w`}
-    {sizes}
-    {alt}
-    decoding="async"
-    loading={eager ? 'eager' : 'lazy'}
-    draggable="false"
-    onload={() => (loaded = true)}
-  />
+  {#if page.crop}
+    <!-- only part of the image is this page (the cover's front): a frame of the
+         crop's shape, the picture scaled and shifted inside it -->
+    <span class="si__crop">{@render pictures(cropImgStyle(page.crop))}</span>
+  {:else}
+    {@render pictures(undefined)}
+  {/if}
+  {#if phase === 'loading'}
+    <!-- paper and a small loader, never a black page (shown after a beat, so a
+         quick load doesn't flash it) -->
+    <span class="si__wait" aria-hidden="true"><span class="mk-loader"></span></span>
+  {:else if phase === 'error'}
+    <span class="si__fail" role="alert">
+      <span class="si__failText">{i18n.t('rd.imgFail')}</span>
+      <!-- data-nav: the page's own tap handling leaves this button alone -->
+      <button type="button" class="mono si__retry" data-nav onclick={retry}>{i18n.t('rd.imgRetry')}</button>
+    </span>
+  {/if}
 
-  {#if translateOn && page.bubbles?.length}
+  {#if typesetOn && page.bubbles?.length}
+    <!-- the same contain rect as the hotspots; the layer sizes its text off it -->
+    <div class="si__bubbles si__bubbles--ts">
+      <TypesetLayer bubbles={page.bubbles} pw={page.width} ph={page.height} clean={pic.clean} />
+    </div>
+  {:else if translateOn && page.bubbles?.length}
     <div class="si__bubbles">
-      {#each page.bubbles as b (b.id)}
+      {#each page.bubbles.filter((x) => !x.cleanOnly) as b (b.id)}
         {@const on = highlightId === b.id || openId === b.id}
         <div
           class="si__bub"
@@ -111,7 +206,9 @@
     position: relative;
     display: block;
     overflow: hidden;
-    background: #101012;
+    /* paper until the picture is in — a near-black box here read as "the page
+       didn't load" on a dark page's blurred thumbnail */
+    background: var(--paper-bg, #e9e4d8);
     max-width: 100%;
     max-height: 100%;
     /* A long press marks a favourite — no iOS image callout on top of it. */
@@ -142,6 +239,21 @@
     user-select: none;
     -webkit-user-drag: none;
   }
+  /* The frame for a cropped page: the same contain rect the bubbles use */
+  .si__crop {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(100cqw, 100cqh * var(--pw) / var(--ph));
+    height: min(100cqh, 100cqw * var(--ph) / var(--pw));
+    overflow: hidden;
+  }
+  .si__crop > img {
+    inset: auto;
+    max-width: none;
+    object-fit: fill;
+  }
   .si__thumb {
     filter: blur(14px);
     transform: scale(1.04);
@@ -152,6 +264,73 @@
   }
   .si__img.is-loaded {
     opacity: 1;
+  }
+  /* loading: a small loader over the paper/thumbnail, after a beat */
+  .si__wait {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    color: var(--accent, #2742f0);
+    font-size: 1.6rem;
+    opacity: 0;
+    animation: si-wait 0.2s 0.35s var(--ease) forwards;
+  }
+  .si__wait .mk-loader {
+    --mk-accent: var(--accent, #2742f0);
+  }
+  @keyframes si-wait {
+    to {
+      opacity: 1;
+    }
+  }
+  /* failed twice: say so, and offer a retry — paper, never black */
+  .si__fail {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 0.9rem;
+    padding: 1rem;
+    background: var(--paper-bg, #e9e4d8);
+    color: #24211c;
+    text-align: center;
+  }
+  .si.is-failed .si__img,
+  .si.is-failed .si__thumb,
+  .si.is-failed .si__bubbles {
+    visibility: hidden;
+  }
+  /* the lettering waits for its picture: over the blurred thumbnail it floated */
+  .si[data-state='loading'] .si__bubbles--ts {
+    visibility: hidden;
+  }
+  .si__failText {
+    font-family: var(--font-display-authored, sans-serif);
+    /* one line on half a phone's width (a spread page) */
+    font-size: clamp(0.7rem, 6cqw, 0.95rem);
+    line-height: 1.6;
+    text-wrap: balance;
+    word-break: auto-phrase;
+  }
+  .si__retry {
+    min-height: 2.75rem;
+    padding: 0 1.3em;
+    border: 0;
+    border-radius: 999px;
+    background: var(--accent, #2742f0);
+    color: #f4f1ea;
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+  }
+  .si__retry:focus-visible {
+    outline: 2px solid #24211c;
+    outline-offset: 2px;
   }
 
   /* --- Translation hotspots --- */
@@ -168,6 +347,9 @@
     width: min(100cqw, 100cqh * var(--pw) / var(--ph));
     height: min(100cqh, 100cqw * var(--ph) / var(--pw));
     z-index: 3;
+  }
+  .si__bubbles--ts {
+    pointer-events: none;
   }
   .si__bub {
     position: absolute;
@@ -226,6 +408,10 @@
     .si__img,
     .si__tip {
       transition: none;
+    }
+    .si__wait {
+      animation: none;
+      opacity: 1;
     }
   }
 </style>

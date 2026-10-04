@@ -9,10 +9,22 @@
   import { converge } from '../../scripts/mv';
   import { stamp, stampStatic } from '../../data/showcase';
   import { toRichHtml } from '../../lib/richtext';
-  import { i18n } from '../../lib/i18n.svelte';
+  import { tidyForeword } from '../../lib/foreword';
+  import { frontOnly, cropImgStyle } from '../../lib/coverCrop';
+  import { seriesRun, kindKey } from '../../lib/series';
+  import { novelProgress, novelToc, resumeLabel, chapterName } from '../../lib/novel';
+  import { langLabel } from '../../lib/bookInfo';
+  import { lockReturn } from '../../lib/readerLink';
+  import { inTimeline } from '../../data/timeline';
+  import { bookInfo } from '../../lib/bookInfo';
+  import { bookParts, partLabel, partNote, partsHero } from '../../lib/bookParts';
+  import { shareLink } from '../../lib/share';
+  import { i18n, type DictKey } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
+  import CastStage from './CastStage.svelte';
   import LockGate from './LockGate.svelte';
+  import BookmarkNote from '../reader/BookmarkNote.svelte';
   import { hasProfile } from '../../lib/types';
   import type { Work, PageRec, Chapter, PageRow } from '../../lib/types';
 
@@ -54,20 +66,204 @@
       })
       .filter((c) => c.pages.length > 0),
   );
-  const forewordHtml = $derived(work ? toRichHtml(work.foreword) : '');
-  const statusKey = $derived(
-    work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
+  // The hero shows the FRONT of the wraparound, like the shelf and the reader.
+  // No `inner` page on purpose: a locked book gets its pages only on unlock,
+  // and the hero would re-trim and jump at that moment.
+  const heroCover = $derived(
+    cover && work && cover.id === work.cover_page_id ? frontOnly(cover, work.cover_crop) : cover,
   );
+  // Render-time tidy (lib/foreword.ts): pasted subset fonts, empty lines, a
+  // duplicate title h1; numbered run-ins become the section nav.
+  const fore = $derived(
+    work ? tidyForeword(toRichHtml(work.foreword), work.title) : { html: '', sections: [] },
+  );
+  const forewordHtml = $derived(fore.html);
+  const info = $derived(work ? bookInfo(work, i18n.lang, (k) => i18n.t(k as DictKey)) : []);
+  const warnings = $derived((work?.content_warnings ?? []).map((w) => w.trim()).filter(Boolean));
+  // A place saved in the novel reader (this browser only, lib/novel.ts): the
+  // novel button reads 「続きから読む（第三話）」 and opens in that place's language.
+  // Re-read when the page comes back from the reader (bfcache) — `marksTick`.
+  let marksTick = $state(0);
+  const novelSaved = $derived.by(() => {
+    void marksTick;
+    return work ? novelProgress(work.id, work.novel_langs, i18n.lang) : null;
+  });
+  // the novel reader opens in the reader's language when the text exists in it
+  const novelLang = $derived.by(() => {
+    const langs = work?.novel_langs ?? [];
+    if (!langs.length) return null;
+    return novelSaved?.lang ?? (langs.includes(i18n.lang) ? i18n.lang : langs[0]);
+  });
+  const novelHref = $derived(novelLang ? `/w/${slug}/novel?lang=${novelLang}` : null);
+  const novelLabel = $derived(
+    novelSaved ? resumeLabel(novelSaved.chapter, i18n.lang, (k) => i18n.t(k as DictKey)) : i18n.t('nv.read'),
+  );
+  // 本編 / 外伝 for a book in a series, never 読切 (lib/series.ts kindKey)
+  const kindLabel = $derived.by(() => {
+    const key = work ? kindKey(work) : null;
+    return key ? i18n.t(key as DictKey) : null;
+  });
+
+  // --- Series: the other published books sharing series_title (book-info.sql).
+  //     Loaded after the page is up and never allowed to break it. ---
+  interface SeriesCard {
+    id: string;
+    slug: string;
+    title: string;
+    series_order: number | null;
+    series_kind: 'main' | 'side' | null;
+    series_label: string | null;
+    read_locked: boolean;
+    cover: PageRec | null;
+  }
+  let seriesCards = $state<SeriesCard[]>([]);
+  const series = $derived(work ? seriesRun(seriesCards, work.id) : { list: [], prev: null, next: null });
+
+  async function loadSeries(w: Work) {
+    if (!w.series_title) return;
+    try {
+      const { data: rows } = await supabase
+        .from('works')
+        .select('id,slug,title,series_order,series_kind,series_label,read_locked,cover_page_id,cover_crop')
+        .eq('published', true)
+        .eq('series_title', w.series_title);
+      if (!rows?.length) return;
+      const coverIds = rows.map((r) => r.cover_page_id).filter(Boolean) as string[];
+      // RLS lets anyone read a locked book's cover row (read-lock.sql)
+      const { data: covers } = coverIds.length
+        ? await supabase.from('pages').select('*').in('id', coverIds)
+        : { data: [] };
+      const byId = new Map((covers ?? []).map((p) => [p.id, toPageRec(p as PageRow)]));
+      seriesCards = rows.map((r) => {
+        const c = r.cover_page_id ? byId.get(r.cover_page_id) : undefined;
+        return {
+          id: r.id,
+          slug: r.slug,
+          title: r.title,
+          series_order: r.series_order === null ? null : Number(r.series_order),
+          series_kind: r.series_kind,
+          series_label: r.series_label,
+          read_locked: r.read_locked,
+          cover: c ? frontOnly(c, r.cover_crop) : null,
+        };
+      });
+    } catch {
+      seriesCards = []; // the page stands without its series
+    }
+  }
+
+  // --- Share this book (the overview URL, without ?c=) ---
+  let shareNote = $state('');
+  let shareReset = 0;
+  async function share() {
+    if (!work) return;
+    const result = await shareLink({ title: work.title, text: work.description || undefined, url: `${location.origin}/w/${slug}` });
+    if (result === 'copied' || result === 'failed') {
+      shareNote = i18n.t(result === 'copied' ? 'ov.shareCopied' : 'ov.shareFail');
+      clearTimeout(shareReset);
+      shareReset = window.setTimeout(() => (shareNote = ''), 1600);
+    }
+  }
+
+  /** Skip the spoilers: straight past the synopsis. */
+  function skipSynopsis(e: Event) {
+    e.preventDefault();
+    const target = document.getElementById('ov-after');
+    target?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+    target?.focus({ preventScroll: true });
+  }
 
   // --- Reading lock: RLS hides page rows of locked works (cover excepted).
   //     `unlocked` flips when the session key works or the author is signed in
   //     (their select already returned everything). ---
   let unlocked = $state(false);
   let lockOpen = $state(false);
-  let pendingHref = $state<string | null>(null);
+  // where to go once unlocked — a function when the target needs the unlocked pages
+  let pendingHref = $state<string | (() => string | null) | null>(null);
   const locked = $derived(Boolean(work?.read_locked) && !unlocked);
 
-  function openLock(href: string | null, e?: Event) {
+  // この本の構成: a book in parts (vol. 2 — a novel, then a manga) says so before
+  // its contents. Chapters are public even while the book is locked; the page
+  // ranges and landing pages wait for the pages (lib/bookParts.ts).
+  const parts = $derived(work ? bookParts(chapters, locked ? null : ordered) : []);
+  const showParts = $derived(parts.length >= 2);
+  /** Where a part's button goes: the novel reader for a novel part with text,
+      else the page reader at the part's first page (?p=, like the thumbnails). */
+  function partHref(part: (typeof parts)[number]): string | null {
+    if (part.kind === 'novel' && novelHref) return novelHref;
+    return part.startId ? `/w/${slug}/read?p=${encodeURIComponent(part.startId)}` : null;
+  }
+  function openPart(part: (typeof parts)[number], e: Event) {
+    if (!locked) return;
+    // a locked book's landing page is known only once the pages arrive
+    openLock(() => partHref(bookParts(chapters, ordered).find((p) => p.id === part.id) ?? part), e);
+  }
+
+  // --- A book whose part is a novel (vol. 2): the hero offers the PARTS — the
+  //     novel in the novel reader, the manga in the page reader — and the whole
+  //     book as scanned pages becomes a quiet link. 「読み始める」 opened those
+  //     scans of the Thai novel, and readers never learned the Japanese text
+  //     existed (lib/bookParts.ts partsHero). ---
+  const hero = $derived(showParts ? partsHero(parts, Boolean(novelHref)) : null);
+  const t = (k: string) => i18n.t(k as DictKey);
+  /** the page-reader place is inside the manga part (only knowable once the pages are in) */
+  const inManga = $derived.by(() => {
+    if (!hero || hero.manga < 0 || !continueAt) return false;
+    return ordered.find((p) => p.id === continueAt)?.chapterId === parts[hero.manga].id;
+  });
+  const heroNovelLabel = $derived.by(() => {
+    if (!hero) return '';
+    const part = partLabel(hero.novel + 1, i18n.lang);
+    if (novelSaved) return `${part} ${resumeLabel(novelSaved.chapter, i18n.lang, t)}`;
+    return t('ov.partNovel').replace('{part}', part).replace('{lang}', novelLang ? langLabel(novelLang, i18n.lang) : '');
+  });
+  const heroManga = $derived.by(() => {
+    if (!hero || hero.manga < 0) return null;
+    const p = parts[hero.manga];
+    const part = partLabel(hero.manga + 1, i18n.lang);
+    return inManga
+      ? { label: t('ov.partMangaResume').replace('{part}', part), href: continueHref }
+      : { label: t('ov.partManga').replace('{part}', part), href: partHref(p) ?? `/w/${slug}/read?ch=${encodeURIComponent(p.id)}` };
+  });
+  const origLabel = $derived(
+    t('ov.origPages').replace('{lang}', work?.book_lang ? langLabel(work.book_lang, i18n.lang) : ''),
+  );
+
+  // The novel's chapters under its part (the novel reader's 目次, lib/novel.ts
+  // novelToc), each a link into the reader there (?s=). A locked book's sections
+  // are hidden until this tab has the password: then the list comes through
+  // unlock_novel; before that, the part shows just its button.
+  let tocRows = $state<unknown[]>([]);
+  const novelChapters = $derived(novelHref && tocRows.length ? novelToc(tocRows, novelHref, t) : []);
+  let tocFor = '';
+  async function loadNovelToc() {
+    if (!work || !hero || !novelLang) return;
+    const key = `${work.id}:${novelLang}:${unlocked}`;
+    if (key === tocFor) return;
+    tocFor = key;
+    try {
+      let { data } = await supabase
+        .from('novel_sections')
+        .select('sort_key,title,lang')
+        .eq('work_id', work.id)
+        .eq('lang', novelLang)
+        .order('sort_key');
+      if (!data?.length && work.read_locked) {
+        const pass = loadUnlock(work.id);
+        if (!pass) return; // locked, and not opened in this tab: the button alone
+        ({ data } = await supabase.rpc('unlock_novel', { p_work_id: work.id, p_password: pass, p_lang: novelLang }));
+      }
+      if (key === tocFor) tocRows = (data ?? []) as unknown[];
+    } catch {
+      tocRows = []; // the part keeps its button
+    }
+  }
+  $effect(() => {
+    void [status, hero, novelLang, unlocked];
+    if (status === 'ready') void loadNovelToc();
+  });
+
+  function openLock(href: string | (() => string | null) | null, e?: Event) {
     e?.preventDefault();
     pendingHref = href;
     lockOpen = true;
@@ -76,7 +272,8 @@
     pages = rows.map(toPageRec);
     unlocked = true;
     lockOpen = false;
-    if (pendingHref) location.href = pendingHref;
+    const href = typeof pendingHref === 'function' ? pendingHref() : pendingHref;
+    if (href) location.href = href;
   }
 
   // --- Cast page: profiled characters only, in the author's array order ---
@@ -122,12 +319,41 @@
     void load();
   });
 
+  // Back from a reader through bfcache: the island is kept as it was, so the
+  // saved places are read again — 「続きから読む」 must name the newest one.
+  $effect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted || !work) return;
+      continueAt = loadProgress(work.id);
+      marksTick++;
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  });
+
   // Fade the "scroll for more" cue once the reader starts scrolling.
   let scrolled = $state(false);
+  // The floating back chip + language switch: away while scrolling down, back on
+  // a solid chip scrolling up, as they were at the top (html[data-ovchrome]).
   $effect(() => {
-    const onScroll = () => (scrolled = window.scrollY > 40);
+    const html = document.documentElement;
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      scrolled = y > 40;
+      if (y < 80) {
+        delete html.dataset.ovchrome;
+        lastY = y;
+      } else if (Math.abs(y - lastY) > 8) {
+        html.dataset.ovchrome = y > lastY ? 'away' : 'solid';
+        lastY = y;
+      }
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      delete html.dataset.ovchrome;
+    };
   });
   function scrollDown() {
     document.getElementById('ov-more')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
@@ -170,6 +396,16 @@
     }
     continueAt = loadProgress(work.id);
     status = 'ready';
+    void loadSeries(work);
+    // A locked reader sent the visitor here with where they were going (?go=, a
+    // timeline or shared link): open the gate at once and take them there after.
+    const go = lockReturn(new URLSearchParams(location.search).get('go'), slug);
+    if (go) {
+      const url = new URL(location.href);
+      url.searchParams.delete('go');
+      history.replaceState(history.state, '', url);
+      if (work.read_locked && !unlocked) openLock(go);
+    }
     // Deep link: /w/slug?c=charId opens that character's file directly.
     const requested = new URLSearchParams(location.search).get('c');
     if (requested) {
@@ -296,13 +532,20 @@
     <div class="bracket bracket--tl" aria-hidden="true"></div>
     <div class="bracket bracket--tr" aria-hidden="true"></div>
     <div class="ov-hero__inner">
-      {#if cover}
-        <figure class="ov-hero__cover" use:reveal={{ y: 34 }}>
-          <img
-            src={cover.medUrl}
-            alt={`${work.title} — cover`}
-            style={`aspect-ratio: ${cover.width} / ${cover.height}`}
-          />
+      {#if heroCover}
+        <figure
+          class="ov-hero__cover"
+          class:is-cropped={Boolean(heroCover.crop)}
+          style={`aspect-ratio: ${heroCover.width} / ${heroCover.height}`}
+          use:reveal={{ y: 34 }}
+        >
+          {#if heroCover.crop}
+            <!-- the front is ~half the wraparound's width: the full-size image
+                 keeps it sharp at the hero's size -->
+            <img src={heroCover.fullUrl} alt={`${work.title} — cover`} style={cropImgStyle(heroCover.crop)} />
+          {:else}
+            <img src={heroCover.medUrl} alt={`${work.title} — cover`} />
+          {/if}
           <!-- RLS returns only the cover row for a locked work, so realPageCount
                would read "1P" — same guard as the CONTENTS header below. -->
           <figcaption class="mono ov-hero__coverTag">
@@ -313,13 +556,73 @@
       <div class="ov-hero__text">
         <p class="mono ov-hero__kicker" use:decodeIn>ASU AZURE · PRESSROOM</p>
         <h1 class="ov-hero__title serif authored" use:titleIn>{work.title}</h1>
-        <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
-          {i18n.t(statusKey)}
-          {#if work.tags.length}· {work.tags.join(' / ')}{/if}
-        </p>
-        {#if work.description}
-          <p class="ov-hero__desc serif" use:reveal={{ delay: 0.14 }}>{work.description}</p>
+        {#if kindLabel || work.tags.length}
+          <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
+            {kindLabel ?? ''}
+            {#if work.tags.length}{kindLabel ? '· ' : ''}<span class="authored">{work.tags.join(' / ')}</span>{/if}
+          </p>
         {/if}
+        {#if info.length}
+          <!-- 奥付: what the book is before anyone opens it — a Japanese visitor
+               learns here that the book is in Thai, and whether it is translated -->
+          <dl class="ov-info" use:reveal={{ delay: 0.11 }}>
+            {#each info as item (item.key)}
+              <div class="ov-info__item">
+                <dt class="mono">{item.label}</dt>
+                {#if item.lines && item.lines.length > 1}
+                  <!-- the first release (初版), then each later printing on its own line -->
+                  <dd class="ov-info__value ov-info__value--lines">
+                    {#each item.lines as line, li (li)}<span class="ov-info__line">{line}</span>{/each}
+                  </dd>
+                {:else}
+                  <dd class="ov-info__value">{item.value}</dd>
+                {/if}
+              </div>
+            {/each}
+          </dl>
+        {/if}
+        {#if work.description}
+          <p class="ov-hero__desc serif authored" use:reveal={{ delay: 0.14 }}>{work.description}</p>
+        {/if}
+        {#if warnings.length}
+          <div class="ov-cw" role="note" use:reveal={{ delay: 0.17 }}>
+            <span class="mono ov-cw__label"><span aria-hidden="true">⚠</span> {i18n.t('ov.cw')}</span>
+            <p class="ov-cw__items">{warnings.join('・')}</p>
+          </div>
+        {/if}
+        {#if hero && novelHref}
+          <!-- a book in parts with its novel as text: the parts are the way in,
+               the scanned pages a quiet link (see `hero`) -->
+          <div class="ov-hero__actions ov-hero__actions--parts" use:reveal={{ delay: 0.2 }}>
+            <a
+              class="ov-btn mono"
+              data-sfx="open"
+              href={novelHref}
+              onclick={(e) => locked && openLock(novelHref, e)}
+            >
+              {#if locked}<span aria-hidden="true">🔒 </span>{/if}{heroNovelLabel} →
+            </a>
+            {#if heroManga}
+              <a
+                class="ov-btn mono"
+                data-sfx="open"
+                href={heroManga.href}
+                onclick={(e) => locked && openLock(heroManga.href, e)}
+              >
+                {#if locked}<span aria-hidden="true">🔒 </span>{/if}{heroManga.label} →
+              </a>
+            {/if}
+            <button type="button" class="ov-btn ov-btn--ghost mono" onclick={share}>
+              {shareNote || i18n.t('ov.share')}
+            </button>
+            <span class="ov-live" aria-live="polite">{shareNote}</span>
+            <a
+              class="ov-quiet"
+              href={continueAt && !inManga ? continueHref : readHref}
+              onclick={(e) => locked && openLock(continueAt && !inManga ? continueHref : readHref, e)}
+            >{origLabel} <span aria-hidden="true">→</span></a>
+          </div>
+        {:else}
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
           <a
             class="ov-btn mono"
@@ -340,6 +643,30 @@
               {i18n.t('ov.start')}
             </a>
           {/if}
+          {#if novelHref}
+            <!-- the prose reads as text in its own reader (supabase/novel.sql);
+                 the button above still opens the pages. With a place saved in the
+                 novel it says which chapter and opens there (lib/novel.ts). -->
+            <a
+              class="ov-btn mono"
+              class:ov-btn--ghost={!novelSaved || continueAt}
+              data-sfx="open"
+              href={novelHref}
+              onclick={(e) => locked && openLock(novelHref, e)}
+            >
+              {#if locked}<span aria-hidden="true">🔒 </span>{/if}{novelLabel} →
+            </a>
+          {/if}
+          <button type="button" class="ov-btn ov-btn--ghost mono" onclick={share}>
+            {shareNote || i18n.t('ov.share')}
+          </button>
+          <span class="ov-live" aria-live="polite">{shareNote}</span>
+        </div>
+        {/if}
+        <!-- the place and the ここすき live in this browser only — say so where
+             「続きから読む」 promises them -->
+        <div class="ov-marknote" use:reveal={{ delay: 0.22 }}>
+          <BookmarkNote />
         </div>
       </div>
     </div>
@@ -351,15 +678,73 @@
       onclick={scrollDown}
       aria-label="Scroll for more"
     >
-      <span class="ov-scrollcue__label">{i18n.t('ov.contents')}</span>
+      <span class="ov-scrollcue__label">{i18n.t(showParts ? 'ov.parts' : 'ov.contents')}</span>
       <span class="ov-scrollcue__line" aria-hidden="true"></span>
       <span class="ov-scrollcue__chev" aria-hidden="true"></span>
     </button>
   </section>
 
   <!-- ACT II: contents — page & chapter overview, straight after the cover (ink) -->
-  <section class="ov-toc spread spread--ink" id="ov-more">
+  <section class="ov-toc spread spread--ink" class:is-locked={locked} id="ov-more">
     <div class="ov-toc__inner">
+      {#if showParts}
+        <!-- この本の構成: one book in parts, each with its kind, pages, language
+             and its own way in — vol. 2's novel and manga read as unrelated before -->
+        <div class="ov-parts" use:reveal>
+          <header class="ov-toc__head">
+            <span class="index-num" aria-hidden="true">構</span>
+            <h2 class="serif ov-toc__title" use:headingIn use:converge>{i18n.t('ov.parts')}</h2>
+            <span class="ov-toc__rule" aria-hidden="true"></span>
+          </header>
+          <ol class="ov-parts__list">
+            {#each parts as part, pi (part.id)}
+              {@const href = partHref(part)}
+              {@const note = partNote(part, work, i18n.lang, (k) => i18n.t(k as DictKey))}
+              <li class="ov-part">
+                <span class="mono ov-part__num">{partLabel(pi + 1, i18n.lang)}</span>
+                <div class="ov-part__body">
+                  <p class="ov-part__head">
+                    <span class="serif authored ov-part__title">{part.name}</span>
+                    {#if part.kind}
+                      <span class="mono ov-part__kind" data-kind={part.kind}>{i18n.t(part.kind === 'novel' ? 'part.novel' : 'part.manga')}</span>
+                    {/if}
+                  </p>
+                  <p class="ov-part__meta">
+                    {#if part.first !== null}
+                      <span class="mono ov-part__range">{i18n.t('part.pages').replace('{a}', String(part.first)).replace('{b}', String(part.last))}</span>
+                    {/if}
+                    {#if note}<span class="ov-part__lang">{note}</span>{/if}
+                  </p>
+                </div>
+                {#if part.kind === 'novel' && novelChapters.length}
+                  <!-- the novel's chapters, as its reader's 目次 lists them; each opens there -->
+                  <nav class="ov-part__toc" aria-label={i18n.t('ov.novelToc')}>
+                    <p class="mono ov-part__tocHead">{i18n.t('ov.novelToc')}</p>
+                    <ol class="ov-part__tocList">
+                      {#each novelChapters as c (c.index)}
+                        <li><a class="authored ov-part__ch" href={c.href} data-sfx="open">{c.title}</a></li>
+                      {/each}
+                    </ol>
+                  </nav>
+                {/if}
+                <a
+                  class="ov-btn mono ov-part__go"
+                  class:ov-btn--ghost={pi > 0}
+                  data-sfx="open"
+                  href={href ?? readHref}
+                  onclick={(e) => openPart(part, e)}
+                >
+                  {#if locked}<span aria-hidden="true">🔒 </span>{/if}
+                  {part.kind === 'novel' && novelHref
+                    ? novelLabel
+                    : i18n.t(part.kind === 'manga' ? 'part.readManga' : 'ov.start')} →
+                </a>
+              </li>
+            {/each}
+          </ol>
+        </div>
+      {/if}
+
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
         <h2 class="serif ov-toc__title" use:headingIn use:converge>{i18n.t('ov.contents')}</h2>
@@ -370,14 +755,19 @@
       {#if locked}
         <!-- RLS returns only the cover row, so there is nothing to strip —
              show the gate invitation instead of thumbnails. -->
-        <div class="ov-lockNote" use:reveal>
-          <span class="ov-lockNote__glyph" aria-hidden="true">🔒</span>
-          <p class="mono ov-lockNote__text">{i18n.t('ov.locked')}</p>
-          <!-- Shown only when the author has set one, in the studio. -->
-          {#if work.password_hint}
-            <p class="mono ov-lockNote__hint">{i18n.t('lock.hint')} — {work.password_hint}</p>
-          {/if}
-          <button type="button" class="mono ov-lockNote__btn" onclick={() => openLock(null)}>
+        <div class="ov-lockbar" use:reveal>
+          <span class="ov-lockbar__glyph" aria-hidden="true">🔒</span>
+          <p class="mono ov-lockbar__text">
+            {#if work.password_hint}
+              {i18n.t('ov.locked')}
+              <!-- Shown only when the author has set one, in the studio. -->
+              <span class="ov-lockbar__hint">{i18n.t('lock.hint')} — <span class="authored">{work.password_hint}</span></span>
+            {:else}
+              <!-- No hint: say it is limited, never where the password comes from -->
+              {i18n.t('ov.limited')} — {i18n.t('ov.limitedNote')}
+            {/if}
+          </p>
+          <button type="button" class="mono ov-lockbar__btn" onclick={() => openLock(null)}>
             {i18n.t('lock.unlock')} →
           </button>
         </div>
@@ -422,7 +812,7 @@
         <div class="ov-chapter" use:reveal>
           <header class="ov-chapter__head">
             <span class="mono ov-chapter__num">{String(ci + 1).padStart(2, '0')}</span>
-            <h3 class="serif ov-chapter__title">{ch.title}</h3>
+            <h3 class="serif authored ov-chapter__title">{ch.title}</h3>
             <span class="mono ov-chapter__count">{chPages.filter((p) => !p.isBlank).length}P</span>
             <a
               class="mono ov-chapter__read"
@@ -452,52 +842,22 @@
     </div>
   </section>
 
-  <!-- ACT III: cast — who's who (paper) -->
+  <!-- ACT III: cast — who's who, staged like the STARFALL MV (night set) -->
   {#if castList.length}
-    <section class="ov-cast spread spread--paper">
-      <div class="paper-grid" aria-hidden="true"></div>
-      <div class="crop crop--tl" aria-hidden="true"></div>
-      <div class="crop crop--tr" aria-hidden="true"></div>
-      <div class="crop crop--bl" aria-hidden="true"></div>
-      <div class="crop crop--br" aria-hidden="true"></div>
-      <div class="regmark ov-cast__reg" aria-hidden="true"></div>
-      <span class="watermark ov-cast__wm" aria-hidden="true">登場人物</span>
-      <div class="ov-cast__inner">
-        <header class="ov-cast__head" use:reveal>
-          <span class="index-num" aria-hidden="true">人</span>
-          <h2 class="serif ov-cast__title" use:headingIn use:converge>{i18n.t('ov.cast')}</h2>
-          <span class="ov-cast__rule" aria-hidden="true"></span>
-          <span class="mono">{pad2(castList.length)}</span>
-        </header>
-        <div class="ov-cast__grid" use:revealChildren>
-          {#each castList as c, i (c.id)}
-            <button
-              type="button"
-              class="ov-castTile"
-              style={`--c:${c.color}`}
-              onclick={() => openCast(i)}
-            >
-              <span class="ov-castTile__frame">
-                {#if c.iconUrl}
-                  <img src={c.iconUrl} alt="" loading="lazy" draggable="false" />
-                {:else}
-                  <span class="serif authored ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
-                {/if}
-                <span class="mono ov-castTile__num">{pad2(i + 1)}</span>
-              </span>
-              <span class="serif authored ov-castTile__name">{c.name}</span>
-              {#if c.role}
-                <span class="mono ov-castTile__role">{c.role}</span>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      </div>
-    </section>
+    <CastStage cast={castList} onOpen={openCast} />
   {/if}
 
   <!-- ACT IV: synopsis — the spoiler leaf, last before the imprint (paper) -->
   {#if forewordHtml}
+    <!-- The synopsis tells the whole story. It stays open (the owner's call),
+         but nobody walks into it unwarned: a band first, and a way past it. -->
+    <aside class="ov-spoiler" aria-label={i18n.t('ov.spoilerTitle')}>
+      <div class="ov-spoiler__inner">
+        <p class="mono ov-spoiler__title"><span aria-hidden="true">⚠</span> {i18n.t('ov.spoilerTitle')}</p>
+        <p class="ov-spoiler__body">{i18n.t('ov.spoilerBody')}</p>
+        <a class="mono ov-spoiler__skip" href="#ov-after" onclick={skipSynopsis}>{i18n.t('ov.skip')} ↓</a>
+      </div>
+    </aside>
     <section class="ov-fore spread spread--paper">
       <div class="paper-grid paper-grid--margin" aria-hidden="true"></div>
       <div class="crop crop--tl" aria-hidden="true"></div>
@@ -507,7 +867,15 @@
       <div class="regmark ov-fore__reg" aria-hidden="true"></div>
       <div class="ov-fore__inner">
         <p class="mono ov-fore__label" use:headingIn>✳ {i18n.t('ov.foreword')}</p>
-        <p class="mono ov-fore__spoiler" use:reveal={{ delay: 0.08 }}>{i18n.t('ov.spoiler')}</p>
+        {#if fore.sections.length >= 2}
+          <nav class="ov-fore__nav" aria-label={i18n.t('ov.sections')}>
+            <ol>
+              {#each fore.sections as sec (sec.id)}
+                <li><a class="authored" href={`#${sec.id}`}>{sec.text}</a></li>
+              {/each}
+            </ol>
+          </nav>
+        {/if}
         <div class="ov-fore__body serif authored" use:revealChildren>
           {@html forewordHtml}
         </div>
@@ -525,8 +893,71 @@
     </section>
   {/if}
 
+  <!-- ACT V: the series — the other books, and where to go next (ink) -->
+  {#if series.list.length}
+    <section class="ov-series spread spread--ink" id="ov-after" tabindex="-1">
+      <div class="ov-series__inner">
+        <header class="ov-series__head" use:reveal>
+          <span class="index-num" aria-hidden="true">続</span>
+          <h2 class="serif ov-series__title" use:headingIn>{i18n.t('ov.series')}</h2>
+          <span class="ov-series__rule" aria-hidden="true"></span>
+          <span class="mono authored">{work.series_title}</span>
+        </header>
+        <ol class="ov-series__list">
+          {#each series.list as b (b.id)}
+            {@const current = b.id === work.id}
+            <li>
+              <a
+                class="ov-seriesCard"
+                class:is-current={current}
+                href={current ? undefined : `/w/${b.slug}`}
+                aria-current={current ? 'page' : undefined}
+                data-sfx={current ? undefined : 'open'}
+              >
+                <span
+                  class="ov-seriesCard__cover"
+                  style={b.cover ? `aspect-ratio: ${b.cover.width} / ${b.cover.height}` : undefined}
+                >
+                  {#if b.cover?.crop}
+                    <img src={b.cover.medUrl} alt="" loading="lazy" style={cropImgStyle(b.cover.crop)} />
+                  {:else if b.cover}
+                    <img src={b.cover.medUrl} alt="" loading="lazy" />
+                  {/if}
+                </span>
+                <span class="mono ov-seriesCard__kind">
+                  {#if b.series_kind}{i18n.t(`series.${b.series_kind}`)}{/if}
+                  {#if b.read_locked}<span aria-hidden="true"> 🔒</span>{/if}
+                  {#if current}<span class="ov-seriesCard__here">· {i18n.t('ov.thisBook')}</span>{/if}
+                </span>
+                <span class="serif authored ov-seriesCard__title">{b.series_label || b.title}</span>
+              </a>
+            </li>
+          {/each}
+        </ol>
+        {#if inTimeline(work.slug)}
+          <!-- the books jump in time on purpose: the timeline says which order, and when -->
+          <a class="mono ov-series__tl" href="/timeline" data-sfx="open">{i18n.t('tl.link')}</a>
+        {/if}
+        {#if series.prev || series.next}
+          <nav class="ov-series__step">
+            {#if series.prev}
+              <a class="mono" href={`/w/${series.prev.slug}`} data-sfx="open" data-vt="back">
+                ← {i18n.t('ov.prev')} <span class="authored">{series.prev.series_label || series.prev.title}</span>
+              </a>
+            {/if}
+            {#if series.next}
+              <a class="mono ov-series__next" href={`/w/${series.next.slug}`} data-sfx="open">
+                {i18n.t('ov.next')} <span class="authored">{series.next.series_label || series.next.title}</span> →
+              </a>
+            {/if}
+          </nav>
+        {/if}
+      </div>
+    </section>
+  {/if}
+
   <!-- Page foot: back link + imprint, always the last leaf (ink) -->
-  <footer class="ov-foot spread spread--ink">
+  <footer class="ov-foot spread spread--ink" id={series.list.length ? undefined : 'ov-after'} tabindex="-1">
     <a class="mono ov-foot__back" href="/">← {i18n.t('ov.back')}</a>
     <span class="ov-foot__right">
       <!-- The artist is reachable from a book too, not only from the shelf. -->
@@ -630,7 +1061,10 @@
     gap: clamp(2rem, 5vw, 4rem);
     align-items: center;
     width: 100%;
-    padding: clamp(5rem, 12vh, 7rem) var(--pad) clamp(3rem, 8vh, 5rem);
+    /* The back chip and the LangBar are fixed at --chrome-top: when the hero
+       runs taller than the screen (phones), its top padding must clear them or
+       the cover starts underneath. */
+    padding: max(clamp(5rem, 12vh, 7rem), calc(var(--chrome-top, 0px) + 3rem)) var(--pad) clamp(3rem, 8vh, 5rem);
     max-width: 1200px;
     margin: 0 auto;
   }
@@ -646,6 +1080,74 @@
     display: block;
     width: 100%;
     height: auto;
+  }
+  /* The front of the wraparound: the frame has the front's aspect, the picture
+     is scaled and shifted inside it (cropImgStyle) — as the reader's .si__crop. */
+  .ov-hero__cover.is-cropped {
+    overflow: hidden;
+    width: 100%;
+  }
+  .ov-hero__cover.is-cropped img {
+    position: absolute;
+    max-width: none;
+  }
+  /* 奥付 — a row of small facts under the title */
+  .ov-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.3rem;
+    margin: 0;
+  }
+  .ov-info__item {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+  .ov-info dt {
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+  }
+  .ov-info__value {
+    margin: 0;
+    font-family: var(--font-display-authored);
+    font-size: 0.86rem;
+    color: var(--fg);
+  }
+  .ov-info__value--lines {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .ov-info__line {
+    display: block;
+  }
+  /* Content notes — before the read button, in the amber warning voice */
+  .ov-cw {
+    display: grid;
+    gap: 0.3rem;
+    max-width: 36em;
+    padding: 0.7rem 0.95rem;
+    border-left: 3px solid #e8a31a;
+    background: rgba(232, 163, 26, 0.09);
+  }
+  .ov-cw__label {
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+    color: #e8a31a;
+  }
+  .ov-cw__items {
+    font-family: var(--font-display-authored);
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--fg);
+  }
+  .ov-live {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .ov-hero__coverTag {
     position: absolute;
@@ -708,146 +1210,14 @@
   @media (max-width: 820px) {
     .ov-hero__inner {
       grid-template-columns: 1fr;
-      padding-top: clamp(4.5rem, 10vh, 6rem);
+      padding-top: max(clamp(4.5rem, 10vh, 6rem), calc(var(--chrome-top, 0px) + 3rem));
     }
     .ov-hero__cover {
       max-width: min(70vw, 18rem);
     }
-  }
-
-  /* ---- cast (paper leaf: who's who) ---- */
-  .ov-cast {
-    position: relative;
-    z-index: 1;
-    padding: clamp(5rem, 12vh, 8rem) var(--pad);
-    isolation: isolate;
-    overflow: hidden;
-  }
-  .ov-cast__reg {
-    top: 2.4rem;
-    left: 10%;
-  }
-  .ov-cast__wm {
-    top: 6%;
-    right: 3%;
-    font-size: clamp(5rem, 16vw, 13rem);
-  }
-  .ov-cast__inner {
-    position: relative;
-    z-index: 2;
-    max-width: 1100px;
-    margin: 0 auto;
-    display: grid;
-    gap: clamp(1.8rem, 4.5vh, 2.8rem);
-  }
-  .ov-cast__head {
-    display: flex;
-    align-items: baseline;
-    gap: 1.2rem;
-    position: relative;
-  }
-  .ov-cast__head .index-num {
-    position: absolute;
-    top: -0.55em;
-    left: -0.12em;
-    z-index: -1;
-    font-size: clamp(5rem, 13vw, 9rem);
-  }
-  .ov-cast__title {
-    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
-  }
-  .ov-cast__rule {
-    flex: 1;
-    height: 1px;
-    background: var(--line-strong);
-  }
-  .ov-cast__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(clamp(7.5rem, 17vw, 10.5rem), 1fr));
-    gap: clamp(0.9rem, 2.2vw, 1.6rem);
-  }
-  /* Roster tile — the art site's gallery-tile recipe, framed in the
-     character's own colour. */
-  .ov-castTile {
-    display: grid;
-    gap: 0.55rem;
-    padding: 0;
-    background: none;
-    border: 0;
-    cursor: pointer;
-    text-align: left;
-    color: var(--fg);
-  }
-  .ov-castTile__frame {
-    position: relative;
-    display: block;
-    aspect-ratio: 1;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-soft);
-    overflow: hidden;
-  }
-  .ov-castTile__frame img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.65s var(--ease), filter 0.65s var(--ease);
-  }
-  .ov-castTile__frame::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border: 2px solid var(--c, var(--accent));
-    opacity: 0;
-    transition: opacity 0.3s var(--ease);
-    pointer-events: none;
-  }
-  /* Pointer-gated: cast tiles are buttons, and an unguarded :hover makes the
-     first tap on a phone do nothing but paint this state. */
-  @media (hover: hover) {
-    .ov-castTile:hover .ov-castTile__frame img {
-      transform: scale(1.06);
-    }
-    .ov-castTile:hover .ov-castTile__frame::after {
-      opacity: 1;
-    }
-  }
-  .ov-castTile:focus-visible .ov-castTile__frame img {
-    transform: scale(1.06);
-  }
-  .ov-castTile:focus-visible .ov-castTile__frame::after {
-    opacity: 1;
-  }
-  .ov-castTile__ph {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    font-size: clamp(2.6rem, 7vw, 4rem);
-    font-style: italic;
-    color: color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
-    user-select: none;
-  }
-  .ov-castTile__num {
-    position: absolute;
-    top: 4px;
-    left: 5px;
-    font-size: 0.52rem;
-    color: #f4f1ea;
-    mix-blend-mode: difference;
-  }
-  .ov-castTile__name {
-    font-size: clamp(1.02rem, 1.8vw, 1.25rem);
-    line-height: 1.25;
-  }
-  .ov-castTile__role {
-    font-size: 0.55rem;
-    color: var(--fg-faint);
-  }
-  @media (max-width: 640px) {
-    .ov-cast__wm {
-      display: none;
+    /* the front is portrait: a little narrower keeps the title in the first screen */
+    .ov-hero__cover.is-cropped {
+      max-width: min(58vw, 15rem);
     }
   }
 
@@ -873,11 +1243,92 @@
   .ov-fore__label {
     color: var(--accent);
   }
-  /* Spoiler notice — the amber warning voice, tucked under the label. */
-  .ov-fore__spoiler {
-    margin-top: -1.2rem;
-    font-size: 0.6rem;
-    color: #b07708;
+  /* A section head (lib/foreword.ts) starts below any floated figure, and reads
+     from the start edge even inside a block the author centred. */
+  .ov-fore__body :global(h2[id^='ov-s-']) {
+    clear: both;
+    text-align: start;
+    margin-top: 1.4em;
+  }
+  /* Section nav — built from the synopsis's own numbered heads */
+  .ov-fore__nav ol {
+    display: grid;
+    gap: 0.45rem;
+    margin: -0.6rem 0 0;
+    padding: 0.9rem 0 0.9rem 1.1rem;
+    border-left: 1px solid var(--paper-mark, var(--line-strong));
+    list-style: none;
+  }
+  .ov-fore__nav a {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    color: var(--fg-dim);
+    text-decoration: underline;
+    text-decoration-color: transparent;
+    text-underline-offset: 0.25em;
+    transition: color 0.2s var(--ease), text-decoration-color 0.2s var(--ease);
+  }
+  .ov-fore__nav a:hover,
+  .ov-fore__nav a:focus-visible {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+  }
+
+  /* ---- spoiler band: a full-width hazard strip before the synopsis ---- */
+  .ov-spoiler {
+    position: relative;
+    z-index: 1;
+    background: #e8a31a;
+    color: #14110a;
+    padding: calc(clamp(1.4rem, 4vh, 2.2rem) + 10px) var(--pad);
+  }
+  .ov-spoiler::before,
+  .ov-spoiler::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 10px;
+    background: repeating-linear-gradient(-45deg, #14110a 0 10px, transparent 10px 20px);
+  }
+  .ov-spoiler::before {
+    top: 0;
+  }
+  .ov-spoiler::after {
+    bottom: 0;
+  }
+  .ov-spoiler__inner {
+    max-width: 44rem;
+    margin: 0 auto;
+    display: grid;
+    gap: 0.5rem;
+  }
+  .ov-spoiler__title,
+  .ov-spoiler__body,
+  .ov-spoiler__skip {
+    color: #14110a;
+  }
+  .ov-spoiler__title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+  }
+  .ov-spoiler__body {
+    font-family: var(--font-serif-authored);
+    font-size: clamp(1rem, 1.6vw, 1.15rem);
+    line-height: 1.7;
+  }
+  .ov-spoiler__skip {
+    justify-self: start;
+    margin-top: 0.3rem;
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+  .ov-spoiler__skip:hover,
+  .ov-spoiler__skip:focus-visible {
+    text-decoration-thickness: 2px;
   }
   /* Block flow (not grid) so author figures can float and wrap text.
      Blocks carry their own margins for rhythm. */
@@ -1021,6 +1472,205 @@
     opacity: 1;
   }
 
+  /* ---- この本の構成: the parts of a book in parts ---- */
+  .ov-parts {
+    display: grid;
+    gap: clamp(1.2rem, 3vh, 1.8rem);
+    /* room for the contents heading's index kanji, which rises above its line */
+    margin-bottom: clamp(2.5rem, 7vh, 4.5rem);
+  }
+  .ov-parts__list {
+    display: grid;
+    gap: 0.8rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ov-part {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem 1.4rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-soft);
+  }
+  .ov-part__num {
+    color: var(--accent);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .ov-part__body {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+  .ov-part__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 0.8rem;
+  }
+  .ov-part__title {
+    font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+    line-height: 1.3;
+    color: var(--fg);
+  }
+  .ov-part__kind {
+    padding: 0.2em 0.6em;
+    border: 1px solid currentColor;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    color: var(--fg);
+  }
+  .ov-part__kind[data-kind='novel'] {
+    color: #e8a31a;
+  }
+  .ov-part__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 1rem;
+  }
+  .ov-part__range {
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-dim);
+  }
+  .ov-part__lang {
+    font-family: var(--font-display-authored);
+    font-size: 0.88rem;
+    color: var(--fg);
+  }
+  .ov-part__go {
+    white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .ov-part {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.55rem;
+    }
+    .ov-part__go {
+      justify-self: stretch;
+      text-align: center;
+    }
+  }
+  .ov-marknote {
+    max-width: 36em;
+  }
+  /* the novel's chapters, a full row under its part */
+  .ov-part__toc {
+    grid-column: 1 / -1;
+    order: 2;
+    display: grid;
+    gap: 0.4rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+  .ov-part__tocHead {
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+  }
+  .ov-part__tocList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    gap: 0.1rem 1.2rem;
+  }
+  .ov-part__ch {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0.2rem 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    text-decoration: none;
+    transition: color 0.25s var(--ease), border-color 0.25s var(--ease);
+  }
+  .ov-part__ch::after {
+    content: '→';
+    margin-left: auto;
+    padding-left: 0.8em;
+    color: var(--fg-faint);
+  }
+  @media (hover: hover) {
+    .ov-part__ch:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+  }
+  .ov-part__ch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* the whole book as scanned pages: a quiet way in, under the parts */
+  .ov-hero__actions--parts .ov-quiet {
+    flex-basis: 100%;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    min-height: 2.75rem;
+    width: fit-content;
+    font-family: var(--font-display-authored);
+    font-size: 0.86rem;
+    color: var(--fg-dim);
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 0.3em;
+  }
+  @media (hover: hover) {
+    .ov-hero__actions--parts .ov-quiet:hover {
+      color: var(--fg);
+      text-decoration-color: var(--accent);
+    }
+  }
+  .ov-hero__actions--parts .ov-quiet:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* The floating 「← 書庫」 and the language switch: over the text once scrolled
+     (they blend by difference and read as noise there). Scrolling down they step
+     away; scrolling up they come back on a solid chip. */
+  :global(html[data-ovchrome] .langbar),
+  .ov-backchip {
+    transition: opacity 0.25s var(--ease), translate 0.25s var(--ease), background-color 0.25s var(--ease);
+  }
+  :global(html[data-ovchrome='away'] .langbar),
+  :global(html[data-ovchrome='away']) .ov-backchip {
+    opacity: 0;
+    translate: 0 -150%;
+    pointer-events: none;
+  }
+  :global(html[data-ovchrome='solid'] .langbar),
+  :global(html[data-ovchrome='solid']) .ov-backchip {
+    mix-blend-mode: normal;
+    opacity: 1;
+    padding: 0.45rem 0.75rem;
+    background: var(--ink-bg, #0c0c0d);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--ink-fg);
+  }
+  :global(html[data-ovchrome='solid']) .ov-backchip {
+    translate: 0 -0.45rem;
+  }
+  :global(html[data-ovchrome='solid'] .langbar) {
+    translate: 0 -0.45rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html[data-ovchrome] .langbar),
+    .ov-backchip {
+      transition: none;
+    }
+  }
+
   /* ---- contents ---- */
   .ov-toc {
     position: relative;
@@ -1150,38 +1800,175 @@
     border-radius: 50%;
     background: #e8a31a;
   }
-  /* Locked contents — the gate invitation where the strips would be. */
-  .ov-lockNote {
-    display: grid;
-    justify-items: center;
-    gap: 0.8rem;
-    padding: clamp(2.5rem, 8vh, 4.5rem) 1rem;
-    border: 1px dashed var(--line-strong);
-    text-align: center;
+  /* Locked contents — one line where the strips would be, not an empty box. */
+  .ov-toc.is-locked {
+    padding-top: clamp(3.5rem, 9vh, 5.5rem);
+    padding-bottom: clamp(2.5rem, 6vh, 3.5rem);
   }
-  .ov-lockNote__glyph {
-    font-size: 1.6rem;
+  .ov-lockbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.7rem 1.1rem;
+    padding: 0.85rem 1rem;
+    border: 1px dashed var(--line-strong);
+  }
+  .ov-lockbar__glyph {
+    font-size: 1.1rem;
     opacity: 0.75;
   }
-  .ov-lockNote__text {
-    letter-spacing: 0.2em;
+  .ov-lockbar__text {
+    flex: 1 1 16rem;
+    letter-spacing: 0.12em;
+    line-height: 1.7;
   }
-  .ov-lockNote__hint {
-    font-size: 0.6rem;
+  .ov-lockbar__hint {
+    display: block;
+    font-size: 0.62rem;
     color: #e8a31a;
   }
-  .ov-lockNote__btn {
-    margin-top: 0.4rem;
+  .ov-lockbar__btn {
     background: var(--accent);
     color: var(--ink-fg);
     border: 0;
-    padding: 0.8em 1.5em;
+    padding: 0.7em 1.3em;
     letter-spacing: 0.14em;
     cursor: pointer;
     transition: background-color 0.25s var(--ease);
   }
-  .ov-lockNote__btn:hover {
+  .ov-lockbar__btn:hover {
     background: #1d33c4;
+  }
+
+  /* ---- series ---- */
+  .ov-series {
+    position: relative;
+    z-index: 1;
+    padding: clamp(4.5rem, 11vh, 7rem) var(--pad) clamp(3rem, 8vh, 5rem);
+  }
+  .ov-series:focus,
+  .ov-foot:focus {
+    outline: none;
+  }
+  .ov-series__inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: grid;
+    gap: clamp(1.8rem, 4.5vh, 2.8rem);
+  }
+  .ov-series__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.6rem 1.2rem;
+    position: relative;
+  }
+  .ov-series__head .index-num {
+    position: absolute;
+    top: -0.55em;
+    left: -0.12em;
+    z-index: -1;
+    font-size: clamp(5rem, 13vw, 9rem);
+  }
+  .ov-series__title {
+    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+  }
+  .ov-series__rule {
+    flex: 1;
+    min-width: 2rem;
+    height: 1px;
+    background: var(--line-strong);
+  }
+  .ov-series__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(9.5rem, 40vw), 1fr));
+    gap: clamp(1rem, 3vw, 2rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ov-seriesCard {
+    display: grid;
+    gap: 0.45rem;
+    color: inherit;
+  }
+  .ov-seriesCard__cover {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: var(--bg-soft);
+    aspect-ratio: 0.72;
+    transition: border-color 0.25s var(--ease), transform 0.25s var(--ease);
+  }
+  .ov-seriesCard__cover img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    object-fit: cover;
+  }
+  /* a cropped front: cropImgStyle sets the box, so undo the cover fit */
+  .ov-seriesCard__cover img[style] {
+    inset: auto;
+    object-fit: fill;
+  }
+  @media (hover: hover) {
+    a.ov-seriesCard[href]:hover .ov-seriesCard__cover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+    }
+  }
+  a.ov-seriesCard[href]:focus-visible .ov-seriesCard__cover {
+    border-color: var(--accent);
+  }
+  .ov-seriesCard.is-current .ov-seriesCard__cover {
+    border-color: var(--line-strong);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+  .ov-seriesCard__kind {
+    font-size: 0.58rem;
+    letter-spacing: 0.16em;
+    color: var(--fg-faint);
+  }
+  .ov-seriesCard__here {
+    color: var(--accent);
+  }
+  .ov-seriesCard__title {
+    font-size: clamp(0.98rem, 1.6vw, 1.12rem);
+    line-height: 1.4;
+  }
+  .ov-series__step {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 0.8rem 1.6rem;
+    border-top: 1px solid var(--line);
+    padding-top: 1rem;
+  }
+  .ov-series__step a {
+    color: var(--fg-dim);
+    letter-spacing: 0.1em;
+  }
+  .ov-series__step a:hover {
+    color: var(--accent);
+  }
+  .ov-series__next {
+    margin-left: auto;
+  }
+  .ov-series__tl {
+    justify-self: start;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    color: var(--fg);
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 0.2em;
+    transition: color 0.25s var(--ease);
+  }
+  .ov-series__tl:hover,
+  .ov-series__tl:focus-visible {
+    color: var(--accent);
   }
 
   .ov-foot {

@@ -295,8 +295,11 @@
     { label: 'Serif — Fraunces', value: 'Fraunces, Georgia, serif' },
     { label: 'Grotesk — Space Grotesk', value: "'Space Grotesk', system-ui, sans-serif" },
     { label: 'Mono — JetBrains Mono', value: "'JetBrains Mono', monospace" },
-    { label: '明朝 — Noto Serif JP', value: "'Noto Serif JP', serif" },
-    { label: 'ゴシック — Noto Sans JP', value: "'Noto Sans JP', sans-serif" },
+    // System faces, never the subset webfonts 'Noto Serif JP' / 'Noto Sans JP':
+    // those hold only the kanji in src/, so an author's paragraph set in them
+    // fell through per glyph to a generic font (see --font-*-authored).
+    { label: '明朝 — Mincho', value: "'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'MS Mincho', serif" },
+    { label: 'ゴシック — Gothic', value: "'Yu Gothic', 'Hiragino Kaku Gothic ProN', 'Noto Sans CJK JP', 'Meiryo', sans-serif" },
   ];
 
   const BLOCKS = [

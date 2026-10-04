@@ -11,8 +11,9 @@ interface Props {
   description?: string;
   /** Absolute URL of a share-card image (a work's cover). Upgrades the card. */
   image?: string;
-  /** Path this page is canonically at, when it isn't the request's own (a song page
-      reached through a redirect or with a query). Defaults to the pathname. */
+  /** Path (+ query) this page is canonically at, when it isn't the request's own: a shared
+      artwork (`/asu?art=…`) is its own card, a song page may be reached through a redirect.
+      Defaults to the pathname. */
   canonical?: string;
   /** Reader route drives its own scrolling — skip Lenis + progress hairline. */
   chromeless?: boolean;

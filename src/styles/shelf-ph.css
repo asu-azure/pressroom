@@ -1,0 +1,76 @@
+/* ============================================================
+   Shelf placeholders — the same size as the real shelf, so nothing below it
+   moves when the books arrive (the jump used to be ~480 px: the island's
+   loading line was one line tall, the shelf three stages and labels tall).
+
+   Used twice with the same classes: by index.astro's `fallback` (before the
+   island hydrates) and by Library.svelte while it fetches. Every number here
+   mirrors Library.svelte (.lib, .lib__head, .lib__hint, .lib__grid) and the
+   stage/label of WorkCard / KeyChain — change them together.
+   ============================================================ */
+:root { --shelf-label-h: 7rem; }
+
+.shelf-ph {
+  padding: clamp(2.5rem, 7vh, 4.5rem) var(--pad) clamp(3rem, 8vh, 5rem);
+}
+.shelf-ph__head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.shelf-ph__k {
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  color: var(--accent);
+}
+.shelf-ph__rule {
+  flex: 1;
+  height: 7px;
+  border-bottom: 1px solid var(--line-strong);
+}
+.shelf-ph__hint {
+  margin-top: 0.7rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.14em;
+  visibility: hidden;
+}
+.shelf-ph__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(14rem, 40vw), 19rem));
+  column-gap: clamp(1.25rem, 5vw, 4.5rem);
+  row-gap: clamp(3rem, 8vh, 5rem);
+  margin-top: clamp(2rem, 5vh, 3rem);
+}
+@media (max-width: 640px) {
+  .shelf-ph__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.shelf-ph__stage {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  aspect-ratio: 0.74;
+}
+.shelf-ph__stage > span {
+  width: 84%;
+  aspect-ratio: 182 / 257;
+  margin-bottom: 0.3rem;
+  border-radius: 2px;
+  background: var(--bg-soft);
+  animation: shelf-ph 1.4s ease-in-out infinite alternate;
+}
+.shelf-ph__label {
+  display: block;
+  box-sizing: border-box;
+  margin-top: 0.2rem;
+  min-height: var(--shelf-label-h);
+  border-top: 6px solid #1c1c1f;
+}
+@keyframes shelf-ph { to { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .shelf-ph__stage > span { animation: none; }
+}
+/* Library omits the hint line under reduced motion; so does the placeholder. */
+@media (prefers-reduced-motion: reduce) {
+  .shelf-ph__hint { display: none; }
+}

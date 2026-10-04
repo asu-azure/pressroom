@@ -13,6 +13,7 @@
   import { supabase } from '../../lib/supabase';
   import { requireSession, watchSignOut } from '../../lib/authGuard';
   import { ART_BUCKET, artUrl } from '../../lib/storagePaths';
+  import { artKey, artPath } from '../../lib/artLink';
   import { uploadArtworkImages, uploadPortrait, artworkPaths } from '../../lib/artImage';
   import StudioCopy from './StudioCopy.svelte';
   import {
@@ -94,6 +95,15 @@
       .order('sort_key', { ascending: true });
     if (err) error = err.message;
     else items = data as ArtworkRow[];
+  }
+
+  async function copyLink(art: ArtworkRow) {
+    try {
+      await navigator.clipboard.writeText(new URL(artPath(artKey(art.id)), location.origin).href);
+      flash('LINK COPIED');
+    } catch {
+      flash('COULD NOT COPY THE LINK');
+    }
   }
 
   function flash(msg: string) {
@@ -560,6 +570,10 @@
                 <button class="mono sa__mini" onclick={() => patch(art, { published: !art.published })}>
                   {art.published ? '● LIVE' : '○ DRAFT'}
                 </button>
+                {#if art.published}
+                  <!-- its own link: /asu?art=<key>, which shares as this piece on the wall -->
+                  <button class="mono sa__mini" onclick={() => copyLink(art)}>COPY LINK</button>
+                {/if}
                 <button class="mono sa__mini sa__mini--danger" onclick={() => remove(art)}>DELETE</button>
               </div>
             </div>

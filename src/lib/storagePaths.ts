@@ -63,5 +63,8 @@ export function toPageRec(row: PageRow): PageRec {
     note: row.note,
     bubbles: row.bubbles ?? [],
     isBlank: row.is_blank ?? false,
+    ...(row.clean_path && row.clean_med_path
+      ? { cleanUrl: publicUrl(row.clean_path), cleanMedUrl: publicUrl(row.clean_med_path) }
+      : {}),
   };
 }
