@@ -63,6 +63,15 @@ describe('the song catalogue', () => {
     expect(songBySlug('starfall')?.status).toBe('out');
   });
 
+  // v07j (4 Oct): these four left STARFALL's choir, their terms need permission; the credits must not name them
+  it('credits only the voices that sing', () => {
+    for (const key of ['ost.creditsVoices', 'ost.creditsCorpora']) {
+      const d = FIELD_BY_KEY.get(key)!.defaults;
+      for (const text of Object.values(d))
+        for (const gone of ['Akane', 'Aoi', 'Tobari', 'JSUT', '琴葉', 'トバリ']) expect(text, `${key}: ${gone}`).not.toContain(gone);
+    }
+  });
+
   it('registers the copy groups the music pages render', () => {
     for (const id of ['musicRack', 'ostHero', 'ostList', 'ostNotes', 'ostMv', 'ostCredits']) {
       expect(SECTIONS.some((s) => s.id === id), id).toBe(true);

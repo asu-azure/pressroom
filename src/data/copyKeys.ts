@@ -537,67 +537,67 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'ost.m1', section: 'ostNotes', label: 'I. Prologue', type: 'line',
-    defaults: { en: 'A melody long forgotten comes back on a single piano. A door stands open.', th: 'ทำนองที่เคยลืมไปกลับมาด้วยเปียโนหลังเดียว ประตูบานหนึ่งเปิดรออยู่', ja: '忘れていた旋律が、ピアノひとつで戻ってくる。扉がひとつ、開いている。' },
+    defaults: { en: 'Dust turning in a beam of light. A door left slightly open.', th: 'ฝุ่นลอยในลำแสง ประตูบานหนึ่งแง้มค้างไว้', ja: '光の中に舞う埃。少しだけ開いたままの扉。' },
   },
   {
     key: 'ost.m2', section: 'ostNotes', label: 'II. Blue Margin', type: 'line',
-    defaults: { en: 'A new school, a desk on its own: the strings rise out of the quiet around Sky.', th: 'โรงเรียนใหม่กับโต๊ะที่ไม่มีใครนั่งด้วย เครื่องสายค่อย ๆ ดังขึ้นจากความเงียบรอบตัวสกาย', ja: '新しい学校、ひとりきりの机。スカイをつつむ静けさから、弦が立ちのぼる。' },
+    defaults: { en: 'Blue at the edge of the page. A quiet with room for one.', th: 'สีฟ้าตรงขอบกระดาษ ความเงียบที่มีที่พอแค่คนเดียว', ja: 'ページの余白の青。ひとり分だけの静けさ。' },
   },
   {
     key: 'ost.m3', section: 'ostNotes', label: 'III. Long Shadows', type: 'line',
-    defaults: { en: 'Long shadows over a sunflower field, a memory of Time, building toward the hook.', th: 'เงายาวทอดบนทุ่งทานตะวัน ความทรงจำถึงทาม ค่อย ๆ ไต่ขึ้นไปหาท่อนฮุก', ja: 'ヒマワリ畑にのびる長い影。タイムの記憶が、サビへ少しずつ高まっていく。' },
+    defaults: { en: 'The shadows stretch out. The gold stays longer than that afternoon did.', th: 'เงาทอดยาวออกไป สีทองค้างอยู่นานกว่าบ่ายวันนั้น', ja: '影が伸びていく。金色は、あの午後よりも長く残る。' },
   },
   {
     key: 'ost.m4', section: 'ostNotes', label: 'IV. Hallway Echo', type: 'line',
-    defaults: { en: 'The motif, G–A♭–G, echoes down the corridors where Sun and Udon keep trying to reach the new boy.', th: 'โมทีฟ ซอล ลาแฟลต ซอล ก้องไปตามทางเดินที่ซันกับอุด้งพยายามเข้าหาเด็กใหม่ไม่เลิก', ja: 'モチーフ、ソ・ラ♭・ソが、サンとウドンが新入りに声をかけ続ける廊下に響く。' },
+    defaults: { en: 'A voice sent down the corridor comes back as an echo.', th: 'เสียงเรียกที่ส่งไปสุดทางเดิน ย้อนกลับมาเป็นเสียงสะท้อน', ja: '廊下の向こうへ投げた声が、こだまになって戻ってくる。' },
   },
   {
     key: 'ost.m5', section: 'ostNotes', label: 'V. Second Hand', type: 'line',
-    defaults: { en: 'The tempo ticks like a second hand as a childhood comes apart.', th: 'จังหวะเดินเร็วเหมือนเข็มวินาที วัยเด็กค่อย ๆ หลุดออกจากกันทีละชิ้น', ja: '秒針のように刻むテンポ。幼い日々が、ほどけていく。' },
+    defaults: { en: 'Every second takes a little something with it.', th: 'ทุกวินาทีพาอะไรบางอย่างไปด้วยทีละนิด', ja: '一秒ごとに、何かが少しずつ持っていかれる。' },
   },
   {
     key: 'ost.m6', section: 'ostNotes', label: 'VI. Sodium Light', type: 'line',
-    defaults: { en: 'A riff under orange street lights, through a night of being alone.', th: 'ริฟฟ์ใต้แสงไฟถนนสีส้ม ผ่านคืนที่ต้องอยู่คนเดียว', ja: 'オレンジの街灯の下を走るリフ。ひとりきりの夜を抜けて。' },
+    defaults: { en: 'Orange light on an empty road, and its low hum.', th: 'แสงสีส้มบนถนนที่ไม่มีใคร กับเสียงหึ่งต่ำ ๆ ของมัน', ja: '誰もいない道のオレンジの灯り。その低いうなり。' },
   },
   {
     key: 'ost.m7', section: 'ostNotes', label: 'VII. Rain on Glass', type: 'line',
-    defaults: { en: 'Rain on the window: a short lament borrowed from Chopin’s Nocturne Op. 48.', th: 'ฝนบนกระจกหน้าต่าง บทรำพึงสั้น ๆ ที่หยิบยืมมาจากนอคเทิร์น Op. 48 ของโชแปง', ja: '窓を打つ雨。ショパンの夜想曲 作品48 を借りた、短い嘆き。' },
+    defaults: { en: 'The rain writes something on the glass, then wipes it away again.', th: 'ฝนเขียนอะไรบางอย่างบนกระจก แล้วก็ลบทิ้งไปอีก', ja: '雨がガラスに何かを書いては、また消していく。' },
   },
   {
     key: 'ost.m8', section: 'ostNotes', label: 'VIII. Roll Call', type: 'line',
-    defaults: { en: 'Roll call: the motif stacks up one instrument at a time, like friends turning up at the door.', th: 'เช็กชื่อ โมทีฟซ้อนขึ้นทีละเครื่อง เหมือนเพื่อนที่ทยอยมาถึงหน้าประตู', ja: '点呼。友だちが次々と扉に顔を出すように、モチーフが楽器ごとに重なっていく。' },
+    defaults: { en: 'One voice, then another, and then the room is full.', th: 'เสียงหนึ่ง อีกเสียงหนึ่ง แล้วก็เต็มห้อง', ja: 'ひとつの声、またひとつ。やがて部屋がいっぱいになる。' },
   },
   {
     key: 'ost.m9', section: 'ostNotes', label: 'IX. Semper ad Lucem', type: 'line',
-    defaults: { en: 'The choir comes in with the school’s motto: always turn toward the light.', th: 'คณะประสานเสียงเข้ามาพร้อมคติพจน์ของโรงเรียน “จงหันหน้าเข้าสู่แสง”', ja: '学校の標語とともに、合唱が入る。『光の方を向け』' },
+    defaults: { en: 'Every face turns the same way, toward where the light is.', th: 'ทุกใบหน้าหันไปทางเดียวกัน ทางที่มีแสง', ja: 'みんなの顔が、同じ方を向く。光のある方へ。' },
   },
   {
     key: 'ost.m10', section: 'ostNotes', label: 'X. Continue?', type: 'line',
-    defaults: { en: '8-bit sounds bring back the games played with Time. Continue?', th: 'เสียงเกม 8 บิตพาเกมที่เคยเล่นกับทามกลับมา Continue?', ja: '8ビットの音が、タイムと遊んだゲームを連れてくる。CONTINUE?' },
+    defaults: { en: 'Three lives left. The screen asks whether you’ll go on.', th: 'เหลืออีกสามชีวิต หน้าจอถามว่าจะเล่นต่อไหม', ja: '残りは三機。画面が、まだ続けるかと訊いてくる。' },
   },
   {
     key: 'ost.m11', section: 'ostNotes', label: 'XI. Cold Hands', type: 'line',
-    defaults: { en: 'Quiet winter lights, and a birthday the one he waited for never came to. The choir, almost a whisper.', th: 'แสงไฟหน้าหนาวที่เงียบงัน วันเกิดที่คนที่รอไม่มา เสียงประสานแผ่วจนเหมือนกระซิบ', ja: '静かな冬の灯り。待っていた人の来ない誕生日。合唱は、ささやくように。' },
+    defaults: { en: 'Winter lights, and fingertips that won’t get warm.', th: 'แสงไฟหน้าหนาว กับปลายนิ้วที่ไม่ยอมอุ่นขึ้นสักที', ja: '冬の灯り。いつまでも温まらない指先。' },
   },
   {
     key: 'ost.m12', section: 'ostNotes', label: 'XII. Undertow', type: 'line',
-    defaults: { en: 'An agitato that pulls like the sea at night.', th: 'ท่อนอะจิตาโตที่ดึงรั้งเหมือนคลื่นทะเลยามค่ำคืน', ja: '夜の海のように引きこむアジタート。' },
+    defaults: { en: 'Still on the surface. Underneath, a current.', th: 'ผิวน้ำนิ่งสนิท แต่ข้างใต้มีกระแสน้ำ', ja: '水面は静か。その下に、流れがある。' },
   },
   {
     key: 'ost.m13', section: 'ostNotes', label: 'XIII. One Breath', type: 'line',
-    defaults: { en: 'Two bars for the piano alone. One breath, then a light in the dark.', th: 'สองห้องที่เปียโนเล่นอยู่ลำพัง หายใจหนึ่งครั้ง แล้วก็มีแสงในความมืด', ja: 'ピアノだけの二小節。ひと呼吸おいて、暗闇に灯り。' },
+    defaults: { en: 'Hold it, let it go. Somewhere, a small light.', th: 'กลั้นไว้ แล้วปล่อยออกมา ที่ไหนสักแห่งมีแสงดวงเล็ก ๆ', ja: '息をとめて、吐く。どこかに、小さな灯り。' },
   },
   {
     key: 'ost.m14', section: 'ostNotes', label: 'XIV. Starfall', type: 'line',
-    defaults: { en: 'The stars fall and the years go by: the biggest chorus of all.', th: 'ดาวร่วงลงมาและปีก็ผ่านไป ท่อนฮุกที่ยิ่งใหญ่ที่สุด', ja: '星が降り、年月が過ぎていく。いちばん大きなサビ。' },
+    defaults: { en: 'Stars fall all night without a sound, and the years go with them.', th: 'ดาวร่วงทั้งคืนโดยไม่มีเสียง แล้วปีก็ไหลตามไปด้วย', ja: '星が音もなく降りつづける。年月も、いっしょに流れていく。' },
   },
   {
     key: 'ost.m15', section: 'ostNotes', label: 'XV. Sunrise', type: 'line',
-    defaults: { en: 'The key turns major, the night breaks, and someone comes back.', th: 'เปลี่ยนเป็นคีย์เมเจอร์ ฟ้าสาง แล้วก็มีคนกลับมา', ja: '長調に変わり、夜が明けて、誰かが帰ってくる。' },
+    defaults: { en: 'The edge of the sky turns pale, and the dark slowly lets go.', th: 'ขอบฟ้าเริ่มซีดลง แล้วความมืดก็ค่อย ๆ คลายมือ', ja: '空の端が白んで、夜がゆっくりと手をほどく。' },
   },
   {
     key: 'ost.m16', section: 'ostNotes', label: 'XVI. Epilogue', type: 'line',
-    defaults: { en: 'A door opens onto a field of sunflowers.', th: 'ประตูเปิดออกสู่ทุ่งทานตะวัน', ja: '扉の向こうは、ヒマワリ畑。' },
+    defaults: { en: 'Beyond the door, yellow as far as the eye can see.', th: 'หลังประตูบานนั้น มีแต่สีเหลืองไปจนสุดสายตา', ja: '扉の向こうは、見渡すかぎりの黄色。' },
   },
   {
     key: 'ost.mvKicker', section: 'ostMv', label: 'Label', type: 'line',
@@ -637,20 +637,20 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'ost.creditsVoices', section: 'ostCredits', label: 'Singing voices', type: 'line',
-    hint: 'Every NEUTRINO voice in the choir. Credit is optional for most of them, but listing them all is the owner\'s choice (4 Oct).',
+    hint: 'Every NEUTRINO voice in the choir (eleven since the v07j mix). Credit is optional for most of them, but listing them all is the owner\'s choice (4 Oct). Kotonoha Akane / Aoi, Yogatari Tobari and JSUT were taken out of the choir: their terms need permission.',
     defaults: {
-      en: 'VOICES — NEUTRINO (Merrow, Reina, NAKUMO, Soma, Runo, Tohoku Zunko, Tohoku Kiritan, Tohoku Itako, Shikoku Metan, No.7, Kotonoha Akane, Kotonoha Aoi, Yogatari Tobari, Yoko, JSUT)',
-      th: 'เสียงร้องสังเคราะห์ด้วย NEUTRINO (Merrow · Reina · NAKUMO · Soma · Runo · Tohoku Zunko · Tohoku Kiritan · Tohoku Itako · Shikoku Metan · No.7 · Kotonoha Akane · Kotonoha Aoi · Yogatari Tobari · Yoko · JSUT)',
-      ja: '歌声 — NEUTRINO（めろう、レイナ、ナクモ、ソウマ、ルノ、東北ずん子、東北きりたん、東北イタコ、四国めたん、No.7、琴葉茜、琴葉葵、夜語トバリ、謡子、JSUT）',
+      en: 'VOICES — NEUTRINO (Merrow, Reina, NAKUMO, Soma, Runo, Tohoku Zunko, Tohoku Kiritan, Tohoku Itako, Shikoku Metan, No.7, Yoko)',
+      th: 'เสียงร้องสังเคราะห์ด้วย NEUTRINO (Merrow · Reina · NAKUMO · Soma · Runo · Tohoku Zunko · Tohoku Kiritan · Tohoku Itako · Shikoku Metan · No.7 · Yoko)',
+      ja: '歌声 — NEUTRINO（めろう、レイナ、ナクモ、ソウマ、ルノ、東北ずん子、東北きりたん、東北イタコ、四国めたん、No.7、謡子）',
     },
   },
   {
     key: 'ost.creditsCorpora', section: 'ostCredits', label: 'Voice databases', type: 'line',
     hint: 'Yoko\'s database is CC BY 3.0, which requires this attribution; the licence link is added after it automatically.',
     defaults: {
-      en: 'Yoko is trained on “NIT SONG070 F001” © Nagoya Institute of Technology; JSUT on the JSUT-song corpus (Saruwatari–Takamichi Lab, The University of Tokyo). Licence:',
-      th: 'เสียง Yoko ฝึกจากฐานข้อมูล “NIT SONG070 F001” © Nagoya Institute of Technology ส่วนเสียง JSUT ฝึกจากคลังเสียง JSUT-song (ห้องวิจัย Saruwatari–Takamichi มหาวิทยาลัยโตเกียว) สัญญาอนุญาต:',
-      ja: '謡子：名古屋工業大学「NIT SONG070 F001」／JSUT：東京大学 猿渡・高道研究室「JSUT-song」コーパス。ライセンス：',
+      en: 'Yoko is trained on “NIT SONG070 F001” © Nagoya Institute of Technology. Licence:',
+      th: 'เสียง Yoko ฝึกจากฐานข้อมูล “NIT SONG070 F001” © Nagoya Institute of Technology สัญญาอนุญาต:',
+      ja: '謡子：名古屋工業大学「NIT SONG070 F001」。ライセンス：',
     },
   },
   {
