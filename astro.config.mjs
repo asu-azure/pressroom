@@ -6,8 +6,8 @@ import { rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Music features (see src/lib/features.ts) are off unless PUBLIC_MUSIC=true.
-// When off, the /ost route is not registered at all, so it is a real 404
-// rather than a hidden page.
+// When off, the music routes are not registered at all, so they are real 404s
+// rather than hidden pages.
 const env = loadEnv(process.env.NODE_ENV ?? 'production', process.cwd(), '');
 const music = (process.env.PUBLIC_MUSIC ?? env.PUBLIC_MUSIC) === 'true';
 
@@ -17,7 +17,11 @@ const musicRoutes = {
   hooks: {
     'astro:config:setup': ({ injectRoute }) => {
       if (!music) return;
-      injectRoute({ pattern: '/ost', entrypoint: './src/routes/ost.astro' });
+      // the rack, and one page per song that is out (src/data/songs.ts)
+      injectRoute({ pattern: '/music', entrypoint: './src/routes/music/index.astro' });
+      injectRoute({ pattern: '/music/[slug]', entrypoint: './src/routes/music/song.astro' });
+      // STARFALL's old address, kept for links and printed QRs
+      injectRoute({ pattern: '/ost', entrypoint: './src/routes/ost-redirect.ts' });
       // the 扉の向こう moving score, kept unlisted (see the file's header)
       injectRoute({ pattern: '/ost/tobira', entrypoint: './src/routes/ost-tobira.astro' });
     },

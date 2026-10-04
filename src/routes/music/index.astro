@@ -1,0 +1,204 @@
+---
+/**
+ * /music — the rack: every song is an acrylic keychain hanging on a rail, like merch on a booth
+ * table (src/data/songs.ts, in rack order). Tap a charm to go to its page (/music/<slug>), where
+ * the same keychain waits to be scanned. Songs not out yet hang as blank clear charms with a
+ * COMING sticker and no title (Jun, 4 Oct); a tap only sets them swinging.
+ *
+ * The charms are hung one by one once the page is quiet (scripts/hangWhenQuiet.ts): each is many
+ * translucent 3D layers, and painting them all at load stuttered. Until then a stage holds its
+ * place with a flat outline, so nothing moves when they arrive. Words are author copy (the
+ * 'music' group in copyKeys.ts). Only exists when PUBLIC_MUSIC=true.
+ */
+import Base from '../../layouts/Base.astro';
+import { SONGS, songPath } from '../../data/songs';
+import { keychainHtml } from '../../lib/keychain';
+import { songKeychain, songLength, songData } from '../../lib/keychainServer';
+import { loadCopy, COPY_PAYLOAD_ID } from '../../lib/siteCopy';
+import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../../lib/lang';
+import { cacheShell } from '../../lib/cache';
+import '../../styles/keychain.css';
+
+export const prerender = false;
+
+const copy = await loadCopy();
+const t = copy[DEFAULT_LANG];
+cacheShell(Astro);
+
+const charms = await Promise.all(
+  SONGS.map(async (song) =>
+    song.status === 'out'
+      ? {
+          song,
+          html: keychainHtml(await songKeychain(song, Astro.site, 640)),
+          length: songLength(song),
+          movements: songData(song).movements.length,
+        }
+      : { song, html: keychainHtml(null), length: '', movements: 0 },
+  ),
+);
+---
+
+<Base title="MUSIC · Pressroom — Asu Azure" description={t['music.lede']}>
+  <nav class="rack__langs mono" aria-label="Language">
+    {LANGS.map((l) => (
+      <button type="button" data-lang={l} aria-pressed={l === DEFAULT_LANG ? 'true' : 'false'}>{LANG_LABEL[l]}</button>
+    ))}
+  </nav>
+
+  <main class="rack" id="rack" data-no-sfx>
+    <header class="rack__head">
+      <p class="mono rack__kicker" data-i18n="music.kicker">{t['music.kicker']}</p>
+      <h1 class="rack__title" data-mv-converge>MUSIC</h1>
+      <p class="rack__lede" data-i18n="music.lede">{t['music.lede']}</p>
+      <p class="mono rack__hint" data-i18n="music.hint">{t['music.hint']}</p>
+    </header>
+
+    <section class="rack__board" aria-label="Songs">
+      <ol class="rack__row">
+        {charms.map(({ song, html, length, movements }, i) =>
+          song.status === 'out' ? (
+            <li class="rack__slot">
+              <a class="rack__card" href={songPath(song.slug)} draggable="false" data-rack-link
+                 aria-label={`${song.title!.ja} — ${song.title!.en}`}>
+                <div class="kc__stage rack__stage" data-rack-stage data-i={i}>
+                  <span class="rack__ghost" aria-hidden="true"></span>
+                  <template set:html={html} />
+                </div>
+                <span class="rack__label">
+                  <span class="rack__name"><b>{song.title!.ja}</b> <span class="mono">{song.title!.en}</span></span>
+                  <span class="mono rack__meta">{movements} MOVEMENTS · {length}</span>
+                  <span class="mono rack__go"><span data-i18n="music.listen">{t['music.listen']}</span> <span aria-hidden="true">→</span></span>
+                </span>
+              </a>
+            </li>
+          ) : (
+            <li class="rack__slot rack__slot--coming">
+              <div class="rack__card" aria-label="Coming soon">
+                <div class="kc__stage rack__stage" data-rack-stage data-i={i}>
+                  <span class="rack__ghost" aria-hidden="true"></span>
+                  <template set:html={html} />
+                </div>
+                <span class="rack__label">
+                  <span class="mono rack__meta" data-i18n="music.coming">{t['music.coming']}</span>
+                </span>
+              </div>
+            </li>
+          ),
+        )}
+      </ol>
+    </section>
+
+    <footer class="rack__foot">
+      <a class="mono rack__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.back">{t['ost.back']}</span></a>
+    </footer>
+  </main>
+
+  <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
+</Base>
+
+<script>
+  import { initRack } from '../../scripts/ost/rack';
+  initRack();
+</script>
+
+<style>
+  .rack {
+    position: relative;
+    min-height: 100svh;
+    padding: calc(var(--topbar-h, 3.6rem) + clamp(1.5rem, 5vh, 3.5rem)) var(--pad) clamp(2rem, 6vh, 4rem);
+    background:
+      radial-gradient(110% 70% at 70% 0%, #1b2a55, transparent 70%),
+      linear-gradient(180deg, #121a33, #07080f);
+    color: var(--fg);
+  }
+  .rack__langs {
+    position: fixed;
+    top: var(--chrome-top, 4.2rem);
+    right: clamp(0.6rem, 2vw, 1.4rem);
+    z-index: 40;
+    display: flex;
+    gap: 0.25rem;
+  }
+  .rack__langs button {
+    padding: 0.3rem 0.55rem;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    border: 1px solid var(--line);
+    color: var(--fg-dim);
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+  }
+  .rack__langs button[aria-pressed='true'] { color: var(--fg); border-color: var(--accent); }
+
+  .rack__head { max-width: 1240px; margin: 0 auto clamp(2rem, 6vh, 4rem); display: grid; gap: 0.8rem; }
+  .rack__kicker { font-size: 0.62rem; letter-spacing: 0.18em; color: #8fb2ff; }
+  .rack__title {
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(3.4rem, 10vw, 8rem);
+    line-height: 0.9;
+    letter-spacing: 0.02em;
+    color: #f4f1ea;
+    text-shadow: 0 0 40px rgba(143, 178, 255, 0.3);
+  }
+  .rack__lede { max-width: 44ch; color: var(--fg-dim); font-size: clamp(0.95rem, 1.4vw, 1.08rem); line-height: 1.7; }
+  .rack__hint { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--fg-faint); }
+
+  /* the board: metal rails with the charms hanging from hooks on them */
+  .rack__board { position: relative; max-width: 1240px; margin: 0 auto; overflow-x: clip; }
+  .rack__row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(15rem, 42vw), 1fr));
+    gap: 0 clamp(1rem, 3vw, 2.5rem);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* every row of charms hangs from its own rail */
+  .rack__slot { position: relative; padding-top: 4px; }
+  .rack__slot::before {
+    content: '';
+    position: absolute;
+    left: -1.5rem;
+    right: -1.5rem;
+    top: 0;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #8d8a84, #4a4945 55%, #2b2a28);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+  .rack__card { display: flex; flex-direction: column; color: inherit; text-decoration: none; -webkit-user-drag: none; user-select: none; outline: none; }
+  .rack__stage { --kc-w: 52cqi; --kc-chain: 30cqi; aspect-ratio: 0.74; }
+  /* a flat outline holds the charm's place until it is hung */
+  .rack__ghost {
+    position: absolute;
+    left: 24%;
+    right: 24%;
+    top: 36%;
+    aspect-ratio: 1 / 1.46;
+    border-radius: 6cqi;
+    border: 1px dashed rgba(244, 241, 234, 0.18);
+    transition: opacity 0.4s var(--ease);
+  }
+  .rack__stage.is-hung .rack__ghost { opacity: 0; }
+  .rack__label { display: grid; gap: 0.3rem; padding: 0.4rem 0 2.6rem; min-height: 6.5rem; align-content: start; }
+  .rack__name b { font-family: var(--font-display); font-weight: 900; font-size: clamp(1.05rem, 1.6vw, 1.25rem); color: #f4f1ea; }
+  .rack__name span { margin-left: 0.4em; font-size: 0.58rem; letter-spacing: 0.3em; color: var(--fg-dim); }
+  .rack__meta { font-size: 0.58rem; letter-spacing: 0.12em; color: var(--fg-dim); }
+  .rack__slot--coming .rack__meta { color: var(--fg-faint); letter-spacing: 0.24em; }
+  .rack__go { font-size: 0.58rem; letter-spacing: 0.14em; color: var(--accent); }
+  @media (hover: hover) {
+    .rack__go { color: var(--fg-faint); transition: color 0.25s var(--ease); }
+    .rack__card:hover .rack__go { color: #8fb2ff; }
+  }
+  .rack__card:focus-visible .rack__stage { outline: 1.5px solid var(--accent); outline-offset: 6px; border-radius: 6px; }
+
+  .rack__foot { max-width: 1240px; margin: clamp(2rem, 6vh, 4rem) auto 0; padding-top: 1.4rem; border-top: 1px solid var(--line); }
+  .rack__back { font-size: 0.66rem; letter-spacing: 0.14em; color: var(--fg-dim); }
+  .rack__back:hover { color: var(--accent); }
+
+  @media (max-width: 640px) {
+    .rack__row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>

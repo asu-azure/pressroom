@@ -1,12 +1,14 @@
-# /ost data
+# Song data for the music pages
 
-## starfall.json — /ost (the CD single)
+## <slug>.json — /music/<slug> (starfall.json → /music/starfall)
 
-Imported, never hand-edited: `node scripts/import-ost.mjs [--audio]` reads the MV player's
-build (`../music/music/visualizer/player2/songs/starfall-mv/timeline.json`) and keeps only title,
-duration, movements, choir lyrics (chunks with kana), accent hits and the motif's right hand
-(for `motif.test.ts`). `--audio` also copies the MP3 to `public/ost/starfall.mp3`. The importer
-copies no credits: the music project's notes use a personal name that must not reach this repo.
+Imported, never hand-edited: `node scripts/import-ost.mjs <slug> [--audio]`. Each slug's sources
+are in `scripts/songs.import.mjs`: the MV player's build of the song (`timeline.json` in
+`../music/music-repo/visualizer/player2/songs/<id>/`) and the master in the song's `final/`
+folder. Kept: duration, movements, lyrics (chunks with kana), accent hits, the keychain's 48-bar
+wave and the motif's right hand (for `motif.test.ts`). `--audio` also copies the master to
+`public/ost/<slug>.mp3`. No title (the catalogue, `src/data/songs.ts`, owns titles) and no credits:
+the music project's notes use a personal name that must not reach this repo.
 
 ## perd-pratu.json — /ost/tobira (the moving score, unlisted)
 

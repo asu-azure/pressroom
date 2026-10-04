@@ -25,11 +25,12 @@ cacheShell(Astro);
 // env read is spelled out (not MUSIC) so the build folds it to a constant and drops the imports.
 const ost = import.meta.env.PUBLIC_MUSIC === 'true'
   ? await (async () => {
-      const [{ soundtrackKeychain, songLength }, { default: song }] = await Promise.all([
+      const [{ songKeychain, songLength, songData }, { songBySlug }] = await Promise.all([
         import('../lib/keychainServer'),
-        import('../data/ost/starfall.json'),
+        import('../data/songs'),
       ]);
-      return { data: await soundtrackKeychain(Astro.site, 480), length: songLength(), movements: song.movements.length };
+      const song = songBySlug('starfall')!;
+      return { data: await songKeychain(song, Astro.site, 480), length: songLength(song), movements: songData(song).movements.length };
     })()
   : null;
 ---
@@ -135,7 +136,7 @@ const ost = import.meta.env.PUBLIC_MUSIC === 'true'
       <span class="mono">© ASU AZURE</span>
       <span class="lib-foot__links">
         <a class="mono" href="/asu">ASU AZURE ↗</a>
-        {MUSIC && <a class="mono" href="/ost">OST ♪</a>}
+        {MUSIC && <a class="mono" href="/music">MUSIC ♪</a>}
         <a class="mono" href="https://x.com/asukonpeki">X — @ASUKONPEKI</a>
         <a class="mono lib-foot__studio" href="/studio">STUDIO ⌘</a>
       </span>

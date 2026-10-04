@@ -31,8 +31,11 @@ export function waveSvg(wave: number[]): string {
   return `<svg class="kc__waveSvg" viewBox="0 0 ${wave.length} 12" preserveAspectRatio="none" aria-hidden="true">${bars}</svg>`;
 }
 
-/** Everything inside a `.kc__stage`: hook, chain, and the charm. */
-export function keychainHtml(d: KeychainData): string {
+/** Everything inside a `.kc__stage`: hook, chain, and the charm. With no data it is a blank charm —
+ *  the clear plate alone with a COMING sticker, no print, holo or QR (a song not out yet; the
+ *  /music rack). Cheap on purpose: one translucent layer per face instead of five. */
+export function keychainHtml(d: KeychainData | null): string {
+  if (!d) return chainAndCharm('kc--blank', blankFace(false) + blankFace(true));
   const print = (back: boolean) =>
     back
       ? `<div class="kc__print kc__print--back">` +
@@ -56,18 +59,27 @@ export function keychainHtml(d: KeychainData): string {
     holo +
     `<span class="kc__spec"></span>` +
     `</div>`;
-  // The chain lives in the stage's own 2D space (the physics moves each bead);
-  // the charm is one 3D object hung from the jump ring, which passes through
-  // the plate's hole — half in front of the acrylic, half behind it.
+  return chainAndCharm('', face(false) + face(true));
+}
+
+const blankFace = (back: boolean) =>
+  `<div class="kc__face ${back ? 'kc__back' : 'kc__front'}">` +
+  `<span class="kc__plate"></span><span class="kc__hole"></span>` +
+  `<span class="kc__sticker">COMING</span>` +
+  `</div>`;
+
+// The chain lives in the stage's own 2D space (the physics moves each bead);
+// the charm is one 3D object hung from the jump ring, which passes through
+// the plate's hole — half in front of the acrylic, half behind it.
+function chainAndCharm(mod: string, faces: string): string {
   const beads = Array.from({ length: BEADS - 1 }, (_, i) => `<i class="kc__bead" style="--i:${i + 1}"></i>`).join('');
   return (
     `<span class="kc__hook" aria-hidden="true"></span>` +
     `<span class="kc__chain" aria-hidden="true"><svg class="kc__links"><polyline data-kc-links points=""/></svg>${beads}</span>` +
-    `<div class="kc" data-kc aria-hidden="true">` +
+    `<div class="kc ${mod}" data-kc aria-hidden="true">` +
     `<span class="kc__ring"></span>` +
     `<div class="kc__body">` +
-    face(false) +
-    face(true) +
+    faces +
     `<span class="kc__edge kc__edge--l"></span><span class="kc__edge kc__edge--r"></span>` +
     `<span class="kc__edge kc__edge--t"></span><span class="kc__edge kc__edge--b"></span>` +
     `</div></div>`

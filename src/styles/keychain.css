@@ -325,7 +325,28 @@
 .kc__edge--t { transform: rotateX(90deg) translateZ(calc(var(--H) / 2)); }
 .kc__edge--b { transform: rotateX(-90deg) translateZ(calc(var(--H) / 2)); }
 
-/* scanning: bars light up left to right (starfall.ts toggles .is-scanning) */
+/* a blank charm (a song not out yet, on the /music rack): the clear plate and a printed
+   COMING sticker, nothing else. Rotated a little, as a sticker slapped on by hand. */
+.kc__sticker {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  translate: -50% -50%;
+  rotate: -8deg;
+  padding: calc(var(--W) * 0.035) calc(var(--W) * 0.07);
+  border-radius: calc(var(--W) * 0.02);
+  background: #e8a31a;
+  color: #16140f;
+  font-family: var(--font-mono);
+  font-size: calc(var(--W) * 0.085);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+}
+.kc__back .kc__sticker { rotate: 8deg; opacity: 0.55; } /* seen through the acrylic */
+
+/* scanning: bars light up left to right (song.ts toggles .is-scanning) */
 .kc__code.is-scanning rect {
   animation: kc-read 0.5s steps(1, end) both;
   animation-delay: calc(var(--i) * 9ms);

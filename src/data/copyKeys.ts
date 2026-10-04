@@ -32,7 +32,7 @@ import type { Lang } from '../lib/lang';
  *
  * ⚠ A new section or slot with no `page` will not appear in the Studio at all.
  */
-export type PageId = 'asu' | 'home' | 'ost' | 'lookbook';
+export type PageId = 'asu' | 'home' | 'music' | 'ost' | 'lookbook';
 
 export interface PageGroup {
   id: PageId;
@@ -59,10 +59,16 @@ export const PAGE_GROUPS: PageGroup[] = [
     note: 'The bookshelf everyone lands on, and the banner under it that leads here.',
   },
   {
+    id: 'music',
+    label: 'MUSIC — THE RACK',
+    href: '/music',
+    note: 'Every song as a keychain on a rail. Only live while music is switched on (PUBLIC_MUSIC).',
+  },
+  {
     id: 'ost',
-    label: 'THE SOUNDTRACK',
-    href: '/ost',
-    note: 'The CD-single page for the song. Only live while music is switched on (PUBLIC_MUSIC).',
+    label: 'STARFALL — SONG PAGE',
+    href: '/music/starfall',
+    note: 'ナガレボシ / STARFALL: the keychain you scan, the playlist, the video. The scan and back labels are shared by every song page.',
   },
   {
     id: 'lookbook',
@@ -111,6 +117,8 @@ export const SECTIONS: CopySection[] = [
   { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
 
   // --- /lookbook — the six acts, in their own scroll order
+  { id: 'musicRack',  page: 'music', label: 'The rack', note: 'The heading above the keychains, and the small labels under them.' },
+
   { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
   { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
   { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the player.' },
@@ -592,9 +600,45 @@ export const COPY_FIELDS: CopyField[] = [
     defaults: { en: 'MUSIC & ILLUSTRATION — ASU AZURE', th: 'ดนตรีและภาพประกอบ — ASU AZURE', ja: '音楽・イラスト — ASU AZURE' },
   },
   {
-    key: 'ost.back', section: 'ostCredits', label: 'Back-to-shelf link', type: 'line',
-    hint: 'The arrow is added automatically.',
+    key: 'ost.back', section: 'musicRack', label: 'Back-to-shelf link', type: 'line',
+    hint: 'At the foot of the rack. The arrow is added automatically.',
     defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
+  },
+  {
+    key: 'ost.backRack', section: 'ostCredits', label: 'Back-to-rack link', type: 'line',
+    hint: 'At the foot of every song page. The arrow is added automatically.',
+    defaults: { en: 'ALL SONGS', th: 'เพลงทั้งหมด', ja: 'すべての曲' },
+  },
+
+  // ---------------- /music — the rack ----------------
+  {
+    key: 'music.kicker', section: 'musicRack', label: 'Small label', type: 'line',
+    hint: 'Uppercase mono, above MUSIC.',
+    defaults: { en: 'ORIGINAL SONGS · ASU AZURE', th: 'เพลงออริจินัล · ASU AZURE', ja: 'オリジナル曲 · ASU AZURE' },
+  },
+  {
+    key: 'music.lede', section: 'musicRack', label: 'Short paragraph', type: 'line',
+    hint: 'Under MUSIC. Also the description in link previews.',
+    defaults: {
+      en: 'Songs from the world of 扉の向こうはヒマワリ畑, one keychain each. Pick one up to listen.',
+      th: 'เพลงจากโลกของ 扉の向こうはヒマワリ畑 เพลงละหนึ่งพวงกุญแจ หยิบขึ้นมาฟังได้เลย',
+      ja: '『扉の向こうはヒマワリ畑』の世界から生まれた曲たち。一曲にひとつのキーホルダー。手に取って聴いてください。',
+    },
+  },
+  {
+    key: 'music.hint', section: 'musicRack', label: 'Hint', type: 'line',
+    hint: 'The small line under the paragraph.',
+    defaults: { en: 'TAP A KEYCHAIN · GRAB IT TO SWING IT', th: 'แตะพวงกุญแจ · จับแล้วเหวี่ยงได้', ja: 'キーホルダーをタップ · つかんで揺らせます' },
+  },
+  {
+    key: 'music.listen', section: 'musicRack', label: 'Under a song', type: 'line',
+    hint: 'The link under each song that is out. The arrow is added automatically.',
+    defaults: { en: 'LISTEN', th: 'ฟัง', ja: '聴く' },
+  },
+  {
+    key: 'music.coming', section: 'musicRack', label: 'Under a blank keychain', type: 'line',
+    hint: 'Songs not out yet hang as clear keychains with no title.',
+    defaults: { en: 'COMING SOON', th: 'เร็ว ๆ นี้', ja: 'COMING SOON' },
   },
 ];
 

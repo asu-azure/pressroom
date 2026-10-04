@@ -3,10 +3,10 @@ import data from '../../data/ost/starfall.json';
 import { MOTIF, CHORDS } from '../sound';
 
 // The UI sounds hardcode the motif so no page needs the JSON to play a note.
-// If the song is re-exported with a changed hook (scripts/import-ost.mjs), this
+// If the song is re-exported with a changed hook (scripts/import-ost.mjs starfall), this
 // is what notices.
 describe('UI sound motif', () => {
-  it('is the top line of IV. Motif, note for note', () => {
+  it('is the top line of IV. Hallway Echo, note for note', () => {
     const top = new Map<string, number>();
     for (const [t, midi] of data.motifRh as [number, number][]) {
       const k = t.toFixed(3);

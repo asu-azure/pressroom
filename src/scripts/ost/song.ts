@@ -1,6 +1,7 @@
 /**
- * /ost — ナガレボシ / STARFALL: the keychain, the scan, the playlist
- * (routes/ost.astro).
+ * /music/<slug> — a song's keychain, the scan, the playlist (routes/music/song.astro).
+ * The song arrives as the page's #song-data payload (src/data/songs.ts + its imported JSON),
+ * so one script serves every song.
  *
  * KEY view: the acrylic keychain hangs on scripts/dangle.ts. Tapping its sound
  * wave (or SCAN) runs the scan — a viewfinder closes on the code, a line reads
@@ -15,8 +16,8 @@
  * the stars, which in XIV. Starfall fall on the accents of the mix.
  * Nothing plays until the visitor asks; if the audio fails the clock runs on.
  */
-import song from '../../data/ost/starfall.json';
 import { ScoreClock } from './clock';
+import type { Mood } from '../../data/songs';
 import { dangle } from '../dangle';
 import { punch } from '../mv';
 import { applyCopy, readCopyPayload } from '../../lib/siteCopyClient';
@@ -32,41 +33,35 @@ interface Line {
   chunks: Chunk[];
 }
 
-/** Sky per movement [top, bottom] — follows the MV's looks, darker for type. */
-const MOODS: [string, string][] = [
-  ['#241d16', '#0c0c0d'], // I    Prologue — memory
-  ['#173466', '#0b1224'], // II   Clear Sky
-  ['#29406a', '#101626'], // III  Afternoon
-  ['#4a3317', '#120d08'], // IV   Motif — golden hour
-  ['#4a2233', '#130a10'], // V    Awakening — dusk
-  ['#0e1846', '#04060f'], // VI   Night Drive
-  ['#18203a', '#07080d'], // VII  Lament — moonlit
-  ['#232048', '#09081a'], // VIII Gathering
-  ['#4a3510', '#100b04'], // IX   Light
-  ['#0f2a4a', '#050b16'], // X    Childhood
-  ['#12233a', '#060a12'], // XI   Silent Lights
-  ['#3a1016', '#0b0406'], // XII  Storm
-  ['#1a1a1c', '#050505'], // XIII Cadenza
-  ['#0b1238', '#02030a'], // XIV  Starfall
-  ['#5a3a3a', '#1c1420'], // XV   Sunrise
-  ['#1c2030', '#0c0c0d'], // XVI  Epilogue
-];
-const STARFALL = 13; // XIV
+/** The page's #song-data payload (routes/music/song.astro). */
+interface SongPayload {
+  title: { ja: string; en: string };
+  album: string;
+  mv: { youtube: string; offset: number } | null;
+  /** sky per movement [top, bottom, light] — src/data/songs.ts */
+  moods: Mood[];
+  /** the movement whose strong accents launch falling stars, or -1 */
+  highlight: number;
+  movements: { name: string; t: number }[];
+  lyrics: Line[];
+  hits: [number, number][];
+  duration: number;
+}
+
 const NIGHT: [string, string] = ['#121a33', '#07080f']; // the KEY view's sky
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 
-export function initStarfall() {
+export function initSongPage() {
   const root = document.getElementById('ost');
   if (!root) return;
   const q = <T extends HTMLElement = HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  const { movements, lyrics, hits, duration } = song as unknown as {
-    movements: { name: string; t: number }[];
-    lyrics: Line[];
-    hits: [number, number][];
-    duration: number;
-  };
+  const song = JSON.parse(document.getElementById('song-data')?.textContent ?? 'null') as SongPayload | null;
+  if (!song) return;
+  const { movements, lyrics, hits, duration } = song;
+  // a song without moods keeps the night sky throughout
+  const mood = (i: number): Mood => song.moods[i] ?? [NIGHT[0], NIGHT[1], 'night'];
 
   const audio = q<HTMLAudioElement>('[data-audio]');
   const kcStage = q('[data-kc-stage]');
@@ -158,7 +153,7 @@ export function initStarfall() {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    const night = !listView() || (cur >= 5 && cur !== 8 && cur !== 14) ? 1 : 0.45;
+    const night = !listView() || cur < 0 || mood(cur)[2] === 'night' ? 1 : 0.45;
     for (const s of stars) {
       const tw = reduced ? 0.7 : 0.55 + 0.45 * Math.sin(t * 1.3 + s.p);
       ctx.globalAlpha = Math.min(1, (0.25 + tw * 0.6) * night + glow * 0.35);
@@ -214,7 +209,7 @@ export function initStarfall() {
   };
   // the playlist follows the song's moods; the keychain hangs in the night
   const paintSky = () => {
-    const [a, b] = listView() && cur >= 0 ? MOODS[cur] : NIGHT;
+    const [a, b] = listView() && cur >= 0 ? mood(cur) : NIGHT;
     root.style.setProperty('--sky-a', a);
     root.style.setProperty('--sky-b', b);
   };
@@ -300,7 +295,7 @@ export function initStarfall() {
     while (hitIdx < hits.length && hits[hitIdx][0] <= t) {
       const [, v] = hits[hitIdx++];
       glow = Math.max(glow, v * 0.6);
-      if (cur === STARFALL && v > 0.8) launch(v);
+      if (cur === song.highlight && v > 0.8) launch(v);
     }
     glow *= 0.9;
     for (const f of falling) {
@@ -424,7 +419,7 @@ export function initStarfall() {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: `${song.title.ja} — ${song.title.en}`,
       artist: 'Asu Azure',
-      album: '扉の向こうはヒマワリ畑 OST',
+      album: song.album,
       artwork: art ? [{ src: new URL(art, location.href).href, sizes: '1000x1000', type: 'image/webp' }] : [],
     });
     navigator.mediaSession.setActionHandler('play', play);
@@ -433,12 +428,13 @@ export function initStarfall() {
   }
 
   // --- MV: click to load, one player at a time -------------------------------------
-  const frameBox = q('[data-yt]');
+  // A song without a video has no frame; pauseVideo() is then a no-op.
+  const frameBox = root.querySelector<HTMLElement>('[data-yt]');
   let iframe: HTMLIFrameElement | null = null;
   function pauseVideo() {
     iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
   }
-  q('[data-yt-play]').addEventListener('click', () => {
+  frameBox?.querySelector('[data-yt-play]')?.addEventListener('click', () => {
     if (clock.playing) pause();
     iframe = document.createElement('iframe');
     iframe.src = `https://www.youtube-nocookie.com/embed/${frameBox.dataset.yt}?autoplay=1&rel=0&enablejsapi=1&playsinline=1`;
@@ -471,10 +467,15 @@ export function initStarfall() {
       return Promise.resolve();
     }
     document.documentElement.dataset.vt = kind;
+    // kc-hero is for arriving from the rack; inside the page it would fight ost-art
+    kcStage.style.viewTransitionName = 'none';
     return doc
       .startViewTransition(change)
       .finished.catch(() => {})
-      .finally(() => delete document.documentElement.dataset.vt);
+      .finally(() => {
+        delete document.documentElement.dataset.vt;
+        kcStage.style.viewTransitionName = '';
+      });
   };
 
   // A soft two-note chime for a good read — only if the visitor has SOUND on.

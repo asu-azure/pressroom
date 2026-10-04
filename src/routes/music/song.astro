@@ -1,37 +1,36 @@
 ---
 /**
- * /ost — 「ナガレボシ · STARFALL」, the soundtrack, as a keychain you scan.
+ * /music/<slug> — one song, as a keychain you scan (STARFALL first; src/data/songs.ts).
  *
  * Two views on one page:
  *   KEY   an acrylic keychain hangs in the night (scripts/dangle.ts). Its sound
  *         wave is a code: tap it (or SCAN) and a viewfinder reads it, then the
  *         page opens out of the scanned point into —
- *   LIST  the playlist: the player (movement, karaoke choir lines), the song
- *         with its sixteen movements, the music video, the credits.
- * The QR printed on the keychain's back is real and opens /ost?scan=1, which is
+ *   LIST  the playlist: the player (movement, karaoke lyric lines), the song
+ *         with its movements, the music video, the credits.
+ * The QR printed on the keychain's back is real and opens /music/<slug>?scan=1,
  * the LIST view arriving "scanned" — so a printed keychain works the same way.
  *
- * Timing is data, not animation: src/data/ost/starfall.json is imported from the
+ * Timing is data, not animation: src/data/ost/<slug>.json is imported from the
  * MV player's build of the mix (scripts/import-ost.mjs). Words around it are
- * author copy (the 'ost' group in copyKeys.ts), so this is server-rendered like
- * /asu. Only exists when PUBLIC_MUSIC=true (astro.config.mjs injects the route).
+ * author copy (the song's `copy` group in copyKeys.ts), so this is server-rendered
+ * like /asu. Only exists when PUBLIC_MUSIC=true (astro.config.mjs injects the route).
  */
 import { getImage } from 'astro:assets';
-import Base from '../layouts/Base.astro';
-import song from '../data/ost/starfall.json';
-import nightArt from '../assets/ost/starfall-night.jpg';
-import dayArt from '../assets/ost/starfall-day.jpg';
-import { keychainHtml } from '../lib/keychain';
-import { soundtrackKeychain, songLength } from '../lib/keychainServer';
-import { loadCopy, COPY_PAYLOAD_ID } from '../lib/siteCopy';
-import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../lib/lang';
-import { cacheShell } from '../lib/cache';
-import '../styles/keychain.css';
+import Base from '../../layouts/Base.astro';
+import { songBySlug, SONGS, songPath } from '../../data/songs';
+import { keychainHtml } from '../../lib/keychain';
+import { songKeychain, songData, songArt, songLength, fmtTime as fmt } from '../../lib/keychainServer';
+import { loadCopy, COPY_PAYLOAD_ID } from '../../lib/siteCopy';
+import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../../lib/lang';
+import { cacheShell } from '../../lib/cache';
+import '../../styles/keychain.css';
 
 export const prerender = false;
 
-/** The music video. A stand-in cut for now — swap this id for the final one. */
-const MV_YOUTUBE_ID = 'YmjVI7A2gIs';
+const song = songBySlug(Astro.params.slug);
+// An empty 404 makes Astro serve the site's 404 page (a rewrite to it is forbidden: it is prerendered).
+if (!song || song.status !== 'out') return new Response(null, { status: 404, statusText: 'Not found' });
 
 const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
@@ -40,26 +39,43 @@ cacheShell(Astro);
 // Arriving from the QR (or a shared playlist link) opens the playlist directly.
 const scanned = Astro.url.searchParams.has('scan');
 
-const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const movements = song.movements;
-const dur = song.duration;
+const data = songData(song);
+const p = song.copy!;
+const songTitle = song.title!;
+const movements = data.movements;
+const dur = data.duration;
 const ends = movements.map((m, i) => movements[i + 1]?.t ?? dur);
 const roman = (name: string) => name.split('.')[0];
 const title = (name: string) => name.split('. ').slice(1).join('. ');
+const lastRoman = roman(movements.at(-1)!.name);
 
 const [kc, head, poster, og] = await Promise.all([
-  soundtrackKeychain(Astro.site, 900),
-  getImage({ src: nightArt, width: 560, format: 'webp', quality: 80 }),
-  getImage({ src: dayArt, width: 1600, format: 'webp', quality: 74 }),
-  getImage({ src: nightArt, width: 1200, format: 'jpg', quality: 82 }),
+  songKeychain(song, Astro.site, 900),
+  getImage({ src: songArt(song), width: 560, format: 'webp', quality: 80 }),
+  getImage({ src: songArt(song, 'day'), width: 1600, format: 'webp', quality: 74 }),
+  getImage({ src: songArt(song), width: 1200, format: 'jpg', quality: 82 }),
 ]);
 const ogImage = new URL(og.src, Astro.site).href;
+
+// What the page script needs, read from the page instead of bundled (one script serves every song).
+const payload = {
+  title: songTitle,
+  album: song.album ?? '',
+  mv: song.mv ?? null,
+  moods: song.moods ?? [],
+  highlight: song.highlight ?? -1,
+  movements: movements.map((m) => ({ name: m.name, t: m.t })),
+  lyrics: data.lyrics,
+  hits: data.hits,
+  duration: dur,
+};
 ---
 
 <Base
-  title={`${song.title.ja} — ${song.title.en} · Pressroom OST`}
+  title={`${songTitle.ja} — ${songTitle.en} · Pressroom MUSIC`}
   description="The soundtrack of 扉の向こうはヒマワリ畑 — a nocturne in sixteen movements, by Asu Azure."
   image={ogImage}
+  canonical={songPath(song.slug)}
 >
   <nav class="ost__langs mono" aria-label="Language">
     {LANGS.map((l) => (
@@ -79,12 +95,12 @@ const ogImage = new URL(og.src, Astro.site).href;
         <div class="kc__stage ost__kcStage" data-kc-stage set:html={keychainHtml(kc)} />
 
         <div class="ost__keyInfo">
-          <p class="mono ost__kicker" data-i18n="ost.kicker">{t['ost.kicker']}</p>
+          <p class="mono ost__kicker" data-i18n={`${p}.kicker`}>{t[`${p}.kicker`]}</p>
           <h1 class="ost__title" data-title>
-            <span class="ost__titleJa" data-mv-converge>{song.title.ja}</span>
-            <span class="mono ost__titleEn">{song.title.en}</span>
+            <span class="ost__titleJa" data-mv-converge>{songTitle.ja}</span>
+            <span class="mono ost__titleEn">{songTitle.en}</span>
           </h1>
-          <p class="ost__lede" data-i18n="ost.lede">{t['ost.lede']}</p>
+          <p class="ost__lede" data-i18n={`${p}.lede`}>{t[`${p}.lede`]}</p>
           <button class="ost__scanBtn mono" type="button" data-scan>
             <span class="ost__scanIcon" aria-hidden="true"></span>
             <span data-i18n="ost.scan">{t['ost.scan']}</span>
@@ -115,8 +131,8 @@ const ogImage = new URL(og.src, Astro.site).href;
           <div class="ost__plInfo">
             <p class="mono ost__kicker" data-i18n="ost.playlist">{t['ost.playlist']}</p>
             <h2 class="ost__title ost__title--list" data-title>
-              <span class="ost__titleJa">{song.title.ja}</span>
-              <span class="mono ost__titleEn">{song.title.en}</span>
+              <span class="ost__titleJa">{songTitle.ja}</span>
+              <span class="mono ost__titleEn">{songTitle.en}</span>
             </h2>
 
             <div class="ost__transport">
@@ -146,7 +162,7 @@ const ogImage = new URL(og.src, Astro.site).href;
             </div>
 
             <div class="ost__now" aria-live="polite">
-              <p class="mono ost__nowK"><span data-now-num>{roman(movements[0].name)}</span> / XVI</p>
+              <p class="mono ost__nowK"><span data-now-num>{roman(movements[0].name)}</span> / {lastRoman}</p>
               <p class="ost__nowName" data-now-name>{title(movements[0].name)}</p>
               <div class="ost__lyric" data-lyric hidden>
                 <p class="ost__lyricJa authored" data-lyric-ja lang="ja"></p>
@@ -171,8 +187,8 @@ const ogImage = new URL(og.src, Astro.site).href;
             <div class="ost__songRow">
               <span class="mono ost__songNo">01</span>
               <img class="ost__songArt" src={head.src} alt="" width="56" height="56" loading="lazy" />
-              <span class="ost__songTitle"><b>{song.title.ja}</b> <span class="mono">{song.title.en}</span></span>
-              <span class="mono ost__songLen">{songLength()}</span>
+              <span class="ost__songTitle"><b>{songTitle.ja}</b> <span class="mono">{songTitle.en}</span></span>
+              <span class="mono ost__songLen">{songLength(song)}</span>
             </div>
             <ol class="ost__list">
               {movements.map((m, i) => (
@@ -184,7 +200,7 @@ const ogImage = new URL(og.src, Astro.site).href;
                         {title(m.name)}
                         {'sub' in m && m.sub && <em class="ost__mvSub">{m.sub}</em>}
                       </span>
-                      <span class="ost__mvNote" data-i18n={`ost.m${i + 1}`}>{t[`ost.m${i + 1}`]}</span>
+                      <span class="ost__mvNote" data-i18n={`${p}.m${i + 1}`}>{t[`${p}.m${i + 1}`]}</span>
                     </span>
                     <span class="mono ost__mvTime">{fmt(m.t)}–{fmt(ends[i])}</span>
                     <span class="ost__mvBar" aria-hidden="true"></span>
@@ -197,13 +213,14 @@ const ogImage = new URL(og.src, Astro.site).href;
       </section>
 
       <!-- ============ MUSIC VIDEO ============ -->
+      {song.mv && (
       <section class="ost__mvid" aria-labelledby="ost-mv-h">
-        <h2 class="mono ost__mvidK" id="ost-mv-h" data-i18n="ost.mvKicker">{t['ost.mvKicker']}</h2>
-        <p class="ost__mvidNote" data-i18n="ost.mvNote">{t['ost.mvNote']}</p>
+        <h2 class="mono ost__mvidK" id="ost-mv-h" data-i18n={`${p}.mvKicker`}>{t[`${p}.mvKicker`]}</h2>
+        <p class="ost__mvidNote" data-i18n={`${p}.mvNote`}>{t[`${p}.mvNote`]}</p>
         {/* Click-to-load: no YouTube script, cookie or request until the visitor
             asks for the video. Privacy-enhanced domain; the JS API is on only so
             the page can pause the video when its own player starts. */}
-        <div class="ost__frame" data-yt={MV_YOUTUBE_ID}>
+        <div class="ost__frame" data-yt={song.mv.youtube}>
           <button class="ost__poster" type="button" data-yt-play aria-label="Play the music video">
             <img src={poster.src} alt="" loading="lazy" decoding="async" />
             <span class="ost__posterPlay" aria-hidden="true"></span>
@@ -211,10 +228,11 @@ const ogImage = new URL(og.src, Astro.site).href;
           </button>
         </div>
       </section>
+      )}
 
       <footer class="ost__credits">
-        <p class="mono" data-i18n="ost.credits">{t['ost.credits']}</p>
-        <a class="mono ost__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.back">{t['ost.back']}</span></a>
+        <p class="mono" data-i18n={`${p}.credits`}>{t[`${p}.credits`]}</p>
+        <a class="mono ost__back" href="/music" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.backRack">{t['ost.backRack']}</span></a>
       </footer>
     </div>
 
@@ -227,15 +245,16 @@ const ogImage = new URL(og.src, Astro.site).href;
       <span class="mono ost__miniTime" data-mini-time>0:00</span>
     </div>
 
-    <audio data-audio src="/ost/starfall.mp3" preload="metadata"></audio>
+    <audio data-audio src={song.audio} preload="metadata"></audio>
   </main>
 
   <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
+  <script type="application/json" id="song-data" set:html={JSON.stringify(payload)} is:inline />
 </Base>
 
 <script>
-  import { initStarfall } from '../scripts/ost/starfall';
-  initStarfall();
+  import { initSongPage } from '../../scripts/ost/song';
+  initSongPage();
 </script>
 
 <style is:global>
@@ -335,6 +354,8 @@ const ogImage = new URL(og.src, Astro.site).href;
     aspect-ratio: 0.92;
     width: min(100%, 34rem);
     justify-self: center;
+    /* the charm tapped on the /music rack lands here (cross-document view transition) */
+    view-transition-name: kc-hero;
   }
   .ost__keyInfo { display: grid; gap: 1.1rem; justify-items: start; }
   .ost__kicker { font-size: 0.62rem; letter-spacing: 0.18em; color: #8fb2ff; }

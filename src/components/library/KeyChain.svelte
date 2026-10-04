@@ -3,7 +3,7 @@
    * The soundtrack on the shelf: an acrylic keychain hanging from a hook at the
    * end of the row (lib/keychain.ts + styles/keychain.css + scripts/dangle.ts).
    * Brush it and it sways, grab it and it swings and spins on its chain (the QR is
-   * on the back), click it to go to /ost. Only rendered when music is on.
+   * on the back), click it to go to its page, /music/starfall. Only rendered when music is on.
    */
   import { prefetch } from 'astro:prefetch';
   import { i18n } from '../../lib/i18n.svelte';
@@ -58,12 +58,12 @@
 
 <a
   class="kc-card"
-  href="/ost"
+  href="/music/starfall"
   draggable="false"
   data-sfx="note open"
   aria-label={`${data.title.ja} — ${data.title.en} · ${i18n.t('lib.ost')}`}
-  onpointerenter={() => prefetch('/ost')}
-  onfocus={() => prefetch('/ost')}
+  onpointerenter={() => prefetch('/music/starfall')}
+  onfocus={() => prefetch('/music/starfall')}
 >
   {#if hung}
     <div class="kc__stage kc-card__stage" use:action>{@html html}</div>
