@@ -649,6 +649,8 @@ const payload = {
   .ost__mvPlay:hover .ost__mvPlayIcon { transform: scale(1.06); background: var(--accent); }
   .ost__mvPlay:focus-visible .ost__mvPlayIcon { outline: 2px solid #fff; outline-offset: 4px; }
   .ost__video { position: absolute; inset: 0; }
+  /* empty until the press: on top of the button it took every click (fixed 4 Oct, live) */
+  .ost__screen:not([data-on]) .ost__video { display: none; }
   .ost__video :global(iframe) { width: 100%; height: 100%; border: 0; }
   .ost__screen[data-on] .ost__poster,
   .ost__screen[data-on] .ost__mvPlay { display: none; }
