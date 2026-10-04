@@ -12,6 +12,7 @@
     cur,
     pageNumberOf,
     onNavigate,
+    onMenu,
     translateOn = false,
     typesetOn = false,
     curl = true,
@@ -25,6 +26,8 @@
     cur: number;
     pageNumberOf: (pageId: string) => number;
     onNavigate: (index: number) => void;
+    /** A tap in the middle third: the menu, not a page turn (Reader → ReaderChrome.toggleMenu). */
+    onMenu?: () => void;
     translateOn?: boolean;
     typesetOn?: boolean;
     curl?: boolean;
@@ -537,8 +540,16 @@
       // A hold is not a tap: a long press marks the page as a favourite
       // (Reader.svelte) and must not also turn it.
       if (performance.now() - startT >= 450) return;
-      // A tap, not a drag — page by screen half (physical side).
-      const side = e.clientX < width / 2 ? -1 : 1;
+      // A tap, not a drag. The middle third shows or hides the menu — on a phone
+      // there was no way to bring the bar back without turning the page — and
+      // the outer thirds turn by physical side.
+      const rect = stage.getBoundingClientRect();
+      const at = (e.clientX - rect.left) / (rect.width || 1);
+      if (onMenu && at > 1 / 3 && at < 2 / 3) {
+        onMenu();
+        return;
+      }
+      const side = at < 0.5 ? -1 : 1;
       go(cur + side * s);
     }
   }
@@ -811,6 +822,13 @@
   @media (prefers-reduced-motion: reduce) {
     .fs__nav {
       transition: none;
+    }
+  }
+  /* Touch screens turn by tapping the sides or swiping; floating over the page
+     edge the buttons only blurred the margin notes there. Kept for mice. */
+  @media (hover: none) {
+    .fs__nav {
+      display: none;
     }
   }
 </style>

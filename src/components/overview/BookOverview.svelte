@@ -13,11 +13,13 @@
   import { frontOnly, cropImgStyle } from '../../lib/coverCrop';
   import { seriesRun } from '../../lib/series';
   import { bookInfo } from '../../lib/bookInfo';
+  import { bookParts, partLabel, partNote } from '../../lib/bookParts';
   import { shareLink } from '../../lib/share';
   import { i18n, type DictKey } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
   import LockGate from './LockGate.svelte';
+  import BookmarkNote from '../reader/BookmarkNote.svelte';
   import { hasProfile } from '../../lib/types';
   import type { Work, PageRec, Chapter, PageRow } from '../../lib/types';
 
@@ -158,10 +160,28 @@
   //     (their select already returned everything). ---
   let unlocked = $state(false);
   let lockOpen = $state(false);
-  let pendingHref = $state<string | null>(null);
+  // where to go once unlocked — a function when the target needs the unlocked pages
+  let pendingHref = $state<string | (() => string | null) | null>(null);
   const locked = $derived(Boolean(work?.read_locked) && !unlocked);
 
-  function openLock(href: string | null, e?: Event) {
+  // この本の構成: a book in parts (vol. 2 — a novel, then a manga) says so before
+  // its contents. Chapters are public even while the book is locked; the page
+  // ranges and landing pages wait for the pages (lib/bookParts.ts).
+  const parts = $derived(work ? bookParts(chapters, locked ? null : ordered) : []);
+  const showParts = $derived(parts.length >= 2);
+  /** Where a part's button goes: the novel reader for a novel part with text,
+      else the page reader at the part's first page (?p=, like the thumbnails). */
+  function partHref(part: (typeof parts)[number]): string | null {
+    if (part.kind === 'novel' && novelHref) return novelHref;
+    return part.startId ? `/w/${slug}/read?p=${encodeURIComponent(part.startId)}` : null;
+  }
+  function openPart(part: (typeof parts)[number], e: Event) {
+    if (!locked) return;
+    // a locked book's landing page is known only once the pages arrive
+    openLock(() => partHref(bookParts(chapters, ordered).find((p) => p.id === part.id) ?? part), e);
+  }
+
+  function openLock(href: string | (() => string | null) | null, e?: Event) {
     e?.preventDefault();
     pendingHref = href;
     lockOpen = true;
@@ -170,7 +190,8 @@
     pages = rows.map(toPageRec);
     unlocked = true;
     lockOpen = false;
-    if (pendingHref) location.href = pendingHref;
+    const href = typeof pendingHref === 'function' ? pendingHref() : pendingHref;
+    if (href) location.href = href;
   }
 
   // --- Cast page: profiled characters only, in the author's array order ---
@@ -478,6 +499,11 @@
           </button>
           <span class="ov-live" aria-live="polite">{shareNote}</span>
         </div>
+        <!-- the place and the ここすき live in this browser only — say so where
+             「続きから読む」 promises them -->
+        <div class="ov-marknote" use:reveal={{ delay: 0.22 }}>
+          <BookmarkNote />
+        </div>
       </div>
     </div>
 
@@ -488,7 +514,7 @@
       onclick={scrollDown}
       aria-label="Scroll for more"
     >
-      <span class="ov-scrollcue__label">{i18n.t('ov.contents')}</span>
+      <span class="ov-scrollcue__label">{i18n.t(showParts ? 'ov.parts' : 'ov.contents')}</span>
       <span class="ov-scrollcue__line" aria-hidden="true"></span>
       <span class="ov-scrollcue__chev" aria-hidden="true"></span>
     </button>
@@ -497,6 +523,51 @@
   <!-- ACT II: contents — page & chapter overview, straight after the cover (ink) -->
   <section class="ov-toc spread spread--ink" class:is-locked={locked} id="ov-more">
     <div class="ov-toc__inner">
+      {#if showParts}
+        <!-- この本の構成: one book in parts, each with its kind, pages, language
+             and its own way in — vol. 2's novel and manga read as unrelated before -->
+        <div class="ov-parts" use:reveal>
+          <header class="ov-toc__head">
+            <span class="index-num" aria-hidden="true">構</span>
+            <h2 class="serif ov-toc__title" use:headingIn use:converge>{i18n.t('ov.parts')}</h2>
+            <span class="ov-toc__rule" aria-hidden="true"></span>
+          </header>
+          <ol class="ov-parts__list">
+            {#each parts as part, pi (part.id)}
+              {@const href = partHref(part)}
+              {@const note = partNote(part, work, i18n.lang, (k) => i18n.t(k as DictKey))}
+              <li class="ov-part">
+                <span class="mono ov-part__num">{partLabel(pi + 1, i18n.lang)}</span>
+                <div class="ov-part__body">
+                  <p class="ov-part__head">
+                    <span class="serif authored ov-part__title">{part.name}</span>
+                    {#if part.kind}
+                      <span class="mono ov-part__kind" data-kind={part.kind}>{i18n.t(part.kind === 'novel' ? 'part.novel' : 'part.manga')}</span>
+                    {/if}
+                  </p>
+                  <p class="ov-part__meta">
+                    {#if part.first !== null}
+                      <span class="mono ov-part__range">{i18n.t('part.pages').replace('{a}', String(part.first)).replace('{b}', String(part.last))}</span>
+                    {/if}
+                    {#if note}<span class="ov-part__lang">{note}</span>{/if}
+                  </p>
+                </div>
+                <a
+                  class="ov-btn mono ov-part__go"
+                  class:ov-btn--ghost={pi > 0}
+                  data-sfx="open"
+                  href={href ?? readHref}
+                  onclick={(e) => openPart(part, e)}
+                >
+                  {#if locked}<span aria-hidden="true">🔒 </span>{/if}
+                  {i18n.t(part.kind === 'novel' && novelHref ? 'nv.read' : part.kind === 'manga' ? 'part.readManga' : 'ov.start')} →
+                </a>
+              </li>
+            {/each}
+          </ol>
+        </div>
+      {/if}
+
       <header class="ov-toc__head" use:reveal>
         <span class="index-num" aria-hidden="true">目</span>
         <h2 class="serif ov-toc__title" use:headingIn use:converge>{i18n.t('ov.contents')}</h2>
@@ -1386,6 +1457,94 @@
   }
   .ov-backchip:hover {
     opacity: 1;
+  }
+
+  /* ---- この本の構成: the parts of a book in parts ---- */
+  .ov-parts {
+    display: grid;
+    gap: clamp(1.2rem, 3vh, 1.8rem);
+    /* room for the contents heading's index kanji, which rises above its line */
+    margin-bottom: clamp(2.5rem, 7vh, 4.5rem);
+  }
+  .ov-parts__list {
+    display: grid;
+    gap: 0.8rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .ov-part {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.6rem 1.4rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line-strong);
+    background: var(--bg-soft);
+  }
+  .ov-part__num {
+    color: var(--accent);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+  }
+  .ov-part__body {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+  .ov-part__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.3rem 0.8rem;
+  }
+  .ov-part__title {
+    font-size: clamp(1.15rem, 2.4vw, 1.5rem);
+    line-height: 1.3;
+    color: var(--fg);
+  }
+  .ov-part__kind {
+    padding: 0.2em 0.6em;
+    border: 1px solid currentColor;
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    color: var(--fg);
+  }
+  .ov-part__kind[data-kind='novel'] {
+    color: #e8a31a;
+  }
+  .ov-part__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 1rem;
+  }
+  .ov-part__range {
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    color: var(--fg-dim);
+  }
+  .ov-part__lang {
+    font-family: var(--font-display-authored);
+    font-size: 0.88rem;
+    color: var(--fg);
+  }
+  .ov-part__go {
+    white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .ov-part {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.55rem;
+    }
+    .ov-part__go {
+      justify-self: stretch;
+      text-align: center;
+    }
+  }
+  .ov-marknote {
+    max-width: 36em;
   }
 
   /* ---- contents ---- */

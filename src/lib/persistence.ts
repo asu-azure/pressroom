@@ -101,14 +101,30 @@ export function saveFavorites(workId: string, pageIds: string[]): boolean {
   }
 }
 
-// --- One-time hints (the page-corner peel on a first flip-mode open) ---
+// --- One-time hints: the reading guide, the page-corner peel, the toolbar that
+//     stays up until the first page turn, the "saved in this browser" toast ---
+const hintKeyFor = (name: string) => `pressroom:hint:${name}`;
+
+/** Shows once: true the first time, false ever after. */
 export function takeHint(name: string): boolean {
-  const key = `pressroom:hint:${name}`;
+  if (seenHint(name)) return false;
+  markHint(name);
+  return seenHint(name); // still false if the browser wouldn't keep it
+}
+
+/** Whether a hint was already used, without using it up. */
+export function seenHint(name: string): boolean {
   try {
-    if (localStorage.getItem(key)) return false;
-    localStorage.setItem(key, '1');
-    return true;
+    return Boolean(localStorage.getItem(hintKeyFor(name)));
   } catch {
-    return false; // can't remember it — better never than every time
+    return true; // can't remember it — better never than every time
+  }
+}
+
+export function markHint(name: string): void {
+  try {
+    localStorage.setItem(hintKeyFor(name), '1');
+  } catch {
+    /* ignore */
   }
 }

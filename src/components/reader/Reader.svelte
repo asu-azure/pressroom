@@ -5,16 +5,19 @@
   import { pictureOf } from '../../lib/cleanPage';
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
+  import { novelHere, partStart } from '../../lib/bookParts';
+  import { openingLayout, pickedLayout, NARROW_QUERY } from '../../lib/readerUi';
   import { i18n } from '../../lib/i18n.svelte';
   import {
     loadSettings, saveSettings, loadProgress, saveProgress, loadUnlock, clearUnlock,
-    loadFavorites, saveFavorites, takeHint,
+    loadFavorites, saveFavorites, takeHint, seenHint, markHint,
   } from '../../lib/persistence';
   import ScrollSurface from './ScrollSurface.svelte';
   import FlipSurface from './FlipSurface.svelte';
   import ReaderChrome from './ReaderChrome.svelte';
   import NoteRail from './NoteRail.svelte';
   import HeartBurst from './HeartBurst.svelte';
+  import ReadingGuide, { type GuideTip } from './ReadingGuide.svelte';
   import { sfx } from '../../scripts/sound';
   import { saveShelfmarks } from '../../lib/shelfmarks';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
@@ -33,6 +36,9 @@
   let bursts = $state<{ id: number; x: number; y: number }[]>([]);
   let toast = $state<string | null>(null);
   let peel = $state(false);
+  let guideOpen = $state(false);
+  // A first visit keeps the labelled bar up until the first page turn.
+  let barPinned = $state(!seenHint('bar'));
 
   const coverSolo = $derived(work?.cover_solo ?? true);
   const sheets = $derived(
@@ -68,10 +74,44 @@
           sheet: first ? sheetIndexOf(sheets, first.id) : -1,
           coverUrl: cover?.thumbUrl ?? null,
           coverFocus: cropFocus(cover?.crop),
+          kind: ch.kind ?? null,
         };
       })
       .filter((m) => m.sheet >= 0),
   );
+  // 「小説はテキストで読めます」: only on a novel part's pages (lib/bookParts.ts), and
+  // only when the text exists in the reader's language.
+  const novelHref = $derived(
+    work?.novel_langs?.includes(i18n.lang) && currentSheet && novelHere(chapters, currentSheet.pages)
+      ? `/w/${work.slug}/novel?lang=${i18n.lang}`
+      : null,
+  );
+
+  // The reading guide's four tips, for the mode and direction in use.
+  const guideTips = $derived.by((): GuideTip[] => {
+    const t = i18n.t.bind(i18n);
+    const flip = settings.mode === 'flip';
+    const rtl = work?.direction === 'rtl';
+    return [
+      flip
+        ? { icon: rtl ? 'turn-rtl' : 'turn-ltr', title: t('gd.turn'), body: t(rtl ? 'gd.turnRtl' : 'gd.turnLtr') }
+        : { icon: 'scroll', title: t('gd.scroll'), body: t('gd.scrollBody') },
+      flip
+        ? { icon: 'menu', title: t('gd.menu'), body: t('gd.menuBody') }
+        : { icon: 'menu', title: t('gd.menuScroll'), body: t('gd.menuScrollBody') },
+      { icon: 'settings', title: t('gd.set'), body: t(anyBubbles ? 'gd.setBody' : 'gd.setBodyNoTrans') },
+      { icon: 'fav', title: t('gd.fav'), body: t('gd.favBody') },
+    ];
+  });
+
+  function closeGuide() {
+    guideOpen = false;
+    // after the guide, once: a page-corner peel says "turn me"
+    if (takeHint('reader') && settings.mode === 'flip') {
+      peel = true;
+      setTimeout(() => (peel = false), 1500);
+    }
+  }
   // Shelfmarks: the same progress and favourites, as positions the shelf can
   // draw (付箋 and しおり on the 3D book — see lib/shelfmarks.ts).
   $effect(() => {
@@ -102,7 +142,7 @@
     work = w as Work;
     document.title = `${work.title} — Pressroom`;
 
-    settings = loadSettings(work.id, {
+    const saved = loadSettings(work.id, {
       layout: work.default_layout,
       mode: work.default_mode,
       fit: work.default_mode === 'flip' ? 'height' : 'width',
@@ -112,6 +152,16 @@
       translateMode: 'typeset',
       curl: true,
     });
+    // A phone held upright opens on single pages; a layout the reader picked
+    // themselves still wins (lib/readerUi.ts).
+    settings = {
+      ...saved,
+      layout: openingLayout({
+        chosen: pickedLayout(saved, work.default_layout),
+        workDefault: work.default_layout,
+        narrow: window.matchMedia(NARROW_QUERY).matches,
+      }),
+    };
     if (settings.translateMode !== 'typeset' && settings.translateMode !== 'notes') {
       settings = { ...settings, translateMode: 'typeset' }; // saved before the mode existed
     }
@@ -143,8 +193,12 @@
     pages = recs.map((p, i) => (i === 0 && p.id === work.cover_page_id ? frontOnly(p, work.cover_crop, inner) : p));
     chapters = (chRows ?? []) as Chapter[];
 
-    // Deep link (?p=pageId from the overview page) wins over saved progress.
-    const requested = new URLSearchParams(location.search).get('p');
+    // Deep links win over saved progress: ?p=pageId (the overview's thumbnails
+    // and parts, SHARE), or ?ch=chapterId — the start of a part, for the novel
+    // reader's last page, which can't see a locked book's page rows.
+    const params = new URLSearchParams(location.search);
+    const part = params.get('ch');
+    const requested = params.get('p') ?? (part ? partStart(part, pages) : null);
     const target = requested ?? loadProgress(work.id);
     if (target) {
       const idx = sheetIndexOf(
@@ -156,13 +210,12 @@
     favorites = loadFavorites(work.id);
     status = 'ready';
 
-    // First visit to any book: a page-corner peel says "turn me", and a toast
-    // teaches the long-press. Once per browser, never again.
-    if (takeHint('reader')) {
-      peel = settings.mode === 'flip';
-      say(i18n.t('rd.modeHint'), 2600);
+    // First visit to the page reader: the guide (which also teaches the
+    // long-press), then the page-corner peel. Once per browser; ？ reopens it.
+    if (takeHint('guide-reader')) guideOpen = true;
+    else if (takeHint('reader') && settings.mode === 'flip') {
+      peel = true;
       setTimeout(() => (peel = false), 1500);
-      setTimeout(() => say(i18n.t('rd.favHint'), 2600), 2800);
     }
   }
 
@@ -199,9 +252,20 @@
   }
 
   function storeFavorites(next: string[], message: string) {
+    const adding = next.length > favorites.length;
     favorites = next;
     const kept = work ? saveFavorites(work.id, next) : false;
-    say(kept ? message : i18n.t('rd.favLocal'));
+    if (!kept) say(i18n.t('rd.favLocal'));
+    else if (adding && firstSave()) say(i18n.t('rd.favSaved'), 2800);
+    else say(message);
+  }
+
+  /** The first time anything is saved, the toast says where: this browser only.
+      Once per browser — 「しおりについて」 in 設定 has the rest. */
+  function firstSave(): boolean {
+    if (seenHint('saved')) return false;
+    markHint('saved');
+    return true;
   }
 
   /** Long-press always adds (and always plays the burst), like comimi. */
@@ -281,18 +345,27 @@
   function setCur(index: number) {
     const next = Math.max(0, Math.min(sheets.length - 1, index));
     const now = performance.now();
-    if (next !== cur && (settings.mode === 'flip' || now - lastTick > 250)) {
+    const moved = next !== cur;
+    if (moved && (settings.mode === 'flip' || now - lastTick > 250)) {
       lastTick = now;
       sfx.tick();
     }
     cur = next;
     const first = sheets[cur]?.pages[0];
     if (work && first) saveProgress(work.id, first.id);
+    if (!moved) return; // scroll mode reports the row it mounted on — not a turn
+    if (barPinned) {
+      barPinned = false; // the first page turn: from now on the bar steps aside
+      markHint('bar');
+    }
+    if (firstSave()) say(i18n.t('rd.markSaved'), 2800);
   }
 
   function patchSettings(patch: Partial<ReaderSettings>) {
     // Keep the page being read visible across layout/mode changes.
     const anchor = currentSheet?.pages[0]?.id ?? null;
+    // a layout picked here is the reader's own and outranks the phone rule
+    if (patch.layout) patch = { ...patch, layoutChosen: true };
     settings = { ...settings, ...patch };
     if (work) saveSettings(work.id, settings);
     if (anchor) {
@@ -326,7 +399,7 @@
 
   // --- Keyboard: physical arrows (direction-aware), f, s, Home/End ---
   function onKey(e: KeyboardEvent) {
-    if (status !== 'ready') return;
+    if (status !== 'ready' || guideOpen) return; // the guide owns the keys (Esc closes it)
     const editing = (e.target as HTMLElement | null)?.closest('input, textarea, select');
     if (editing) return;
     if (e.key === 'f') {
@@ -399,7 +472,6 @@
           onCurrent={setCur}
           translateOn={notesOn}
           {typesetOn}
-          curl={settings.curl}
           {characters}
           {highlightId}
           onHighlight={(id) => (highlightId = id)}
@@ -412,8 +484,10 @@
           {cur}
           {pageNumberOf}
           onNavigate={setCur}
+          onMenu={() => chrome?.toggleMenu()}
           translateOn={notesOn}
           {typesetOn}
+          curl={settings.curl}
           {characters}
           {highlightId}
           onHighlight={(id) => (highlightId = id)}
@@ -457,13 +531,19 @@
       {pageNumberOf}
       pages={orderedPages}
       {favorites}
+      pinned={barPinned}
+      {novelHref}
       onSettings={patchSettings}
       onJump={jump}
       onJumpPage={jumpToPage}
       onToggleFavorite={toggleCurrentFavorite}
       onRemoveFavorite={removeFavorite}
       onShare={sharePage}
+      onHelp={() => (guideOpen = true)}
     />
+    {#if guideOpen}
+      <ReadingGuide tips={guideTips} onClose={closeGuide} />
+    {/if}
   {/if}
   <p class="mono reader__toast" class:is-on={toast} role="status" aria-live="polite">{toast ?? ''}</p>
 </div>

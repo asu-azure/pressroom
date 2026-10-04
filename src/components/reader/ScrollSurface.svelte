@@ -110,12 +110,16 @@
 <style>
   .ss {
     display: grid;
+    /* minmax(0, …): an auto track grows to its widest page's min-content — on a
+       phone in fit-height that made the whole document 15px wider than the screen,
+       and the fixed bar with it */
+    grid-template-columns: minmax(0, 1fr);
     gap: clamp(0.6rem, 1.6vh, 1.4rem);
     padding: calc(3.4rem + env(safe-area-inset-top)) 0 5rem;
   }
   .ss__row {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     justify-items: center;
   }
   .ss__sheet {

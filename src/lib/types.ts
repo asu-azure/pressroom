@@ -152,6 +152,9 @@ export interface NovelSection {
   body: NovelBlock[];
 }
 
+/** What a chapter is, when it is a part of a mixed book (vol. 2: a novel part, then a manga part). */
+export type ChapterKind = 'manga' | 'novel';
+
 export interface Chapter {
   id: string;
   work_id: string;
@@ -159,6 +162,8 @@ export interface Chapter {
   sort_key: string;
   cover_page_id: string | null;
   created_at: string;
+  /** supabase/chapter-kind.sql — optional: rows from before it, or unset, are plain chapters */
+  kind?: ChapterKind | null;
 }
 
 /** DB row shape for `pages`. */
@@ -218,6 +223,10 @@ export interface ReaderSettings {
   translateMode: TranslateMode;
   /** Flip mode turns pages with a paper curl (scripts/curl.ts). */
   curl: boolean;
+  /** The reader picked the layout themselves. Settings are saved whole, so without
+      this a phone that once saved the work's 'double' default would keep it
+      (lib/readerUi.ts openingLayout). */
+  layoutChosen?: boolean;
 }
 
 export type TranslateMode = 'typeset' | 'notes';
@@ -230,6 +239,7 @@ export interface ChapterMark {
   coverUrl: string | null;
   /** object-position keeping a cropped cover's front in view (lib/coverCrop.ts) */
   coverFocus?: string;
+  kind?: ChapterKind | null;
 }
 
 /** Social/contact links on the artist profile (all optional). */

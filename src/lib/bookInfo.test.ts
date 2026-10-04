@@ -35,6 +35,21 @@ describe('bookInfo', () => {
     expect(items.find((i) => i.key === 'trans')!.value).toBe('日本語・英語');
   });
 
+  it('counts a novel part that reads in another language as a translation', () => {
+    const t2 = (k: string) => (k === 'ov.novelPart' ? '小説パート' : `<${k}>`);
+    // vol. 2: no manga translation, but the whole novel reads in Japanese — never なし
+    const vol2 = { book_lang: 'th', translations: [], novel_langs: ['ja', 'th'] };
+    expect(bookInfo(vol2, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('日本語（小説パート）');
+    expect(bookInfo(vol2, 'en', (k) => (k === 'ov.novelPart' ? 'novel part' : k)).find((i) => i.key === 'trans')!.value).toBe(
+      'Japanese (novel part)',
+    );
+    // a language the pages are translated into already says it all
+    expect(bookInfo({ ...vol2, translations: ['ja'] }, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('日本語');
+    expect(bookInfo({ ...vol2, translations: ['en'] }, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('英語・日本語（小説パート）');
+    // the Thai text is the original, not a translation
+    expect(bookInfo({ ...vol2, novel_langs: ['th'] }, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('<ov.transNone>');
+  });
+
   it('shows nothing for a work without book info', () => {
     expect(bookInfo({}, 'ja', t)).toEqual([]);
     expect(bookInfo({ book_lang: ' ', formats: [], release_label: '' }, 'en', t)).toEqual([]);

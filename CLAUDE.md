@@ -93,7 +93,7 @@ text. See `src/lib/richtext.ts` and its tests.
    `AUTHOR_UID` with the author user's `auth.users.id` first.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
    `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
-   `scenes.sql`, `book-info.sql`, `novel.sql`, `clean-pages.sql`.
+   `scenes.sql`, `book-info.sql`, `novel.sql`, `clean-pages.sql`, `chapter-kind.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
@@ -209,8 +209,24 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
 
 ### The book overview (`/w/[slug]`, `BookOverview.svelte`)
 
-Order: hero → 収録内容 → 登場人物 → spoiler band + あらすじ → シリーズ → foot. The visitors it is
-written for are Japanese; the books are Thai.
+Order: hero → (この本の構成) → 収録内容 → 登場人物 → spoiler band + あらすじ → シリーズ → foot. The
+visitors it is written for are Japanese; the books are Thai.
+
+- **この本の構成** (`lib/bookParts.ts`, tested): a book with 2+ chapters lists its parts above the
+  contents — 第一部 / PART 1, the title without the number the author wrote into it (`partName`), a
+  小説 / マンガ badge from `chapters.kind` (`supabase/chapter-kind.sql`), the page range, a language
+  line (`partNote`: a novel part names its `novel_langs` — 「日本語で読めます」 — a manga part its
+  translation or 「タイ語のみ（翻訳なし）」) and its own button: a novel part with text opens the novel
+  reader, any other part the page reader at its first readable page (`?p=`). Vol. 2's novel and
+  manga read as two unrelated things before this. Chapters are public even while the book is
+  locked, so titles and kinds show; ranges and landing pages wait for the pages (`bookParts(…, null)`),
+  and a locked part's button hands LockGate a *function* (`pendingHref`), resolved once the
+  unlocked rows are in.
+- **「しおりについて」** (`components/reader/BookmarkNote.svelte`, a plain `<details>`) under the hero
+  buttons, by 「続きから読む」: the place and the ここすき live in this browser on this device only — not
+  on other devices, not in another app's built-in browser (a link opened from X or LINE), gone in
+  private browsing or when site data is cleared, never collected. The same note sits in both
+  readers' 設定.
 
 - **The hero shows the front of the wraparound** (`frontOnly` + `cropImgStyle`, full-size image —
   the front is half the picture). No `inner` page on purpose: a locked book's pages arrive on
@@ -218,7 +234,8 @@ written for are Japanese; the books are Thai.
 - **奥付 row + content notes** from `supabase/book-info.sql` (all optional): `book_lang`,
   `translations`, `formats`, `release_label`, `content_warnings`, `series_*` (`lib/bookInfo.ts`,
   tested; language names via `Intl.DisplayNames`). "翻訳 なし" is shown on purpose — it is how a
-  Japanese visitor learns the Thai book has no Japanese yet. Content notes sit above the read
+  Japanese visitor learns the Thai book has no Japanese yet. But a novel part that reads as text in
+  another language (`novel_langs`) counts: vol. 2 says 「日本語（小説パート）」, never なし. Content notes sit above the read
   button, amber, `role="note"`. Studio META edits them all (content notes one per line).
 - **Locked contents is one bar**, not a box: with no `password_hint` it says 限定公開 — 合言葉を
   お持ちの方のみ読めます and never where the password comes from (the owner hands it out in closed
@@ -636,10 +653,66 @@ the `/asu` hero and every book's synopsis (the library author card that also use
 Animated WebP cannot be paused with
 CSS, so each placement uses `<picture>` with the still frame under `prefers-reduced-motion`.
 
+## The page reader's chrome (`ReaderChrome.svelte`, `ReadingGuide.svelte`, `lib/readerUi.ts`)
+
+Readers didn't know where to tap (the 2026-10 UX audit, `doujin/.local-tools/pressroom-ja/ux-plan.md`):
+that pages could be single or double, that the translation could be switched, that ここすき and the
+bookmark existed, or where they were kept. So:
+
+- **Every control in the top bar has its name under its icon, on every screen** (`.rc-tool`, labels
+  11px — never smaller): 翻訳 switch · 目次 (with chapters) · めくり/スクロール · ここすき · 一覧 (the page
+  grid) · 全画面 (not on touch phones) · 設定 (a drawn gear; it was "AA", which read as text size) ·
+  使い方. Phones (≤ 520px) drop the title and the note flag (the rail still shows the note) and get
+  one めくり/スクロール button showing the mode it is in; spacing is tuned so a 390-wide phone holds
+  the widest bar (原文 + スクロール) on one row — narrower ones wrap rather than lose a button, and
+  「← 概要」 never wraps. `:hover` is pointer-gated (it stuck after a tap and lit the switch's off).
+- **The translation switch is a real toggle** (only when the book has bubbles): its label is its
+  state, 「翻訳：日本語」 / 「原文：タイ語」 (`translationLabel`, tested; one shape for both, and the
+  narrowest that fits). The old 「◫ 翻訳」 chip looked like a switch and did nothing.
+- **設定 is three named sections**: 表示 (単ページ/見開き, めくり/スクロール, 紙のめくり, ページの合わせ方,
+  SOUND), 翻訳 (on/off in the switch's words, 翻訳の出し方 + explanation), 画面の言語（ボタンの表示）
+  — readers took 言語 under 翻訳 for the translation's language. Then 「しおりについて」. The panel
+  scrolls on a short screen.
+- **A phone held upright opens single pages** (`openingLayout`, tested; `NARROW_QUERY` is
+  FlipSurface's own phone rule), whatever `works.default_layout` says; wide screens keep the
+  default. A layout the reader picked in 設定 still wins — `ReaderSettings.layoutChosen` marks it,
+  because settings are saved whole and a phone that once saved the work's 'double' default would
+  otherwise keep it (`pickedLayout`, tested: a saved layout that differs from the default counts as
+  a pick too — the picks made before the mark existed).
+- **The bar stays up on a first visit until the first page turn** (`pinned`, hint key `bar`), then
+  the 3 s auto-hide as before. **A tap in the middle third shows or hides it** (FlipSurface
+  `onMenu` → `toggleMenu`; the outer thirds turn) — on a phone there was no way to bring the bar back
+  without turning the page. What counts is whether the bar was away when the press began (the
+  press itself wakes it). With a mouse, moving shows it, so a centre click hides it.
+- **The reading guide** (`ReadingGuide.svelte`, shared with the novel reader): four tips with drawn
+  icons — tap left/right to turn (RTL-aware; scroll mode says scroll), the middle for the menu,
+  設定 for layout/mode/translation, long-press for ここすき and where to find them (一覧 → ここすき).
+  Shown once per reader type (`takeHint('guide-reader')`), then the page-corner peel; 「？ 使い方」
+  reopens it. A tap anywhere or Esc closes it; `role="dialog"` + `aria-modal`, focus on the button,
+  Tab stays there, focus goes back on close; the reader ignores keys while it is open. Reduced
+  motion: no animation. The old first-visit toasts (mode, long-press) are gone — the guide says both.
+- **No ‹ › on touch screens** (`@media (hover: none)` in FlipSurface): they floated over the page
+  edge and blurred the margin notes. Mice keep them.
+- **The first save says where it went**: the first page turn, or the first ここすき, toasts
+  「…このブラウザに保存しました」 once per browser (hint key `saved`; scroll mode's mount report isn't a
+  turn).
+- **「小説はテキストで読めます →」 is a pill above the page counter**, a real link, shown only on pages of
+  a novel part (`novelHere`, tested — a book whose chapters carry no kind keeps offering it
+  everywhere) and only when the text exists in the reader's language. It used to sit in the bar on
+  every page, manga included, looking like a label.
+- **Deep links**: `?p=pageId` (thumbnails, parts, SHARE) and `?ch=chapterId` — the start of a part
+  (`partStart`), for the novel reader's last page, which can't see a locked book's page rows. Both
+  win over saved progress.
+- The page-curl setting now reaches FlipSurface (it was passed to ScrollSurface, which has no such
+  prop — 紙のめくり オフ did nothing). ScrollSurface's grid columns are `minmax(0, 1fr)`: in
+  fit-height on a phone an auto track grew to a page's min-content and widened the document (and the
+  fixed bar) by 15px.
+
 ## Translations — lettered into the balloons (`TypesetLayer.svelte` + `lib/typeset.ts`)
 
-Bubbles (`pages.bubbles`) are drawn two ways; `ReaderSettings.translateMode` picks one and the
-chrome offers 吹き出し / 一覧 / オフ:
+Bubbles (`pages.bubbles`) are drawn two ways; `ReaderSettings.translateMode` picks one. The bar's
+switch turns the translation on and off (below); 設定 → 翻訳 picks 吹き出し / 訳文リスト (the notes
+mode — renamed from 一覧, which is now the page grid's label) with a one-line explanation:
 
 - **typeset** (default): the translation lettered into the balloon, vertical (縦書き) unless the box
   is wide or Latin. The fit is computed once in the page's pixels (`fitBubble`: `Intl.Segmenter`
@@ -724,6 +797,18 @@ chip) even while the book is locked.
     only afterwards, and the first measure saw 1px-wide figures;
   - a remainder of ≤ 2px past a page edge is rounding, not a column (padding it left a blank page).
   Tap thirds / keys / swipe right = forward; ‹ › buttons with a mouse, kept clear of the text.
+- **Its bar names its tools like the page reader's**: 目次 · 設定 (a gear; it was "Aa") · 使い方, and
+  its own reading guide (`takeHint('guide-novel')`; 縦書き: tap left third = next, centre = menu,
+  設定 for 縦/横 + size + 明朝/ゴシック, 目次 — 横書き swaps the first two for "scroll; your place is
+  saved"). 設定 ends with 「しおりについて」; the first page turned (or scrolled by the reader, not by
+  a resume or a 目次 jump — `quietUntil`) toasts that the place is saved in this browser, once.
+- `.nv` pins its one column to `minmax(0, 1fr)`: an auto column grew to the bar's min-content (back +
+  title + labelled tools) and the page pitch, measured from it, came out wider than a phone.
+- **The last page belongs to the book** (`novelSequel`, tested): when the book also has a manga part,
+  「第一部 おわり」 (vertical in 縦書き) and a button 「第二部 マンガ『大人の重荷編』へ →」 to the page reader
+  at that part's start (`?ch=`), then 「概要に戻る」 — readers finished the novel not knowing the
+  manga continued it. Chapters are read for this (public even when locked); without both kinds it
+  is a plain おわり. In 縦書き the end is a whole page laid out across, like a figure.
 - **横書き** is a plain scroll, and the only mode for Thai and English. Thai is set in Noto Serif Thai
   (see Languages); the 明朝/ゴシック choice is hidden for Thai.
 - Settings (direction, 3 sizes, mincho/gothic) in `pressroom:novel-settings`; the place per work and
@@ -778,13 +863,15 @@ chip) even while the book is locked.
 - **"ここすき" favourite pages** (idea and `HeartBurst.svelte` adapted from `yui540/comimi`, MIT):
   long-press a page (500 ms, cancelled by >10px movement, a second finger or a scroll) → heart burst,
   saved per work in localStorage (`loadFavorites`/`saveFavorites`). The chrome heart toggles the
-  current sheet. **FlipSurface treats a hold of 450 ms or more as not-a-tap** — without that guard a
+  current sheet. The reading guide teaches the long-press (it used to be one 2.6 s toast). **FlipSurface treats a hold of 450 ms or more as not-a-tap** — without that guard a
   long-press also turned the page. Don't remove it.
-- **Page grid** (▦ in the chrome): every page, a favourites tab, and SHARE, which copies the
+- **Page grid** (一覧 in the chrome, ▦ icon): every page, a favourites tab, and SHARE, which copies the
   `?p=pageId` deep link. Jumps go through `Reader.jump()`, which scrolls the row in scroll mode —
   ScrollSurface reads its start index only at mount, so a bare `setCur` did nothing there.
 - Chrome icons are inline SVG: the subset mono webfont has no ♥/▦ glyphs.
-- The chrome hides after 3 s idle; never while a panel is open or focus is inside it.
+- The chrome hides after 3 s idle; never while a panel is open, focus is inside it, or before a
+  first-time reader's first page turn. A tap in the middle third shows/hides it (see the chrome
+  section).
 - **Page curl** (`src/scripts/curl.ts`, geometry tested in `curl.test.ts`): in flip mode a one-sheet
   turn at 1x — drag, tap or ‹ › — is drawn as a paper fold. **Only overlays move**: the track jumps
   to the target sheet underneath, and absolutely-positioned copies of the current page rects fold
@@ -829,4 +916,5 @@ chip) even while the book is locked.
   `curl.test.ts`; harness frames checked on desktop and a 390-wide phone.
 - Reader harness (scratchpad, not in the repo): Playwright `page.route` serves a fake unlocked
   6-page book (works/pages/chapters REST + generated page images) — never the real DB, never a
-  password.
+  password. The UX harness (`ux-audit/lib.mjs`, `ux-phase1/run.mjs`) mocks both real books, vol. 2
+  split into its two parts, at iPhone 13 / 360 / 1440×900.

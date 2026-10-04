@@ -35,7 +35,7 @@ export function langName(code: string, ui: UiLang): string {
   }
 }
 
-type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label'>;
+type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label' | 'novel_langs'>;
 
 export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
   const sep = ui === 'ja' ? '・' : ' / ';
@@ -46,10 +46,15 @@ export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
     // only meaningful next to the original language: "翻訳 なし" tells a
     // Japanese visitor the Thai book has no Japanese yet
     const trans = (work.translations ?? []).filter((c) => c && c !== lang);
+    // ...but a novel part that reads as text in another language is a translation
+    // too: vol. 2 said なし while its whole novel reads in Japanese
+    const novelOnly = (work.novel_langs ?? []).filter((c) => c && c !== lang && !trans.includes(c));
+    const part = (name: string) => (ui === 'ja' ? `${name}（${t('ov.novelPart')}）` : `${name} (${t('ov.novelPart')})`);
+    const names = [...trans.map((c) => langName(c, ui)), ...novelOnly.map((c) => part(langName(c, ui)))];
     items.push({
       key: 'trans',
       label: t('rd.translate'),
-      value: trans.length ? trans.map((c) => langName(c, ui)).join(sep) : t('ov.transNone'),
+      value: names.length ? names.join(sep) : t('ov.transNone'),
     });
   }
   const formats = (work.formats ?? []).filter(Boolean);

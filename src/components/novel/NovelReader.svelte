@@ -12,11 +12,17 @@
    *
    * Locked works: the rows reach anon only through unlock_novel(), with the
    * password this tab unlocked on the overview — else back to the overview.
+   *
+   * A book in parts (lib/bookParts.ts): the last page says which part ended and
+   * leads on to the manga part in the page reader (?ch=, the part's start).
    */
   import { supabase } from '../../lib/supabase';
   import { publicUrl } from '../../lib/storagePaths';
-  import { loadUnlock, clearUnlock } from '../../lib/persistence';
+  import { loadUnlock, clearUnlock, takeHint, seenHint, markHint } from '../../lib/persistence';
   import { i18n } from '../../lib/i18n.svelte';
+  import { novelSequel, partLabel, partName } from '../../lib/bookParts';
+  import ReadingGuide, { type GuideTip } from '../reader/ReadingGuide.svelte';
+  import BookmarkNote from '../reader/BookmarkNote.svelte';
   import {
     normalizeSections,
     chapters,
@@ -32,7 +38,7 @@
     rowsFor,
     type NovelPlace,
   } from '../../lib/novel';
-  import type { NovelPara, NovelSection, Work } from '../../lib/types';
+  import type { Chapter, NovelPara, NovelSection, Work } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
 
@@ -42,6 +48,9 @@
   let sections = $state<NovelSection[]>([]);
   let lang = $state<string>('ja');
   let status = $state<'loading' | 'ready' | 'missing' | 'empty'>('loading');
+  let bookChapters = $state<Chapter[]>([]);
+  // 「第一部 おわり」 and the way on to the manga part, when the book has both
+  const sequel = $derived(novelSequel(bookChapters));
 
   // --- settings, remembered for every book ---
   const SETTINGS = 'pressroom:novel-settings';
@@ -128,6 +137,15 @@
     }
     pending = parsePlace(saved, sections) ?? { section: 0, block: 0 };
     status = 'ready';
+    if (takeHint('guide-novel')) guideOpen = true;
+    // the book's parts, for the last page — chapters are public even while the
+    // pages are locked; without them the end is a plain おわり
+    try {
+      const { data: chRows } = await supabase.from('chapters').select('*').eq('work_id', work.id).order('sort_key');
+      bookChapters = (chRows ?? []) as Chapter[];
+    } catch {
+      bookChapters = [];
+    }
   }
 
   // --- layout (vertical) ---
@@ -242,6 +260,7 @@
     requestAnimationFrame(() => {
       if (vertical) layout();
       else if (pending) {
+        quietUntil = performance.now() + 800;
         blockEl(pending)?.scrollIntoView({ block: 'start' });
         pending = null;
       }
@@ -266,7 +285,42 @@
     const next = Math.max(0, Math.min(pages - 1, to));
     if (next === page) return;
     page = next;
-    requestAnimationFrame(remember);
+    requestAnimationFrame(() => {
+      remember();
+      savedOnce();
+    });
+  }
+
+  // --- the reading guide (first open, and 使い方) + the "saved here" toast ---
+  let guideOpen = $state(false);
+  const guideTips = $derived.by((): GuideTip[] => {
+    const t = i18n.t.bind(i18n);
+    // what 設定 offers in this language: 縦/横 is Japanese only, 明朝/ゴシック not for Thai
+    const offers = lang === 'ja' ? 'gd.nvSetBody' : lang === 'th' ? 'gd.nvSetBodyTh' : 'gd.nvSetBodyH';
+    const set = { icon: 'settings' as const, title: t('gd.nvSet'), body: t(offers) };
+    const toc = { icon: 'toc' as const, title: t('gd.nvToc'), body: t('gd.nvTocBody') };
+    return vertical
+      ? [
+          { icon: 'turn-rtl', title: t('gd.nvTurn'), body: t('gd.nvTurnBody') },
+          { icon: 'menu', title: t('gd.menu'), body: t('gd.menuBody') },
+          set,
+          toc,
+        ]
+      : [{ icon: 'scroll', title: t('gd.nvScroll'), body: t('gd.nvScrollBody') }, set, toc];
+  });
+  function openGuide() {
+    panel = null;
+    guideOpen = true;
+  }
+  let toast = $state<string | null>(null);
+  let toastT = 0;
+  /** The first time a place is saved by reading on, the toast says where: this browser. */
+  function savedOnce() {
+    if (seenHint('saved')) return;
+    markHint('saved');
+    toast = i18n.t('rd.markSaved');
+    clearTimeout(toastT);
+    toastT = window.setTimeout(() => (toast = null), 2800);
   }
 
   // --- input: tap thirds, keys, swipe (vertical) ---
@@ -282,14 +336,14 @@
   });
 
   function onTap(e: MouseEvent) {
-    if (!vertical || panel) return;
+    if (!vertical || panel || guideOpen) return;
     const x = e.clientX / window.innerWidth;
     if (x < 0.33) go(page + 1); // right-to-left book: the left edge turns forward
     else if (x > 0.67) go(page - 1);
     else (chrome ? (chrome = false) : poke());
   }
   function onKey(e: KeyboardEvent) {
-    if (status !== 'ready' || !vertical || (e.target as HTMLElement)?.closest('input, select, textarea')) return;
+    if (status !== 'ready' || !vertical || guideOpen || (e.target as HTMLElement)?.closest('input, select, textarea')) return;
     if (e.key === 'ArrowLeft' || e.key === 'PageDown' || e.key === ' ') {
       e.preventDefault();
       go(page + 1);
@@ -315,9 +369,13 @@
   // --- horizontal scroll ---
   let scroller = $state<HTMLElement | null>(null);
   let scrollT = 0;
+  let quietUntil = 0; // scrolls before this are ours (resume, 目次), not reading
   function onScroll() {
     clearTimeout(scrollT);
-    scrollT = window.setTimeout(remember, 200);
+    scrollT = window.setTimeout(() => {
+      remember();
+      if (performance.now() > quietUntil) savedOnce(); // the reader's own scroll, not a jump
+    }, 200);
   }
 
   // --- panels ---
@@ -327,6 +385,7 @@
     pending = { section: si, block: 0 };
     if (vertical) layout();
     else {
+      quietUntil = performance.now() + 800;
       blockEl(pending)?.scrollIntoView({ block: 'start' });
       pending = null;
     }
@@ -373,9 +432,19 @@
     <header class="nv-bar mono">
       <a class="nv-bar__back" href={`/w/${slug}`} data-vt="back">← {i18n.t('rd.overview')}</a>
       <span class="nv-bar__title authored">{work.title}</span>
+      <!-- named like the page reader's: 目次 · 設定 (was "Aa") · ？ 使い方 -->
       <span class="nv-bar__tools">
-        <button type="button" onclick={() => (panel = panel === 'toc' ? null : 'toc')} aria-expanded={panel === 'toc'}>{i18n.t('rd.toc')}</button>
-        <button type="button" onclick={() => (panel = panel === 'settings' ? null : 'settings')} aria-expanded={panel === 'settings'} aria-label={i18n.t('rd.settings')}>Aa</button>
+        <button type="button" onclick={() => (panel = panel === 'toc' ? null : 'toc')} aria-expanded={panel === 'toc'}
+          ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.1M4.5 12h.1M4.5 18h.1" /></svg
+          >{i18n.t('rd.toc')}</button>
+        <button type="button" onclick={() => (panel = panel === 'settings' ? null : 'settings')} aria-expanded={panel === 'settings'}
+          ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"
+            ><circle cx="12" cy="12" r="7.2" stroke-width="3" stroke-dasharray="2.83 2.83" stroke-linecap="butt" /><circle cx="12" cy="12" r="5.4" /><circle cx="12" cy="12" r="2" /></svg
+          >{i18n.t('rd.set')}</button>
+        <button type="button" onclick={openGuide}
+          ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"
+            ><circle cx="12" cy="12" r="9" /><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.9v.1" /></svg
+          >{i18n.t('rd.help')}</button>
       </span>
     </header>
 
@@ -436,8 +505,14 @@
           <button type="button" class:is-on={settings.face === 'gothic'} onclick={() => patch({ face: 'gothic' })}>{i18n.t('nv.gothic')}</button>
         </div>
         {/if}
+        <div class="nv-mark"><BookmarkNote tone="paper" /></div>
       </div>
     {/if}
+
+    {#if guideOpen}
+      <ReadingGuide tips={guideTips} tone="paper" onClose={() => (guideOpen = false)} />
+    {/if}
+    <p class="nv-toast mono" class:is-on={toast} role="status" aria-live="polite">{toast ?? ''}</p>
   </div>
 {/if}
 
@@ -484,7 +559,20 @@
       {/each}
     </section>
   {/each}
-  <p class="nv-end mono" data-pagestart={vertical ? '' : undefined}>{i18n.t('nv.end')}</p>
+  <!-- the last page: which part ended, and the way on to the manga part (a book in
+       parts, lib/bookParts.ts) or back to the overview. A whole page in 縦書き. -->
+  <div class="nv-end" data-pagestart={vertical ? '' : undefined}>
+    <p class="nv-end__mark mono">
+      {sequel ? i18n.t('nv.partEnd').replace('{part}', partLabel(sequel.part, i18n.lang)) : i18n.t('nv.end')}
+    </p>
+    {#if sequel}
+      <a class="nv-end__next" href={`/w/${slug}/read?ch=${encodeURIComponent(sequel.next.id)}`} onclick={(e) => e.stopPropagation()}>
+        {i18n.t('nv.toPart').replace('{part}', partLabel(sequel.next.part, i18n.lang)).replace('{title}', partName(sequel.next.title))}
+        <span aria-hidden="true">→</span>
+      </a>
+    {/if}
+    <a class="nv-end__back mono" href={`/w/${slug}`} data-vt="back" onclick={(e) => e.stopPropagation()}>← {i18n.t('nv.back')}</a>
+  </div>
 {/snippet}
 
 <style>
@@ -505,6 +593,9 @@
     inset: 0;
     display: grid;
     grid-template-rows: auto 1fr auto;
+    /* never wider than the screen: an auto column grows to the bar's min-content
+       (back + title + labelled tools), and the page pitch is measured from it */
+    grid-template-columns: minmax(0, 1fr);
     background: var(--paper);
     color: var(--ink);
     font-family: var(--font-typeset, 'Yu Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', serif);
@@ -572,6 +663,60 @@
   .nv-bar__tools {
     display: flex;
     gap: 0.2rem;
+    flex-shrink: 0;
+  }
+  .nv-bar__tools button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: 0.6875rem; /* 11px */
+    white-space: nowrap;
+  }
+  .nv-ico {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .nv-bar__back {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .nv-mark {
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .nv-toast {
+    position: absolute;
+    left: 50%;
+    bottom: calc(2.8rem + env(safe-area-inset-bottom));
+    z-index: 4;
+    translate: -50% 0.5rem;
+    max-width: calc(100vw - 2rem);
+    margin: 0;
+    padding: 0.55em 1em;
+    background: #24211c;
+    color: #f4efe3;
+    font-size: 0.68rem;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s var(--ease), translate 0.25s var(--ease);
+  }
+  .nv-toast.is-on {
+    opacity: 1;
+    translate: -50% 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .nv-toast {
+      transition: none;
+    }
   }
   .nv-foot__where {
     flex: 1;
@@ -786,11 +931,53 @@
   }
   .nv-end {
     margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.6rem;
+    text-indent: 0;
+  }
+  /* in 縦書き the end is a page of its own, laid out across like a figure */
+  .nv.is-v .nv-end {
+    writing-mode: horizontal-tb;
+    width: var(--step);
+    height: 100%;
+  }
+  .nv-end__mark {
+    margin: 0;
     color: var(--dim);
     font-size: 0.8em;
     letter-spacing: 0.3em;
     text-align: center;
-    text-indent: 0;
+  }
+  .nv.is-v .nv-end__mark {
+    writing-mode: vertical-rl;
+  }
+  .nv-end__next {
+    max-width: min(22rem, 90%);
+    padding: 0.85em 1.3em;
+    background: var(--accent);
+    color: #f4f1ea;
+    font-family: var(--font-display-authored);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.25s var(--ease);
+  }
+  .nv-end__next:hover {
+    background: #1d33c4;
+  }
+  .nv-end__back {
+    color: var(--dim);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-decoration: none;
+    padding: 0.5rem;
+  }
+  .nv-end__back:hover {
+    color: var(--ink);
   }
 
   /* ---- horizontal: a plain scroll ---- */
@@ -817,6 +1004,7 @@
   }
   .nv.is-h .nv-end {
     margin-top: 4em;
+    padding-bottom: 2em;
   }
   .nv[lang='th'] .nv-p,
   .nv[lang='en'] .nv-p {
