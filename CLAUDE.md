@@ -623,9 +623,10 @@ act-character → craft → act-select → act-3d → act-grid → contact.
 
 ## Music features are behind a flag (`PUBLIC_MUSIC`)
 
-**Everything musical is off in production** until the owner launches it: `/music`, `/music/<slug>`,
+**Live since 4 Oct 2026** (the owner's call): `PUBLIC_MUSIC=true` is set in the Vercel project for
+Production and Preview. The flag still gates everything musical — `/music`, `/music/<slug>`,
 `/ost` (a redirect), `/ost/tobira`, the soundtrack keychain on the shelf, the `MUSIC ♪` links, the
-SOUND switch and the UI sounds.
+SOUND switch and the UI sounds — so removing the variable and redeploying takes it all down again.
 `src/lib/features.ts` exports `MUSIC` (`import.meta.env.PUBLIC_MUSIC === 'true'`); every entry point
 checks it.
 
@@ -636,11 +637,12 @@ checks it.
 - **Music work happens on the `music` branch** (its own worktree, `../pressroom-music`), cut from
   `main` on 4 Oct 2026 so the music could ship without the reader work then waiting on
   `press-proof`. Later that day `main` caught up with `press-proof` (the reader work went out) and
-  `main` was merged into `music`. Release = merge `music` into `main`. If `press-proof` gets ahead of
-  `main` again with unreleased work, don't merge it into `music`: take `main` instead.
+  `main` was merged into `music`. Release = merge `music` into `main` (first done that night,
+  fast-forward to f94bbf8). If `press-proof` gets ahead of `main` again with unreleased work, don't
+  merge it into `music`: take `main` instead.
 - With the flag off, the build also deletes `ost/` (the MP3s in `public/ost/`) from the output.
-- Local work: `PUBLIC_MUSIC=true` in `.env`. Going live: set it in the Vercel project env and
-  redeploy — no code change.
+- Local work: `PUBLIC_MUSIC=true` in `.env`. A Vercel env change needs a redeploy (without the build
+  cache) — no code change.
 
 ## `/music` — the rack, and the song catalogue
 
