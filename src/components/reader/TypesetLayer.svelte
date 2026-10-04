@@ -115,21 +115,27 @@
   .ts__cover.is-dark {
     background: #000;
   }
+  /* text over the art (glosses, notes, captions): a crisp outline all round plus a soft
+     glow, so it reads on busy screentone — a glow alone washed out (the owner's p42 note) */
   .ts__b--none .ts__t {
+    --halo: #fff;
     text-shadow:
-      0 0 0.12em #fff,
-      0 0 0.12em #fff,
-      0 0 0.25em #fff;
+      0.07em 0 0 var(--halo),
+      -0.07em 0 0 var(--halo),
+      0 0.07em 0 var(--halo),
+      0 -0.07em 0 var(--halo),
+      0.05em 0.05em 0 var(--halo),
+      -0.05em 0.05em 0 var(--halo),
+      0.05em -0.05em 0 var(--halo),
+      -0.05em -0.05em 0 var(--halo),
+      0 0 0.25em var(--halo);
   }
   .ts__b.is-dark {
     --ts-fill: #000;
     color: #f4f1ea;
   }
   .ts__b--none.is-dark .ts__t {
-    text-shadow:
-      0 0 0.12em #111,
-      0 0 0.12em #111,
-      0 0 0.25em #111;
+    --halo: #111;
   }
   .ts__t {
     position: relative;

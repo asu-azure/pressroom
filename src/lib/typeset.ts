@@ -53,8 +53,8 @@ export interface Fit {
 
 // ---------------------------------------------------------------- tokens
 
-/** May not start a column: closing brackets, punctuation, small kana, ー. */
-const NO_START = new Set([...'、。，．・：；？！ー―…‥」』）］｝〉》】〕”’ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ々ゝゞヽヾ!?,.)]}']);
+/** May not start a column: closing brackets, punctuation, small kana, ー and 〜. */
+const NO_START = new Set([...'、。，．・：；？！ー―〜～…‥」』）］｝〉》】〕”’ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶ々ゝゞヽヾ!?,.)]}']);
 /** May not end a column: opening brackets. */
 const NO_END = new Set([...'「『（［｛〈《【〔“‘([{']);
 
@@ -105,18 +105,43 @@ interface Word {
   units: Unit[];
   em: number;
   nl?: boolean;
+  /** unit indices inside the phrase where a word boundary still allows a break */
+  inner?: number[];
 }
 
-/** Group units into unbreakable words: segmenter boundaries minus kinsoku. */
+const HIRA = /[\u3041-\u309f]/;
+const STRONG = /[\u4e00-\u9fff\u3400-\u4dbf々〆\u30a1-\u30fa\uff66-\uff9dA-Za-z0-9]/; // kanji, katakana, Latin, digits
+const CLOSERS = new Set([...'、。，．！？!?…‥」』）］｝〉》】〕”’　 ']);
+const OPENERS = new Set([...'「『（［｛〈《【〔“‘']);
+
+/**
+ * Does a phrase (文節) start at this word? A letterer breaks Japanese between phrases, not
+ * inside them: a particle or okurigana stays with the word before it (勉強できて、｜頭よくて、),
+ * a compound stays whole (人気者), and a new phrase starts after punctuation or where a
+ * kanji/katakana word follows kana.
+ */
+function phraseStart(prevLast: string, first: string): boolean {
+  if (OPENERS.has(first) || CLOSERS.has(prevLast)) return true;
+  if (HIRA.test(first) || NO_START.has(first)) return false;
+  return STRONG.test(first) && HIRA.test(prevLast);
+}
+
+/**
+ * Group units into phrases: the segmenter's word boundaries, kept only where a phrase
+ * starts (phraseStart) and kinsoku allows. The other word boundaries are remembered
+ * (`inner`), so a phrase too long for a column still breaks between words first.
+ */
 function words(us: Unit[]): Word[] {
   const plain = us.map((u) => u.t).join('');
   const starts = wordStarts(plain);
   const ws: Word[] = [];
   let at = 0;
   let cur: Unit[] = [];
+  let inner: number[] = [];
   const flush = () => {
-    if (cur.length) ws.push({ units: cur, em: cur.reduce((a, u) => a + u.em, 0) });
+    if (cur.length) ws.push({ units: cur, em: cur.reduce((a, u) => a + u.em, 0), inner });
     cur = [];
+    inner = [];
   };
   for (let i = 0; i < us.length; i++) {
     const u = us[i];
@@ -127,9 +152,9 @@ function words(us: Unit[]): Word[] {
       continue;
     }
     const prev = cur[cur.length - 1];
-    const canBreak =
-      !prev || (starts.has(at) && !NO_START.has(u.t[0]) && !NO_END.has(prev.t[prev.t.length - 1]));
-    if (canBreak) flush();
+    const legal = !prev || (starts.has(at) && !NO_START.has(u.t[0]) && !NO_END.has(prev.t[prev.t.length - 1]));
+    if (!prev || (legal && phraseStart(prev.t[prev.t.length - 1], u.t[0]))) flush();
+    else if (legal) inner.push(cur.length);
     cur.push(u);
     at += u.t.length;
   }
@@ -137,23 +162,38 @@ function words(us: Unit[]): Word[] {
   return ws;
 }
 
-/** A word too long for any column, broken where kinsoku allows. */
+/**
+ * A phrase too long for the column: broken at the last word boundary that fits, else
+ * (one long word) where kinsoku allows.
+ */
 function splitWord(w: Word, cap: number): Word[] {
-  const parts: Word[] = [];
-  let cur: Unit[] = [];
+  const us = w.units;
   let em = 0;
-  for (const u of w.units) {
-    const prev = cur[cur.length - 1];
-    if (prev && em + u.em > cap && !NO_START.has(u.t[0]) && !NO_END.has(prev.t[prev.t.length - 1])) {
-      parts.push({ units: cur, em });
-      cur = [];
-      em = 0;
+  let cut = -1;
+  let lastInner = -1;
+  for (let i = 0; i < us.length; i++) {
+    if (i > 0 && (w.inner ?? []).includes(i)) lastInner = i;
+    if (i > 0 && em + us[i].em > cap) {
+      cut = lastInner;
+      if (cut <= 0) {
+        // no word boundary fits: the last kinsoku-legal place at or before i
+        for (let j = i; j > 0; j--) {
+          if (!NO_START.has(us[j].t[0]) && !NO_END.has(us[j - 1].t[us[j - 1].t.length - 1])) {
+            cut = j;
+            break;
+          }
+        }
+      }
+      break;
     }
-    cur.push(u);
-    em += u.em;
+    em += us[i].em;
   }
-  if (cur.length) parts.push({ units: cur, em });
-  return parts;
+  if (cut <= 0) return [w];
+  const sum = (a: Unit[]) => a.reduce((x, u) => x + u.em, 0);
+  const head = us.slice(0, cut);
+  const tail = us.slice(cut);
+  const tailInner = (w.inner ?? []).filter((k) => k > cut).map((k) => k - cut);
+  return [{ units: head, em: sum(head) }, ...splitWord({ units: tail, em: sum(tail), inner: tailInner }, cap)];
 }
 
 // ---------------------------------------------------------------- geometry

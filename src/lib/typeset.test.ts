@@ -19,7 +19,7 @@ const bub = (text: string, px: [number, number, number, number], extra: Partial<
 const LONG = bub('でも最近は、痛いだけじゃもう振り向いてもらえないのかも', [788, 468, 1012, 802]);
 const SHORT = bub('ねえ、タイム', [880, 880, 1020, 1080]);
 const colText = (f: ReturnType<typeof fitBubble>) => f.lines.map((l) => l.map((p) => p.t).join(''));
-const NO_START = /^[、。」』）ー…！？ぁぃぅぇぉっゃゅょァィゥェォッャュョ]/;
+const NO_START = /^[、。」』）ー〜～…！？ぁぃぅぇぉっゃゅょァィゥェォッャュョ]/;
 const NO_END = /[「『（]$/;
 
 describe('fitBubble', () => {
@@ -107,6 +107,32 @@ describe('fitBubble', () => {
 
   it('is deterministic', () => {
     expect(fitBubble(LONG, W, H)).toEqual(fitBubble(LONG, W, H));
+  });
+});
+
+describe('phrases (文節)', () => {
+  // the owner's notes, 4 Oct: 〜 opened a column, and 「て、」 stood alone in one
+  it('never starts a column with 〜 or ー', () => {
+    for (const t of ['ウソつけ〜〜', 'やった〜!', 'マーーー・フランキーーー']) {
+      for (const w of [60, 80, 110]) {
+        const f = fitBubble(bub(t, [500, 500, 500 + w, 640]), W, H);
+        for (const c of colText(f)) expect(c).not.toMatch(NO_START);
+      }
+    }
+  });
+  it('breaks between phrases, keeping a particle with its word', () => {
+    const f = fitBubble(bub('勉強できて、頭よくて、人気者で', [500, 400, 640, 560], { shape: 'rect' }), W, H);
+    const cols = colText(f);
+    expect(cols).not.toContain('て、');
+    for (const c of cols) expect(c).not.toMatch(/^て/);
+    expect(cols.join('|')).not.toMatch(/人気[|]者/);
+  });
+  it('still breaks a phrase too long for any column, between words first', () => {
+    const f = fitBubble(bub('ちょっとからかうだけのつもりだった', [500, 400, 640, 640], { shape: 'rect' }), W, H);
+    expect(f.overflow).toBe(false);
+    expect(f.lines.length).toBeGreaterThan(1);
+    expect(colText(f).join('|')).not.toMatch(/からか\|う|つも\|り/); // words stay whole
+    for (const c of colText(f)) expect(c).not.toMatch(NO_START);
   });
 });
 
