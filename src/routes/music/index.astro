@@ -13,7 +13,8 @@
 import Base from '../../layouts/Base.astro';
 import { SONGS, songPath } from '../../data/songs';
 import { keychainHtml } from '../../lib/keychain';
-import { songKeychain, songLength, songData } from '../../lib/keychainServer';
+import { songKeychain, songLength, songData, songArt } from '../../lib/keychainServer';
+import { getImage } from 'astro:assets';
 import { loadCopy, COPY_PAYLOAD_ID } from '../../lib/siteCopy';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../../lib/lang';
 import { cacheShell } from '../../lib/cache';
@@ -37,9 +38,14 @@ const charms = await Promise.all(
       : { song, html: keychainHtml(null), length: '', movements: 0 },
   ),
 );
+
+// The share card: the newest song's cover (for now STARFALL's, F2) until the rack has its own picture.
+const lead = SONGS.find((s) => s.status === 'out');
+const og = lead ? await getImage({ src: songArt(lead), width: 1200, format: 'jpg', quality: 82 }) : null;
+const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
 ---
 
-<Base title="MUSIC · Pressroom — Asu Azure" description={t['music.lede']}>
+<Base title="MUSIC · Pressroom — Asu Azure" description={t['music.lede']} image={ogImage}>
   <nav class="rack__langs mono" aria-label="Language">
     {LANGS.map((l) => (
       <button type="button" data-lang={l} aria-pressed={l === DEFAULT_LANG ? 'true' : 'false'}>{LANG_LABEL[l]}</button>
