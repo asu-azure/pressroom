@@ -633,17 +633,35 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'ost.credits', section: 'ostCredits', label: 'Credit line', type: 'line',
-    hint: 'Alias only — never a real name. As the MV credits it, plus the Chopin it quotes and the singing voices.',
+    hint: 'Alias only — never a real name. As the MV credits it, plus the Chopin it quotes.',
     defaults: {
-      en: 'MUSIC · LYRICS · STORY & ILLUSTRATION · MOVIE — ASU AZURE  /  JAPANESE PROOFREADING, LYRICS & DIALOGUE — なぎ  /  QUOTES CHOPIN, NOCTURNE OP. 48 NO. 1  /  VOICES — NEUTRINO',
-      th: 'ดนตรี · เนื้อร้อง · เรื่องและภาพ · วิดีโอ — ASU AZURE  /  ตรวจภาษาญี่ปุ่นของเนื้อร้องและบทพูด — なぎ  /  ยกท่อนจากนอคเทิร์น Op. 48 No. 1 ของโชแปง  /  เสียงร้อง — NEUTRINO',
-      ja: '作曲・作詞・原作・イラスト・映像 — ASU AZURE  /  日本語監修（歌詞・台詞）— なぎ  /  引用：ショパン《夜想曲 作品48-1》  /  歌声 — NEUTRINO',
+      en: 'MUSIC · LYRICS · STORY & ILLUSTRATION · MOVIE — ASU AZURE  /  JAPANESE PROOFREADING, LYRICS & DIALOGUE — なぎ  /  QUOTES CHOPIN, NOCTURNE OP. 48 NO. 1',
+      th: 'ดนตรี · เนื้อร้อง · เรื่องและภาพ · วิดีโอ — ASU AZURE  /  ตรวจภาษาญี่ปุ่นของเนื้อร้องและบทพูด — なぎ  /  ยกท่อนจากนอคเทิร์น Op. 48 No. 1 ของโชแปง',
+      ja: '作曲・作詞・原作・イラスト・映像 — ASU AZURE  /  日本語監修（歌詞・台詞）— なぎ  /  引用：ショパン《夜想曲 作品48-1》',
     },
   },
   {
     key: 'ost.back', section: 'musicRack', label: 'Back-to-shelf link', type: 'line',
     hint: 'At the foot of the rack. The arrow is added automatically.',
     defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
+  },
+  {
+    key: 'ost.creditsVoices', section: 'ostCredits', label: 'Singing voices', type: 'line',
+    hint: 'Every NEUTRINO voice in the choir. Credit is optional for most of them, but listing them all is the owner\'s choice (4 Oct).',
+    defaults: {
+      en: 'VOICES — NEUTRINO (Merrow, Reina, NAKUMO, Soma, Runo, Tohoku Zunko, Tohoku Kiritan, Tohoku Itako, Shikoku Metan, No.7, Kotonoha Akane, Kotonoha Aoi, Yogatari Tobari, Yoko, JSUT)',
+      th: 'เสียงร้องสังเคราะห์ด้วย NEUTRINO (Merrow · Reina · NAKUMO · Soma · Runo · Tohoku Zunko · Tohoku Kiritan · Tohoku Itako · Shikoku Metan · No.7 · Kotonoha Akane · Kotonoha Aoi · Yogatari Tobari · Yoko · JSUT)',
+      ja: '歌声 — NEUTRINO（めろう、レイナ、ナクモ、ソウマ、ルノ、東北ずん子、東北きりたん、東北イタコ、四国めたん、No.7、琴葉茜、琴葉葵、夜語トバリ、謡子、JSUT）',
+    },
+  },
+  {
+    key: 'ost.creditsCorpora', section: 'ostCredits', label: 'Voice databases', type: 'line',
+    hint: 'Yoko\'s database is CC BY 3.0, which requires this attribution; the licence link is added after it automatically.',
+    defaults: {
+      en: 'Yoko is trained on “NIT SONG070 F001” © Nagoya Institute of Technology; JSUT on the JSUT-song corpus (Saruwatari–Takamichi Lab, The University of Tokyo). Licence:',
+      th: 'เสียง Yoko ฝึกจากฐานข้อมูล “NIT SONG070 F001” © Nagoya Institute of Technology ส่วนเสียง JSUT ฝึกจากคลังเสียง JSUT-song (ห้องวิจัย Saruwatari–Takamichi มหาวิทยาลัยโตเกียว) สัญญาอนุญาต:',
+      ja: '謡子：名古屋工業大学「NIT SONG070 F001」／JSUT：東京大学 猿渡・高道研究室「JSUT-song」コーパス。ライセンス：',
+    },
   },
   {
     key: 'ost.backRack', section: 'ostCredits', label: 'Back-to-rack link', type: 'line',

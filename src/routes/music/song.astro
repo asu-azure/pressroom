@@ -222,7 +222,18 @@ const payload = {
       </section>
 
       <footer class="ost__credits">
-        <p class="mono" data-i18n={`${p}.credits`}>{t[`${p}.credits`]}</p>
+        <div class="ost__creditLines">
+          <p class="mono" data-i18n={`${p}.credits`}>{t[`${p}.credits`]}</p>
+          {/* every singing voice of the choir, as each library's terms allow; Yoko's database is CC BY 3.0,
+              which asks for the attribution and a link to the licence */}
+          {t[`${p}.creditsVoices`] && <p class="mono ost__voices" data-i18n={`${p}.creditsVoices`}>{t[`${p}.creditsVoices`]}</p>}
+          {t[`${p}.creditsCorpora`] && (
+            <p class="mono ost__voices">
+              <span data-i18n={`${p}.creditsCorpora`}>{t[`${p}.creditsCorpora`]}</span>
+              <a href="https://creativecommons.org/licenses/by/3.0/" rel="license noopener" target="_blank">CC BY 3.0</a>
+            </p>
+          )}
+        </div>
         <a class="mono ost__back" href="/music" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.backRack">{t['ost.backRack']}</span></a>
       </footer>
     </div>
@@ -643,6 +654,10 @@ const payload = {
     color: var(--fg-dim);
   }
   .ost__back:hover { color: var(--accent); }
+  .ost__creditLines { display: grid; gap: 0.7rem; max-width: 72ch; }
+  .ost__voices { font-size: 0.58rem; letter-spacing: 0.08em; line-height: 1.8; color: var(--fg-faint); }
+  .ost__voices a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+  .ost__voices a:hover { color: var(--accent); }
 
   .ost__mini {
     position: fixed;
