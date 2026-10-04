@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { seriesRun } from './series';
+import { kindKey, seriesRun } from './series';
 
 const main = { id: 'a', slug: 'bdlfs-seasparkles', series_order: 1 };
 const side = { id: 'b', slug: 'bdlfs-skyafterrain', series_order: 2 };
@@ -20,5 +20,18 @@ describe('seriesRun', () => {
   it('is not a series with one book, and has no neighbours for an outsider', () => {
     expect(seriesRun([main], 'a')).toEqual({ list: [], prev: null, next: null });
     expect(seriesRun([main, side], 'zzz')).toMatchObject({ prev: null, next: null });
+  });
+});
+
+describe('kindKey', () => {
+  it('calls a book in a series 本編 / 外伝, never 読切', () => {
+    expect(kindKey({ status: 'oneshot', series_title: '扉の向こうはヒマワリ畑', series_kind: 'main' })).toBe('series.main');
+    expect(kindKey({ status: 'oneshot', series_title: '扉の向こうはヒマワリ畑', series_kind: 'side' })).toBe('series.side');
+    expect(kindKey({ status: 'oneshot', series_title: '扉の向こうはヒマワリ畑', series_kind: null })).toBeNull();
+  });
+
+  it('keeps the status for a book on its own', () => {
+    expect(kindKey({ status: 'oneshot' })).toBe('status.oneshot');
+    expect(kindKey({ status: 'ongoing', series_title: '  ', series_kind: 'main' })).toBe('status.ongoing');
   });
 });

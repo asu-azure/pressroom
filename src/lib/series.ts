@@ -16,6 +16,19 @@ export interface SeriesRun<T> {
   next: T | null;
 }
 
+/**
+ * What the shelf label and the overview call a book: its place in a series
+ * (series.main 本編 / series.side 外伝) when it has one, else its status. A book
+ * in a series is never 読切 — both books said so, and it read as "unrelated".
+ * A series book with no kind set says nothing rather than 読切.
+ */
+export function kindKey(
+  work: { status: string; series_title?: string | null; series_kind?: 'main' | 'side' | null },
+): string | null {
+  if (work.series_title?.trim()) return work.series_kind ? `series.${work.series_kind}` : null;
+  return `status.${work.status}`;
+}
+
 /** Ordered by series_order (unset last), then slug — stable for ties. */
 export function seriesRun<T extends SeriesEntry>(entries: T[], currentId: string): SeriesRun<T> {
   const order = (e: T) => (typeof e.series_order === 'number' && Number.isFinite(e.series_order) ? e.series_order : Infinity);

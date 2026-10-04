@@ -5,11 +5,14 @@
  * bookInfo.test.ts.
  */
 import type { Work } from './types';
+import { releaseLines } from './release';
 
 export interface InfoItem {
   key: 'lang' | 'trans' | 'format' | 'release';
   label: string;
   value: string;
+  /** the release, one printing per line — first release (初版) first (lib/release.ts) */
+  lines?: string[];
 }
 
 /** The chrome speaks ja or en (Thai visitors read the English chrome). */
@@ -35,7 +38,7 @@ export function langName(code: string, ui: UiLang): string {
   }
 }
 
-type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label' | 'novel_langs'>;
+type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label' | 'released_on' | 'novel_langs'>;
 
 export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
   const sep = ui === 'ja' ? '・' : ' / ';
@@ -59,7 +62,9 @@ export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
   }
   const formats = (work.formats ?? []).filter(Boolean);
   if (formats.length) items.push({ key: 'format', label: t('ov.format'), value: formats.map((f) => t(`fmt.${f}`)).join(' + ') });
-  const release = work.release_label?.trim();
-  if (release) items.push({ key: 'release', label: t('ov.release'), value: release });
+  // the author's label, each printing on its own line; without one, the first
+  // release date (works.released_on) as a month
+  const lines = releaseLines(work, ui);
+  if (lines.length) items.push({ key: 'release', label: t('ov.release'), value: lines.join(sep), lines });
   return items;
 }

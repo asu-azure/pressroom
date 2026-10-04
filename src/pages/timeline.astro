@@ -1,0 +1,32 @@
+---
+import Base from '../layouts/Base.astro';
+import Timeline from '../components/timeline/Timeline.svelte';
+
+// Which order to read the books in, and when each part is set
+// (components/timeline/Timeline.svelte, src/data/timeline.ts). No server reads:
+// the story line is a data file and the release list is fetched in the browser,
+// like the shelf — so the shell is static.
+export const prerender = true;
+---
+
+<Base
+  title="時系列 · Timeline — Pressroom"
+  description="扉の向こうはヒマワリ畑 — the books in release order, and where each part falls in the story's time. No spoilers."
+>
+  <main class="spread spread--ink tl-shell">
+    <Timeline client:only="svelte">
+      <div slot="fallback" class="tl-shell__ph" aria-hidden="true"></div>
+    </Timeline>
+  </main>
+</Base>
+
+<style>
+  .tl-shell {
+    position: relative;
+    z-index: 1;
+    min-height: 100svh;
+  }
+  .tl-shell__ph {
+    min-height: 100svh;
+  }
+</style>

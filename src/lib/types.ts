@@ -106,6 +106,8 @@ export interface Work {
   translations?: string[]; // languages a translation exists in, e.g. ['ja']
   formats?: BookFormat[];
   release_label?: string | null;
+  /** the first release (初版), YYYY-MM-DD (supabase/release-date.sql) — the shelf's order */
+  released_on?: string | null;
   content_warnings?: string[];
   series_title?: string | null; // same string = same series
   series_order?: number | null;

@@ -11,7 +11,10 @@
   import { toRichHtml } from '../../lib/richtext';
   import { tidyForeword } from '../../lib/foreword';
   import { frontOnly, cropImgStyle } from '../../lib/coverCrop';
-  import { seriesRun } from '../../lib/series';
+  import { seriesRun, kindKey } from '../../lib/series';
+  import { novelProgress, resumeLabel } from '../../lib/novel';
+  import { lockReturn } from '../../lib/readerLink';
+  import { inTimeline } from '../../data/timeline';
   import { bookInfo } from '../../lib/bookInfo';
   import { bookParts, partLabel, partNote } from '../../lib/bookParts';
   import { shareLink } from '../../lib/share';
@@ -75,16 +78,29 @@
   const forewordHtml = $derived(fore.html);
   const info = $derived(work ? bookInfo(work, i18n.lang, (k) => i18n.t(k as DictKey)) : []);
   const warnings = $derived((work?.content_warnings ?? []).map((w) => w.trim()).filter(Boolean));
+  // A place saved in the novel reader (this browser only, lib/novel.ts): the
+  // novel button reads 「続きから読む（第三話）」 and opens in that place's language.
+  // Re-read when the page comes back from the reader (bfcache) — `marksTick`.
+  let marksTick = $state(0);
+  const novelSaved = $derived.by(() => {
+    void marksTick;
+    return work ? novelProgress(work.id, work.novel_langs, i18n.lang) : null;
+  });
   // the novel reader opens in the reader's language when the text exists in it
   const novelHref = $derived.by(() => {
     const langs = work?.novel_langs ?? [];
     if (!langs.length) return null;
-    const lang = langs.includes(i18n.lang) ? i18n.lang : langs[0];
+    const lang = novelSaved?.lang ?? (langs.includes(i18n.lang) ? i18n.lang : langs[0]);
     return `/w/${slug}/novel?lang=${lang}`;
   });
-  const statusKey = $derived(
-    work ? (`status.${work.status}` as const) : ('status.oneshot' as const),
+  const novelLabel = $derived(
+    novelSaved ? resumeLabel(novelSaved.chapter, i18n.lang, (k) => i18n.t(k as DictKey)) : i18n.t('nv.read'),
   );
+  // 本編 / 外伝 for a book in a series, never 読切 (lib/series.ts kindKey)
+  const kindLabel = $derived.by(() => {
+    const key = work ? kindKey(work) : null;
+    return key ? i18n.t(key as DictKey) : null;
+  });
 
   // --- Series: the other published books sharing series_title (book-info.sql).
   //     Loaded after the page is up and never allowed to break it. ---
@@ -237,6 +253,18 @@
     void load();
   });
 
+  // Back from a reader through bfcache: the island is kept as it was, so the
+  // saved places are read again — 「続きから読む」 must name the newest one.
+  $effect(() => {
+    const onShow = (e: PageTransitionEvent) => {
+      if (!e.persisted || !work) return;
+      continueAt = loadProgress(work.id);
+      marksTick++;
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  });
+
   // Fade the "scroll for more" cue once the reader starts scrolling.
   let scrolled = $state(false);
   $effect(() => {
@@ -286,6 +314,15 @@
     continueAt = loadProgress(work.id);
     status = 'ready';
     void loadSeries(work);
+    // A locked reader sent the visitor here with where they were going (?go=, a
+    // timeline or shared link): open the gate at once and take them there after.
+    const go = lockReturn(new URLSearchParams(location.search).get('go'), slug);
+    if (go) {
+      const url = new URL(location.href);
+      url.searchParams.delete('go');
+      history.replaceState(history.state, '', url);
+      if (work.read_locked && !unlocked) openLock(go);
+    }
     // Deep link: /w/slug?c=charId opens that character's file directly.
     const requested = new URLSearchParams(location.search).get('c');
     if (requested) {
@@ -436,11 +473,12 @@
       <div class="ov-hero__text">
         <p class="mono ov-hero__kicker" use:decodeIn>ASU AZURE · PRESSROOM</p>
         <h1 class="ov-hero__title serif authored" use:titleIn>{work.title}</h1>
-        <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
-          {i18n.t(statusKey)}
-          {#if work.series_kind}· {i18n.t(`series.${work.series_kind}`)}{/if}
-          {#if work.tags.length}· <span class="authored">{work.tags.join(' / ')}</span>{/if}
-        </p>
+        {#if kindLabel || work.tags.length}
+          <p class="mono ov-hero__meta" use:reveal={{ delay: 0.08 }}>
+            {kindLabel ?? ''}
+            {#if work.tags.length}{kindLabel ? '· ' : ''}<span class="authored">{work.tags.join(' / ')}</span>{/if}
+          </p>
+        {/if}
         {#if info.length}
           <!-- 奥付: what the book is before anyone opens it — a Japanese visitor
                learns here that the book is in Thai, and whether it is translated -->
@@ -448,7 +486,14 @@
             {#each info as item (item.key)}
               <div class="ov-info__item">
                 <dt class="mono">{item.label}</dt>
-                <dd class="ov-info__value">{item.value}</dd>
+                {#if item.lines && item.lines.length > 1}
+                  <!-- the first release (初版), then each later printing on its own line -->
+                  <dd class="ov-info__value ov-info__value--lines">
+                    {#each item.lines as line, li (li)}<span class="ov-info__line">{line}</span>{/each}
+                  </dd>
+                {:else}
+                  <dd class="ov-info__value">{item.value}</dd>
+                {/if}
               </div>
             {/each}
           </dl>
@@ -484,14 +529,16 @@
           {/if}
           {#if novelHref}
             <!-- the prose reads as text in its own reader (supabase/novel.sql);
-                 the button above still opens the pages -->
+                 the button above still opens the pages. With a place saved in the
+                 novel it says which chapter and opens there (lib/novel.ts). -->
             <a
-              class="ov-btn ov-btn--ghost mono"
+              class="ov-btn mono"
+              class:ov-btn--ghost={!novelSaved || continueAt}
               data-sfx="open"
               href={novelHref}
               onclick={(e) => locked && openLock(novelHref, e)}
             >
-              {#if locked}<span aria-hidden="true">🔒 </span>{/if}{i18n.t('nv.read')} →
+              {#if locked}<span aria-hidden="true">🔒 </span>{/if}{novelLabel} →
             </a>
           {/if}
           <button type="button" class="ov-btn ov-btn--ghost mono" onclick={share}>
@@ -560,7 +607,9 @@
                   onclick={(e) => openPart(part, e)}
                 >
                   {#if locked}<span aria-hidden="true">🔒 </span>{/if}
-                  {i18n.t(part.kind === 'novel' && novelHref ? 'nv.read' : part.kind === 'manga' ? 'part.readManga' : 'ov.start')} →
+                  {part.kind === 'novel' && novelHref
+                    ? novelLabel
+                    : i18n.t(part.kind === 'manga' ? 'part.readManga' : 'ov.start')} →
                 </a>
               </li>
             {/each}
@@ -796,6 +845,10 @@
             </li>
           {/each}
         </ol>
+        {#if inTimeline(work.slug)}
+          <!-- the books jump in time on purpose: the timeline says which order, and when -->
+          <a class="mono ov-series__tl" href="/timeline" data-sfx="open">{i18n.t('tl.link')}</a>
+        {/if}
         {#if series.prev || series.next}
           <nav class="ov-series__step">
             {#if series.prev}
@@ -971,6 +1024,13 @@
     font-family: var(--font-display-authored);
     font-size: 0.86rem;
     color: var(--fg);
+  }
+  .ov-info__value--lines {
+    display: grid;
+    gap: 0.15rem;
+  }
+  .ov-info__line {
+    display: block;
   }
   /* Content notes — before the read button, in the amber warning voice */
   .ov-cw {
@@ -1832,6 +1892,19 @@
   }
   .ov-series__next {
     margin-left: auto;
+  }
+  .ov-series__tl {
+    justify-self: start;
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    color: var(--fg);
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 0.2em;
+    transition: color 0.25s var(--ease);
+  }
+  .ov-series__tl:hover,
+  .ov-series__tl:focus-visible {
+    color: var(--accent);
   }
 
   .ov-foot {

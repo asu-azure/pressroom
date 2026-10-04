@@ -118,6 +118,39 @@
     panelOpen = false;
   }
 
+  // --- The drawers (一覧, 目次) close four ways: ×, a tap on the dimmed page
+  //     beside them, Esc, or their button again. On a phone the grid used to
+  //     cover 92% of the screen with a 31px strip as the only way out. Focus
+  //     goes to × on open and back to the bar's button on close. ---
+  let gridBtn: HTMLButtonElement | undefined = $state();
+  let tocBtn: HTMLButtonElement | undefined = $state();
+  let drawerClose: HTMLButtonElement | undefined = $state();
+  function closeDrawers() {
+    const back = gridOpen ? gridBtn : tocOpen ? tocBtn : null;
+    gridOpen = false;
+    tocOpen = false;
+    back?.focus({ preventScroll: true });
+  }
+  function toggleToc() {
+    if (tocOpen) return closeDrawers();
+    tocOpen = true;
+    gridOpen = false;
+    panelOpen = false;
+  }
+  $effect(() => {
+    if (gridOpen || tocOpen) drawerClose?.focus({ preventScroll: true });
+  });
+  function onKey(e: KeyboardEvent) {
+    if (e.key !== 'Escape') return;
+    if (gridOpen || tocOpen) {
+      e.preventDefault();
+      closeDrawers();
+    } else if (panelOpen) {
+      e.preventDefault();
+      panelOpen = false;
+    }
+  }
+
   // Chrome steps aside after 3 s without input, like comimi's overlay. Any
   // pointer, key or wheel brings it back; it never hides while a panel is open,
   // while keyboard focus is inside it, or on a first visit before the first page
@@ -172,6 +205,19 @@
   }
 </script>
 
+<svelte:window onkeydown={onKey} />
+
+{#snippet drawerBar(title: string)}
+  <!-- sticky: × stays in reach however far the grid scrolls -->
+  <div class="rc-drawer__bar">
+    <p class="mono rc-drawer__title">{title}</p>
+    <button class="rc-drawer__close" bind:this={drawerClose} onclick={closeDrawers}>
+      <svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg>
+      <span class="mono">{i18n.t('rd.close')}</span>
+    </button>
+  </div>
+{/snippet}
+
 {#snippet modeIcon(mode: 'flip' | 'scroll')}
   {#if mode === 'flip'}
     <svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"
@@ -209,7 +255,8 @@
       <button
         class="rc-tool"
         class:is-active={tocOpen}
-        onclick={() => (tocOpen = !tocOpen)}
+        bind:this={tocBtn}
+        onclick={toggleToc}
         aria-expanded={tocOpen}
       ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.1M4.5 12h.1M4.5 18h.1" /></svg
         ><span class="rc-tool__label">{i18n.t('rd.toc')}</span></button>
@@ -246,7 +293,8 @@
     <button
       class="rc-tool"
       class:is-active={gridOpen}
-      onclick={() => (gridOpen ? (gridOpen = false) : openGrid())}
+      bind:this={gridBtn}
+      onclick={() => (gridOpen ? closeDrawers() : openGrid())}
       title={i18n.t('rd.pages')}
       aria-expanded={gridOpen}
     ><svg class="rc-ico rc-ico--grid" viewBox="0 0 24 24" aria-hidden="true"
@@ -387,8 +435,9 @@
 
 {#if gridOpen}
   <div class="rc-toc rc-grid">
-    <button class="rc-toc__scrim" aria-label="Close pages" onclick={() => (gridOpen = false)}></button>
+    <button class="rc-toc__scrim" tabindex="-1" aria-label={i18n.t('rd.close')} onclick={closeDrawers}></button>
     <nav class="rc-toc__body rc-grid__body" aria-label={i18n.t('rd.pages')}>
+      {@render drawerBar(i18n.t('rd.pages'))}
       <div class="rc-grid__head">
         <div class="rc-grid__tabs" role="tablist">
           <button
@@ -422,7 +471,7 @@
                 class:is-current={currentIds.includes(page.id)}
                 onclick={() => {
                   onJumpPage(page.id);
-                  gridOpen = false;
+                  closeDrawers();
                 }}
               >
                 <img
@@ -454,9 +503,9 @@
 
 {#if tocOpen}
   <div class="rc-toc">
-    <button class="rc-toc__scrim" aria-label="Close chapters" onclick={() => (tocOpen = false)}></button>
-    <nav class="rc-toc__body">
-      <p class="mono rc-toc__head">{i18n.t('ov.chapters')}</p>
+    <button class="rc-toc__scrim" tabindex="-1" aria-label={i18n.t('rd.close')} onclick={closeDrawers}></button>
+    <nav class="rc-toc__body" aria-label={i18n.t('ov.chapters')}>
+      {@render drawerBar(i18n.t('ov.chapters'))}
       <ul class="rc-toc__list">
         {#each chapterMarks as mark, i (mark.id)}
           <li>
@@ -465,7 +514,7 @@
               class:is-current={currentChapter === mark.title}
               onclick={() => {
                 onJump(mark.sheet);
-                tocOpen = false;
+                closeDrawers();
               }}
             >
               {#if mark.coverUrl}
@@ -824,21 +873,68 @@
   .rc-toc__scrim {
     position: absolute;
     inset: 0;
-    background: rgba(8, 8, 10, 0.55);
+    background: rgba(8, 8, 10, 0.66);
     border: 0;
     cursor: pointer;
   }
   .rc-toc__body {
     position: relative;
-    width: min(21rem, 88vw);
+    /* leaves a dimmed strip of the page to tap on a phone (it was 31px) */
+    width: min(21rem, 82vw);
     height: 100%;
     overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--ink-bg-soft);
     border-left: 1px solid var(--line-strong);
-    padding: calc(3.6rem + env(safe-area-inset-top)) 1.2rem 2rem;
+    padding: 0 1.2rem calc(2rem + env(safe-area-inset-bottom));
   }
-  .rc-toc__head {
-    margin-bottom: 1rem;
+  .rc-drawer__bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin: 0 -1.2rem 1rem;
+    padding: calc(0.6rem + env(safe-area-inset-top)) 0.7rem 0.6rem 1.2rem;
+    background: var(--ink-bg-soft);
+    border-bottom: 1px solid var(--line);
+  }
+  .rc-drawer__title {
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    color: var(--fg-dim);
+  }
+  .rc-drawer__close {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 2.75rem;
+    padding: 0 0.85rem 0 0.6rem;
+    background: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--fg);
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease);
+  }
+  .rc-drawer__close .rc-ico {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+  .rc-drawer__close .mono {
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+  }
+  .rc-drawer__close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (hover: hover) {
+    .rc-drawer__close:hover {
+      border-color: var(--accent);
+    }
   }
   .rc-toc__list {
     list-style: none;
@@ -891,7 +987,7 @@
   }
   /* --- Page grid (the TOC drawer's shell, wider) --- */
   .rc-grid__body {
-    width: min(26rem, 92vw);
+    width: min(26rem, 84vw);
   }
   .rc-grid__head {
     display: flex;

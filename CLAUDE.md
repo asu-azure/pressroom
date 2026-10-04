@@ -93,7 +93,8 @@ text. See `src/lib/richtext.ts` and its tests.
    `AUTHOR_UID` with the author user's `auth.users.id` first.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
    `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
-   `scenes.sql`, `book-info.sql`, `novel.sql`, `clean-pages.sql`, `chapter-kind.sql`.
+   `scenes.sql`, `book-info.sql`, `novel.sql`, `clean-pages.sql`, `chapter-kind.sql`,
+   `release-date.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
@@ -200,6 +201,20 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
   lettering and the old overlay collided with it. Books stand on planks drawn per item (±½ gap);
   the last one runs on and fades — room for the next book.
 - Reduced motion: the resting pose, a plain link, no hint line.
+- **Release order** (`lib/release.ts`, tested): the shelf stands oldest first by `works.released_on`
+  (the first release, 初版 — `supabase/release-date.sql`); undated books follow in the query's order
+  (most recently edited first, as before). Sorted **in the browser**, not in the query: ordering by
+  the column before it exists would fail the whole select, and `library_cards()` doesn't need it
+  (the shelf reads `works.*` itself — its fixed return type stays). The label leads with the year:
+  「2025 · 本編 · 79P · RTL」. A book with a `series_title` says 本編 / 外伝 (`kindKey` in
+  `lib/series.ts`), never 読切 — both books said 読切 and read as unrelated; the overview's meta uses
+  the same. The meta line is ONE text node on purpose (a flex row: a `{#if}` split it into items
+  whose edge spaces collapsed, 「本編 ·79P」).
+- **読む順番 → 時系列** sits in the shelf's head row (not under the grid: the shelf must keep its
+  placeholder's height), shown when a book the timeline covers is on the shelf; the footer links
+  `/timeline` too.
+- **小説しおり**: a place saved in the novel reader shows on the label as 「小説しおり 第三話」
+  (`novelProgress` in `lib/novel.ts`) — text only, the novel has no pages to put a card at.
 - **付箋 & しおり** (`src/lib/shelfmarks.ts`, tested): the reader also saves progress and ここすき
   favourites as *positions* (`pressroom:shelfmarks:{workId}` = total / at / favs), because the shelf
   can't map page IDs to order — locked works hide their page rows from anon reads. The book then
@@ -222,6 +237,18 @@ visitors it is written for are Japanese; the books are Thai.
   locked, so titles and kinds show; ranges and landing pages wait for the pages (`bookParts(…, null)`),
   and a locked part's button hands LockGate a *function* (`pendingHref`), resolved once the
   unlocked rows are in.
+- **The novel button remembers** (`novelProgress` / `resumeLabel` in `lib/novel.ts`, tested): with a
+  place saved in the novel reader (this browser only), the hero's novel button and the novel part's
+  button read 「続きから読む（第三話）」 and open the novel in that place's language, where it resumes.
+  The novel reader saves the chapter's number with the place (`SavedPlace.chapter`, `chapterNumber`)
+  because the overview can't read a locked book's sections; a bare {0,0} (the reader just opened) is
+  not progress, and a place saved before the number was kept gets plain 続きから読む. The button is
+  filled when there is no page-reader progress. Both saved places are re-read on `pageshow` (bfcache).
+- **`?go=` — the gate takes you there** (`lib/readerLink.ts`, tested): a locked reader (page or
+  novel) that can't unlock sends its visitor to `/w/slug?go=<its own path+query>`; the overview strips
+  it, opens the LockGate at once and goes there on unlock. Only this book's own `/read` or `/novel`
+  path is accepted (`lockReturn`) — never another site, book or page. That is what makes a timeline
+  link (`?n=66`) or a shared page link work on a locked book.
 - **「しおりについて」** (`components/reader/BookmarkNote.svelte`, a plain `<details>`) under the hero
   buttons, by 「続きから読む」: the place and the ここすき live in this browser on this device only — not
   on other devices, not in another app's built-in browser (a link opened from X or LINE), gone in
@@ -233,7 +260,10 @@ visitors it is written for are Japanese; the books are Thai.
   unlock, and the hero would re-trim and jump.
 - **奥付 row + content notes** from `supabase/book-info.sql` (all optional): `book_lang`,
   `translations`, `formats`, `release_label`, `content_warnings`, `series_*` (`lib/bookInfo.ts`,
-  tested; language names via `Intl.DisplayNames`). "翻訳 なし" is shown on purpose — it is how a
+  tested; language names via `Intl.DisplayNames`). **頒布 lists every printing on its own line**, the
+  first release first: `release_label` is split where a new date starts (「2025年11月 Comic Avenue 10
+  （初版）・2026年3月 Comic Square 9（再版）」, `releaseLines` in `lib/release.ts`); with no label the
+  first release date stands in as a month. "翻訳 なし" is shown on purpose — it is how a
   Japanese visitor learns the Thai book has no Japanese yet. But a novel part that reads as text in
   another language (`novel_langs`) counts: vol. 2 says 「日本語（小説パート）」, never なし. Content notes sit above the read
   button, amber, `role="note"`. Studio META edits them all (content notes one per line).
@@ -251,11 +281,47 @@ visitors it is written for are Japanese; the books are Thai.
   mincho/gothic stacks instead of the subset names — the root cause.
 - **Series**: published works sharing `series_title`, queried directly (not through
   `library_cards()`, whose return type would need a drop) after the page is up, try/catch;
-  `lib/series.ts` orders them and finds prev/next. `series_kind` main/side → 本編/外伝.
+  `lib/series.ts` orders them and finds prev/next. `series_kind` main/side → 本編/外伝. A book on the
+  timeline adds 「読む順番は？ → 時系列」 under the series cards.
 - **SHARE** (`lib/share.ts`, lifted from the lightbox): share sheet on touch, copy on desktop.
 - ⚠ The JP subset fonts in `public/fonts/` predate most of the chrome copy: kanji like 読 訳 翻
   限 are missing from them, so those labels mix in a fallback face. Regenerating the subsets from
   the kanji in `src/` is an open follow-up.
+
+### The timeline (`/timeline`, `components/timeline/Timeline.svelte` + `src/data/timeline.ts`)
+
+Which order to read the books in, and when each part is set — the books jump in time on purpose
+(vol. 1's last pages are set three years after vol. 2's novel). One page, two views, and the note
+「刊行順に読むのがおすすめです。本は、わざと時間を行き来しています。」 at the top:
+
+- **刊行順** — the series' books from the database in shelf order (`shelfOrder`), each with its
+  front cover, Nº + year, every printing (`releaseLines`), format (マンガ / 小説+マンガ, from
+  `works.formats`), 本編/外伝 and a link to its overview. A later book that joins the series
+  (`series_title`) appears by itself. Offline: the data file's books, without covers or dates.
+- **物語の時系列** — three eras on a vertical line (子ども時代（チャンタブリー） · 3年後・中学1年（バンコク）
+  · さらに3年後・高校時代), each listing the part of each book set there with its reader page range, a
+  小説/マンガ tag, the point of view when the book says so, and a button: the novel reader for the
+  novel part, the page reader at the part's first page for manga (`?n=`, below). The line runs on,
+  dashed amber, to 「次は：フランクの物語（予定）」 (announced in vol. 1's afterword).
+- **Spoiler-free on purpose (the owner's call)**: eras, places and points of view only, never what
+  happens. Don't add events; era 3 deliberately names no place.
+- **The content is a typed data file** (`src/data/timeline.ts`, JA + EN strings, `timeline.test.ts`):
+  slugs, reader page ranges (inside the book, no page in two eras, the p.65→66 time skip), both
+  languages present. Ranges are **reader pages** (cover = p.1, blanks counted), checked against the
+  books: 夜光虫編 p.1–65 childhood, epilogue p.66–75 (p.66 opens 「で、三年たって」; p.76 is a guest
+  illustration, p.77 the afterword); 雨上がりの空編 第一部 p.1–65 novel, 第二部「大人の重荷編」 from p.66,
+  its story ending p.82 (p.83–84 are the afterword and colophon, inside the DB chapter's 66–84).
+  Re-check them if pages are added or reordered.
+- JA/EN like the reader and library chrome (`i18n.t` + `pick()`); Thai visitors read English. Book
+  titles stay as printed in every language (`.authored`), and the page's Japanese body text uses the
+  authored stacks too (the subset webfonts predate these kanji).
+- Prerendered shell (`prerender = true`, no server reads, no `cacheShell`), the island `client:only`
+  like the shelf. Linked from the shelf's head row and footer, the overview's series block, and the
+  foot of both readers' 使い方 guide (「読む順番は？ → 時系列」, `ReadingGuide`'s `timeline` prop — Tab
+  then cycles between OK and the link). Only for works the data file covers (`inTimeline`).
+- **`?n=66` deep link** (`pageByNumber` in `lib/readerLink.ts`): the page reader opens at the n-th
+  page. The timeline can't use `?p=`: a locked book hides its page ids from anyone who hasn't
+  unlocked it. `?p=` and `?ch=` still win over it.
 
 ### Removed on purpose — do not reintroduce
 
@@ -695,14 +761,22 @@ bookmark existed, or where they were kept. So:
   edge and blurred the margin notes. Mice keep them.
 - **The first save says where it went**: the first page turn, or the first ここすき, toasts
   「…このブラウザに保存しました」 once per browser (hint key `saved`; scroll mode's mount report isn't a
-  turn).
+  turn). **Every ここすき added also says where they live**: a second line 「「一覧」→「ここすき」で見られます」
+  (the toast is `pre-line` and `width: max-content` — with `left: 50%` a shrink-to-fit box was capped
+  at half the screen and wrapped every few characters).
+- **The drawers (一覧, 目次) close four ways**: a visible 「× 閉じる」 in a sticky bar at their top (in
+  reach however far the grid scrolls), a tap on the dimmed page beside them (the drawer is 82–84vw on
+  a phone — the grid used to cover 92% with a 31px strip as the only way out), Esc, or their button.
+  Focus goes to × on open and back to the bar's button on close. Esc also closes 設定.
 - **「小説はテキストで読めます →」 is a pill above the page counter**, a real link, shown only on pages of
   a novel part (`novelHere`, tested — a book whose chapters carry no kind keeps offering it
   everywhere) and only when the text exists in the reader's language. It used to sit in the bar on
   every page, manga included, looking like a label.
-- **Deep links**: `?p=pageId` (thumbnails, parts, SHARE) and `?ch=chapterId` — the start of a part
-  (`partStart`), for the novel reader's last page, which can't see a locked book's page rows. Both
-  win over saved progress.
+- **Deep links**: `?p=pageId` (thumbnails, parts, SHARE), `?ch=chapterId` — the start of a part
+  (`partStart`), for the novel reader's last page — and `?n=66`, a page number (the timeline); the
+  last two exist because a locked book's page rows are hidden. All win over saved progress, `p`
+  first. A locked reader that can't unlock goes to the overview with `?go=` (the gate opens and
+  brings the visitor back — see the overview section).
 - The page-curl setting now reaches FlipSurface (it was passed to ScrollSurface, which has no such
   prop — 紙のめくり オフ did nothing). ScrollSurface's grid columns are `minmax(0, 1fr)`: in
   fit-height on a phone an auto track grew to a page's min-content and widened the document (and the
@@ -802,6 +876,9 @@ chip) even while the book is locked.
   設定 for 縦/横 + size + 明朝/ゴシック, 目次 — 横書き swaps the first two for "scroll; your place is
   saved"). 設定 ends with 「しおりについて」; the first page turned (or scrolled by the reader, not by
   a resume or a 目次 jump — `quietUntil`) toasts that the place is saved in this browser, once.
+- **The place carries its chapter's number** (`{section, block, chapter}` under `placeKey`, see the
+  overview): the overview and the shelf say 「続きから読む（第三話）」 / 「小説しおり 第三話」 without
+  reading a locked book's text. `parsePlace` ignores the extra field.
 - `.nv` pins its one column to `minmax(0, 1fr)`: an auto column grew to the bar's min-content (back +
   title + labelled tools) and the page pitch, measured from it, came out wider than a phone.
 - **The last page belongs to the book** (`novelSequel`, tested): when the book also has a manga part,

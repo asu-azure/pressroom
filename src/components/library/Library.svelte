@@ -5,6 +5,8 @@
   import { publicUrl } from '../../lib/storagePaths';
   import { i18n } from '../../lib/i18n.svelte';
   import { assemble } from '../../scripts/text';
+  import { shelfOrder } from '../../lib/release';
+  import { inTimeline } from '../../data/timeline';
   import WorkCard from './WorkCard.svelte';
   import KeyChain from './KeyChain.svelte';
   import LangBar from './LangBar.svelte';
@@ -45,6 +47,8 @@
 
   let cards = $state<CardData[] | null>(null);
   let error = $state<string | null>(null);
+  // 読む順番 → 時系列, when the shelf holds a book the timeline covers
+  const timeline = $derived(Boolean(cards?.some((c) => inTimeline(c.work.slug))));
 
   $effect(() => {
     void load();
@@ -106,7 +110,11 @@
     const byWork = new Map<string, CardRow>(
       ((rows ?? []) as CardRow[]).map((r) => [r.card_work_id, r]),
     );
-    cards = ((works ?? []) as Work[]).map((work) => {
+    // Release order (works.released_on, supabase/release-date.sql): sorted here,
+    // not in the query, so the shelf still stands before that column exists —
+    // ordering by a missing column would fail the whole select. Undated books
+    // follow, most recently edited first, as the shelf always stood.
+    cards = shelfOrder((works ?? []) as Work[]).map((work) => {
       const row = byWork.get(work.id);
       return {
         work,
@@ -127,6 +135,11 @@
     <span class="lib__rule" aria-hidden="true"></span>
     {#if cards?.length}
       <span class="mono lib__n">{i18n.t('lib.count').replace('{n}', String(cards.length).padStart(2, '0'))}</span>
+    {/if}
+    {#if timeline}
+      <!-- in the head row, not under the grid: the shelf must keep the height
+           its placeholder promised (styles/shelf-ph.css) -->
+      <a class="mono lib__tl" href="/timeline" data-sfx="tap">{i18n.t('lib.timeline')}</a>
     {/if}
   </header>
   {#if !reduced && (cards === null || cards.length)}
@@ -190,6 +203,17 @@
   }
   .lib__k { color: var(--accent); }
   .lib__n { color: var(--fg-dim); }
+  .lib__tl {
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+    color: var(--fg);
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 0.15em;
+    transition: color 0.25s var(--ease);
+  }
+  .lib__tl:hover,
+  .lib__tl:focus-visible { color: var(--accent); }
   /* ruler ticks along the slug line */
   .lib__rule {
     flex: 1;

@@ -3,6 +3,7 @@
  * Tested in novel.test.ts.
  */
 import type { NovelBlock, NovelPara, NovelRun, NovelSection } from './types';
+import { kanjiNumber } from './bookParts';
 
 const LANGS = new Set(['th', 'ja', 'en']);
 const RULES = new Set(['line', 'dots', 'wave']);
@@ -159,6 +160,86 @@ export function chapters(sections: NovelSection[]): { index: number; title: stri
 export function chapterOf(sections: NovelSection[], section: number): number {
   for (let i = Math.min(section, sections.length - 1); i > 0; i--) if (sections[i].title) return i;
   return 0;
+}
+
+/**
+ * The chapter a section is in, numbered as the book numbers it: 1 for 第一話 — the
+ * titled sections up to the one it belongs to. 0 is the untitled opening.
+ */
+export function chapterNumber(sections: NovelSection[], section: number): number {
+  if (!sections.length) return 0;
+  const at = chapterOf(sections, section);
+  let n = 0;
+  for (let i = 0; i <= at; i++) if (sections[i]?.title) n++;
+  return n;
+}
+
+/**
+ * What the reader saves under placeKey: the place, and its chapter's number for the
+ * pages that can't see the text — the overview and the shelf (a locked book hides its
+ * sections from them).
+ */
+export interface SavedPlace extends NovelPlace {
+  chapter: number;
+}
+
+/**
+ * A saved place read without the text: null when nothing is saved, or only the very
+ * start (opening the reader saves its first page — that isn't progress). `chapter` is
+ * null for a place saved before the number was kept.
+ */
+export function savedProgress(raw: string | null): { section: number; block: number; chapter: number | null } | null {
+  if (!raw) return null;
+  try {
+    const p = JSON.parse(raw) as Partial<SavedPlace> | null;
+    const s = Number(p?.section);
+    const b = Number(p?.block);
+    if (!Number.isInteger(s) || !Number.isInteger(b) || s < 0 || b < 0) return null;
+    if (s === 0 && b === 0) return null;
+    const c = Number(p?.chapter);
+    return { section: s, block: b, chapter: p?.chapter !== undefined && Number.isInteger(c) && c >= 0 ? c : null };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The saved place to offer, in the language the novel would open in first, else any
+ * other it exists in. Only this browser's data.
+ */
+export function novelProgress(
+  workId: string,
+  langs: string[] | undefined,
+  prefer: string,
+  get: (key: string) => string | null = localGet,
+): { lang: string; chapter: number | null } | null {
+  const list = langs ?? [];
+  const order = list.includes(prefer) ? [prefer, ...list.filter((l) => l !== prefer)] : list;
+  for (const lang of order) {
+    const p = savedProgress(get(placeKey(workId, lang)));
+    if (p) return { lang, chapter: p.chapter };
+  }
+  return null;
+}
+
+function localGet(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** 第三話 · CH. 3 — the way the book numbers its chapters; 0 is the opening. */
+export function chapterName(n: number, ui: string, t: (key: string) => string): string {
+  if (n <= 0) return t('nv.opening');
+  return ui === 'ja' ? `第${kanjiNumber(n)}話` : `CH. ${n}`;
+}
+
+/** The novel button with a saved place: 「続きから読む（第三話）」, or plain 続きから読む for an old save. */
+export function resumeLabel(chapter: number | null, ui: string, t: (key: string) => string): string {
+  if (chapter === null) return t('ov.continue');
+  return t('nv.resume').replace('{at}', chapterName(chapter, ui, t));
 }
 
 /** Share of the whole text read up to a place — by characters, so long sections weigh more. */

@@ -20,6 +20,8 @@
   import ReadingGuide, { type GuideTip } from './ReadingGuide.svelte';
   import { sfx } from '../../scripts/sound';
   import { saveShelfmarks } from '../../lib/shelfmarks';
+  import { pageByNumber, lockedOverview } from '../../lib/readerLink';
+  import { inTimeline } from '../../data/timeline';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
   let { slug }: { slug: string } = $props();
@@ -180,7 +182,8 @@
         : { data: null };
       if (!unlockedRows?.length) {
         if (key) clearUnlock(work.id); // password changed since
-        location.replace(`/w/${slug}`);
+        // the overview opens its gate and brings the visitor back here (?go=)
+        location.replace(lockedOverview(slug, location.pathname, location.search));
         return;
       }
       rows = unlockedRows;
@@ -194,11 +197,15 @@
     chapters = (chRows ?? []) as Chapter[];
 
     // Deep links win over saved progress: ?p=pageId (the overview's thumbnails
-    // and parts, SHARE), or ?ch=chapterId — the start of a part, for the novel
-    // reader's last page, which can't see a locked book's page rows.
+    // and parts, SHARE), ?ch=chapterId — the start of a part, for the novel
+    // reader's last page — or ?n=66, a page number (the timeline): those two
+    // can't see a locked book's page rows (lib/readerLink.ts).
     const params = new URLSearchParams(location.search);
     const part = params.get('ch');
-    const requested = params.get('p') ?? (part ? partStart(part, pages) : null);
+    const requested =
+      params.get('p') ??
+      (part ? partStart(part, pages) : null) ??
+      pageByNumber(params.get('n'), [...pages].sort((a, b) => (a.sortKey < b.sortKey ? -1 : 1)));
     const target = requested ?? loadProgress(work.id);
     if (target) {
       const idx = sheetIndexOf(
@@ -251,12 +258,14 @@
     setTimeout(() => (bursts = bursts.filter((b) => b.id !== id)), 1700);
   }
 
-  function storeFavorites(next: string[], message: string) {
-    const adding = next.length > favorites.length;
+  function storeFavorites(next: string[], message: string, adding = next.length > favorites.length) {
     favorites = next;
     const kept = work ? saveFavorites(work.id, next) : false;
+    // an addition also says where the ここすき are kept: 一覧 → ここすき
+    const where = '\n' + i18n.t('rd.favWhere');
     if (!kept) say(i18n.t('rd.favLocal'));
-    else if (adding && firstSave()) say(i18n.t('rd.favSaved'), 2800);
+    else if (adding && firstSave()) say(i18n.t('rd.favSaved') + where, 3400);
+    else if (adding) say(message + where, 2600);
     else say(message);
   }
 
@@ -272,7 +281,7 @@
   function addFavorite(pageId: string, at: { x: number; y: number }) {
     burst(at.x, at.y);
     const next = favorites.includes(pageId) ? favorites : [...favorites, pageId];
-    storeFavorites(next, i18n.t('rd.favAdd'));
+    storeFavorites(next, i18n.t('rd.favAdd'), true); // a page already faved is still "added" to the eye
   }
 
   function removeFavorite(pageId: string) {
@@ -542,7 +551,7 @@
       onHelp={() => (guideOpen = true)}
     />
     {#if guideOpen}
-      <ReadingGuide tips={guideTips} onClose={closeGuide} />
+      <ReadingGuide tips={guideTips} onClose={closeGuide} timeline={inTimeline(work?.slug)} />
     {/if}
   {/if}
   <p class="mono reader__toast" class:is-on={toast} role="status" aria-live="polite">{toast ?? ''}</p>
@@ -584,6 +593,11 @@
     left: 0;
   }
   .reader__toast {
+    white-space: pre-line; /* the ここすき toast is two lines: what, and where */
+    line-height: 1.7;
+    word-break: auto-phrase;
+    /* left: 50% would cap a shrink-to-fit box at half the screen and wrap every line */
+    width: max-content;
     position: fixed;
     left: 50%;
     bottom: calc(3.4rem + env(safe-area-inset-bottom));

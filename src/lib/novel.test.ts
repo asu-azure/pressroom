@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chapters, chapterOf, groupBoxes, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, rowsFor, tcyPieces } from './novel';
+import { chapters, chapterOf, chapterName, chapterNumber, groupBoxes, novelProgress, placeKey, resumeLabel, savedProgress, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, rowsFor, tcyPieces } from './novel';
 import type { NovelBlock, NovelPara, NovelSection } from './types';
 
 const sec = (sort_key: string, body: unknown[], lang = 'ja'): NovelSection =>
@@ -145,3 +145,50 @@ describe('chapters', () => {
   });
 });
 
+
+describe('novel progress outside the novel', () => {
+  const sec = (title: string, i: number): NovelSection => ({ id: `s${i}`, work_id: 'w', lang: 'ja', sort_key: `a${i}`, title, body: [] });
+  // vol. 2's shape: an untitled opening, 第一話, 第二話, 第三話 with two untitled sections after it
+  const book = ['', '第一話　氷の壁と太陽', '第二話', '第三話', '', ''].map(sec);
+  const t = (k: string) => ({ 'ov.continue': '続きから読む', 'nv.resume': '続きから読む（{at}）', 'nv.opening': 'はじまり' })[k] ?? k;
+
+  it('numbers chapters as the book does, the opening 0', () => {
+    expect([0, 1, 2, 3, 4, 5].map((s) => chapterNumber(book, s))).toEqual([0, 1, 2, 3, 3, 3]);
+    expect(chapterNumber([], 0)).toBe(0);
+    // a book whose opening has a title counts it
+    expect(chapterNumber(['序章', '第一話'].map(sec), 1)).toBe(2);
+  });
+
+  it('reads a saved place without the text, and the bare start as nothing', () => {
+    expect(savedProgress(JSON.stringify({ section: 4, block: 7, chapter: 3 }))).toEqual({ section: 4, block: 7, chapter: 3 });
+    expect(savedProgress(JSON.stringify({ section: 0, block: 3, chapter: 0 }))).toEqual({ section: 0, block: 3, chapter: 0 });
+    // saved before the chapter number was kept
+    expect(savedProgress(JSON.stringify({ section: 2, block: 0 }))).toEqual({ section: 2, block: 0, chapter: null });
+    // opening the reader saves its first page: not progress
+    expect(savedProgress(JSON.stringify({ section: 0, block: 0, chapter: 0 }))).toBeNull();
+    for (const raw of [null, '', 'x', '{}', '{"section":-1,"block":2}', '{"section":1.5,"block":0}', 'null']) expect(savedProgress(raw)).toBeNull();
+  });
+
+  it('offers the place in the language the novel opens in first, else another', () => {
+    const store: Record<string, string> = {
+      [placeKey('w', 'th')]: JSON.stringify({ section: 5, block: 2, chapter: 3 }),
+    };
+    const get = (k: string) => store[k] ?? null;
+    expect(novelProgress('w', ['ja', 'th'], 'ja', get)).toEqual({ lang: 'th', chapter: 3 });
+    store[placeKey('w', 'ja')] = JSON.stringify({ section: 1, block: 9, chapter: 1 });
+    expect(novelProgress('w', ['ja', 'th'], 'ja', get)).toEqual({ lang: 'ja', chapter: 1 });
+    expect(novelProgress('w', ['ja', 'th'], 'th', get)).toEqual({ lang: 'th', chapter: 3 });
+    expect(novelProgress('w', [], 'ja', get)).toBeNull();
+    expect(novelProgress('w', undefined, 'ja', get)).toBeNull();
+    expect(novelProgress('other', ['ja'], 'ja', get)).toBeNull();
+  });
+
+  it('labels the button 「続きから読む（第三話）」', () => {
+    expect(resumeLabel(3, 'ja', t)).toBe('続きから読む（第三話）');
+    expect(resumeLabel(0, 'ja', t)).toBe('続きから読む（はじまり）');
+    expect(resumeLabel(null, 'ja', t)).toBe('続きから読む');
+    expect(resumeLabel(12, 'en', (k) => (k === 'nv.resume' ? 'CONTINUE ({at})' : k))).toBe('CONTINUE (CH. 12)');
+    expect(chapterName(6, 'ja', t)).toBe('第六話');
+    expect(chapterName(6, 'th', t)).toBe('CH. 6');
+  });
+});

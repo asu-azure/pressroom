@@ -21,12 +21,15 @@
   import { loadUnlock, clearUnlock, takeHint, seenHint, markHint } from '../../lib/persistence';
   import { i18n } from '../../lib/i18n.svelte';
   import { novelSequel, partLabel, partName } from '../../lib/bookParts';
+  import { lockedOverview } from '../../lib/readerLink';
+  import { inTimeline } from '../../data/timeline';
   import ReadingGuide, { type GuideTip } from '../reader/ReadingGuide.svelte';
   import BookmarkNote from '../reader/BookmarkNote.svelte';
   import {
     normalizeSections,
     chapters,
     chapterOf,
+    chapterNumber,
     pickLang,
     placeKey,
     parsePlace,
@@ -37,6 +40,7 @@
     groupBoxes,
     rowsFor,
     type NovelPlace,
+    type SavedPlace,
   } from '../../lib/novel';
   import type { Chapter, NovelPara, NovelSection, Work } from '../../lib/types';
 
@@ -119,7 +123,8 @@
         : { data: null };
       if (!data?.length) {
         if (key) clearUnlock(work.id); // password changed since
-        location.replace(`/w/${slug}`);
+        // the overview opens its gate and brings the visitor back here (?go=)
+        location.replace(lockedOverview(slug, location.pathname, location.search));
         return;
       }
       rows = data;
@@ -247,7 +252,10 @@
     if (!p || !work) return;
     place = p;
     try {
-      localStorage.setItem(placeKey(work.id, lang), JSON.stringify(p));
+      // the chapter's number rides along: the overview and the shelf can't see the
+      // text of a locked book, but can say 「続きから読む（第三話）」 (lib/novel.ts)
+      const saved: SavedPlace = { ...p, chapter: chapterNumber(sections, p.section) };
+      localStorage.setItem(placeKey(work.id, lang), JSON.stringify(saved));
     } catch {
       /* ignore */
     }
@@ -510,7 +518,7 @@
     {/if}
 
     {#if guideOpen}
-      <ReadingGuide tips={guideTips} tone="paper" onClose={() => (guideOpen = false)} />
+      <ReadingGuide tips={guideTips} tone="paper" timeline={inTimeline(work?.slug)} onClose={() => (guideOpen = false)} />
     {/if}
     <p class="nv-toast mono" class:is-on={toast} role="status" aria-live="polite">{toast ?? ''}</p>
   </div>

@@ -50,6 +50,17 @@ describe('bookInfo', () => {
     expect(bookInfo({ ...vol2, novel_langs: ['th'] }, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('<ov.transNone>');
   });
 
+  it('lists each printing of the release, the first release first', () => {
+    const vol1 = {
+      release_label: '2025年11月 Comic Avenue 10（初版）・2026年3月 Comic Square 9（再版）',
+      released_on: '2025-11-01',
+    };
+    const release = bookInfo(vol1, 'ja', t).find((i) => i.key === 'release')!;
+    expect(release.lines).toEqual(['2025年11月 Comic Avenue 10（初版）', '2026年3月 Comic Square 9（再版）']);
+    // with no label, the first release date stands in
+    expect(bookInfo({ released_on: '2026-03-08' }, 'en', t).find((i) => i.key === 'release')!.value).toBe('Mar 2026');
+  });
+
   it('shows nothing for a work without book info', () => {
     expect(bookInfo({}, 'ja', t)).toEqual([]);
     expect(bookInfo({ book_lang: ' ', formats: [], release_label: '' }, 'en', t)).toEqual([]);

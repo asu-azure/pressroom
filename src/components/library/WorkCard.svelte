@@ -1,8 +1,11 @@
 <script lang="ts">
   import { prefetch } from 'astro:prefetch';
-  import { i18n } from '../../lib/i18n.svelte';
+  import { i18n, type DictKey } from '../../lib/i18n.svelte';
   import { book, region } from '../../scripts/book3d';
   import { loadShelfmarks, layoutMarks, type Shelfmarks } from '../../lib/shelfmarks';
+  import { novelProgress, chapterName } from '../../lib/novel';
+  import { kindKey } from '../../lib/series';
+  import { releaseYear } from '../../lib/release';
   import type { Work } from '../../lib/types';
   import { wrapBack } from '../../lib/coverCrop';
 
@@ -13,7 +16,13 @@
     index,
   }: { work: Work; coverUrl: string | null; pageCount: number; index: number } = $props();
 
-  const statusLabel = $derived(i18n.t(`status.${work.status}`));
+  // 本編 / 外伝 for a book in a series — both books said 読切, which read as
+  // "unrelated" (lib/series.ts kindKey); the status for a book on its own
+  const kind = $derived(kindKey(work));
+  const kindLabel = $derived(kind ? i18n.t(kind as DictKey) : null);
+  // the first release's year (works.released_on): the shelf stands in that order
+  const year = $derived(releaseYear(work.released_on));
+  const lead = $derived([year, kindLabel].filter(Boolean).join(' · '));
   const href = $derived(`/w/${work.slug}`);
 
   // --- The cover as a book -------------------------------------------------
@@ -54,12 +63,19 @@
   // Re-read when the page comes back from the reader (bfcache keeps the island
   // alive) or another tab writes.
   let marks = $state<Shelfmarks | null>(null);
+  // 小説しおり: a place saved in the novel reader (lib/novel.ts, placeKey) — the
+  // novel has no pages, so it is a line on the label, not a card in the book
+  let novel = $state<{ lang: string; chapter: number | null } | null>(null);
   $effect(() => {
     const id = work.id;
-    const load = () => (marks = loadShelfmarks(id));
+    const langs = work.novel_langs;
+    const load = () => {
+      marks = loadShelfmarks(id);
+      novel = novelProgress(id, langs, i18n.lang);
+    };
     load();
     const onStorage = (e: StorageEvent) => {
-      if (e.key?.endsWith(id)) load();
+      if (e.key?.includes(id)) load();
     };
     window.addEventListener('pageshow', load);
     window.addEventListener('storage', onStorage);
@@ -91,7 +107,7 @@
   {href}
   draggable="false"
   data-sfx="note open"
-  aria-label={`${work.title} — ${statusLabel} · ${pageCount}P`}
+  aria-label={`${work.title} — ${lead ? `${lead} · ` : ''}${pageCount}P`}
   onpointerenter={() => prefetch(href)}
   onfocus={() => prefetch(href)}
 >
@@ -164,8 +180,11 @@
   <span class="book-card__label">
     <span class="book-card__title serif authored">{work.title}</span>
     <span class="book-card__meta mono">
-      {statusLabel} · {pageCount}P · {work.direction.toUpperCase()}
+      <!-- one text node: the meta is a flex row, and a block here would split it
+           into items whose edge spaces collapse (「本編 ·79P」) -->
+      {lead ? `${lead} · ` : ''}{pageCount}P · {work.direction.toUpperCase()}
       {#if laid?.bookmark}<span class="book-card__marked">· {i18n.t('lib.mark')} p.{laid.bookmark.page}</span>{/if}
+      {#if novel}<span class="book-card__marked book-card__novel">· {i18n.t('lib.novelMark')}{#if novel.chapter !== null}&nbsp;{chapterName(novel.chapter, i18n.lang, (k) => i18n.t(k as DictKey))}{/if}</span>{/if}
       {#if laid?.tabs.length}<span class="book-card__marked">· <svg class="book-card__heart" viewBox="0 0 12 11" aria-label="ここすき" role="img"><path d="M6 10.5 1.2 5.8A3 3 0 0 1 6 2a3 3 0 0 1 4.8 3.8Z" fill="currentColor" /></svg> {laid.tabs.length}</span>{/if}
       {#if work.read_locked}
         <svg class="book-card__lock" viewBox="0 0 12 14" aria-label={i18n.t('ov.locked')} role="img">
@@ -423,6 +442,7 @@
     letter-spacing: 0.04em;
   }
   .book-card__marked { color: var(--fg); }
+  .book-card__novel { white-space: nowrap; }
   .book-card__heart { width: 0.62rem; height: 0.56rem; color: #ff6e96; vertical-align: -0.05em; }
 
   /* --- Label on the shelf edge --------------------------------------------- */
@@ -446,8 +466,9 @@
   }
   .book-card__meta {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: 0.45em;
+    gap: 0.2em 0.45em;
     font-size: 0.58rem;
     letter-spacing: 0.12em;
     color: var(--fg-dim);

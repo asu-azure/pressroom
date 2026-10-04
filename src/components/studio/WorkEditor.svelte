@@ -57,12 +57,16 @@
     translations: [] as string[],
     formats: [] as BookFormat[],
     release_label: '',
+    released_on: '', // YYYY-MM-DD, the first release (supabase/release-date.sql)
     cwText: '', // content notes, one per line (Japanese items carry 、 — commas won't do)
     series_title: '',
     series_order: '',
     series_kind: '' as '' | 'main' | 'side',
     series_label: '',
   });
+
+  /** works.released_on exists (supabase/release-date.sql has been run). */
+  const hasReleaseDate = $derived(Boolean(work && 'released_on' in work));
 
   /** Existing series names, so a second book joins the first by picking it. */
   let seriesTitles = $state<string[]>([]);
@@ -177,6 +181,7 @@
       translations: [...(work.translations ?? [])],
       formats: [...(work.formats ?? [])],
       release_label: work.release_label ?? '',
+      released_on: work.released_on ?? '',
       cwText: (work.content_warnings ?? []).join('\n'),
       series_title: work.series_title ?? '',
       series_order: work.series_order == null ? '' : String(work.series_order),
@@ -224,6 +229,9 @@
         translations: meta.translations.filter((c) => c !== meta.book_lang),
         formats: meta.formats,
         release_label: meta.release_label.trim() || null,
+        // only once release-date.sql has added the column (select * then carries
+        // it): naming a missing column would fail the whole save
+        ...(hasReleaseDate ? { released_on: meta.released_on || null } : {}),
         content_warnings: meta.cwText.split('\n').map((t) => t.trim()).filter(Boolean),
         series_title: meta.series_title.trim() || null,
         series_order: meta.series_order.trim() === '' || !Number.isFinite(Number(meta.series_order)) ? null : Number(meta.series_order),
@@ -407,8 +415,17 @@
         </div>
       </div>
       <label class="we__field">
-        <span class="mono">RELEASE (FREE TEXT)</span>
-        <input type="text" bind:value={meta.release_label} placeholder="2026年3月 Comic Square 9" />
+        <span class="mono">RELEASE (FREE TEXT — EVERY PRINTING, FIRST FIRST, JOINED BY ・)</span>
+        <input type="text" bind:value={meta.release_label} placeholder="2025年11月 Comic Avenue 10（初版）・2026年3月 Comic Square 9（再版）" />
+      </label>
+      <label class="we__field">
+        <span class="mono">FIRST RELEASE DATE / 初版 (ORDERS THE SHELF)</span>
+        {#if hasReleaseDate}
+          <input type="date" bind:value={meta.released_on} />
+        {:else}
+          <input type="date" disabled />
+          <span class="mono we__hint">RUN supabase/release-date.sql TO ENABLE</span>
+        {/if}
       </label>
       <label class="we__field we__field--wide">
         <span class="mono">CONTENT NOTES / 内容に関する注意 (ONE PER LINE — SHOWN ABOVE THE READ BUTTON)</span>

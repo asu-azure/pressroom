@@ -15,22 +15,28 @@
    * and again from the bar's 「？ 使い方」. Readers didn't know where to tap.
    *
    * One button, but a tap anywhere or Esc closes it too. Modal: focus moves to
-   * the button, Tab stays on it, and goes back where it was on close. Reduced
-   * motion: it simply appears.
+   * the button, Tab stays on it (or between it and the timeline link), and goes
+   * back where it was on close. Reduced motion: it simply appears.
+   *
+   * `timeline`: the book is on /timeline — the foot asks 「読む順番は？ → 時系列」,
+   * because the books jump in time on purpose.
    */
   import { i18n } from '../../lib/i18n.svelte';
 
   let {
     tips,
     tone = 'ink',
+    timeline = false,
     onClose,
   }: {
     tips: GuideTip[];
     tone?: 'ink' | 'paper';
+    timeline?: boolean;
     onClose: () => void;
   } = $props();
 
   let okEl: HTMLButtonElement | undefined = $state();
+  let tlEl: HTMLAnchorElement | undefined = $state();
   const before = document.activeElement as HTMLElement | null;
   $effect(() => {
     okEl?.focus();
@@ -42,8 +48,8 @@
       e.preventDefault();
       onClose();
     } else if (e.key === 'Tab') {
-      e.preventDefault(); // one control: focus stays on it
-      okEl?.focus();
+      e.preventDefault(); // focus stays in the dialog: the button, and the link when there is one
+      (tlEl && document.activeElement === okEl ? tlEl : okEl)?.focus();
     }
   }
 </script>
@@ -120,6 +126,10 @@
     </ol>
     <button type="button" class="gd__ok" bind:this={okEl} onclick={onClose}>{i18n.t('gd.ok')}</button>
     <p class="gd__foot">{i18n.t('gd.anywhere')} · {i18n.t('gd.again')}</p>
+    {#if timeline}
+      <!-- a real link: the tap that closes the guide still follows it -->
+      <a class="gd__tl" href="/timeline" bind:this={tlEl}>{i18n.t('tl.link')}</a>
+    {/if}
   </div>
 </div>
 
@@ -257,5 +267,24 @@
     line-height: 1.5;
     color: var(--gd-dim);
     text-align: center;
+  }
+  /* 読む順番は？ → 時系列: a quiet link under the foot, a real tap target */
+  .gd__tl {
+    justify-self: center;
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0 0.6rem;
+    margin-top: -0.4rem;
+    font-family: var(--font-display-authored, sans-serif);
+    font-size: 0.84rem;
+    color: var(--gd-fg);
+    text-decoration: underline;
+    text-decoration-color: var(--accent);
+    text-underline-offset: 0.3em;
+  }
+  .gd__tl:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 </style>
