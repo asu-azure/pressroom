@@ -5,7 +5,7 @@
   import { sfx } from '../../scripts/sound';
   import { MUSIC } from '../../lib/features';
   import { cropFocus } from '../../lib/coverCrop';
-  import { translationLabel } from '../../lib/readerUi';
+  import { translationLabel, zoomLabel, ZOOM_STEPS } from '../../lib/readerUi';
   import BookmarkNote from './BookmarkNote.svelte';
 
   let {
@@ -23,6 +23,9 @@
     favorites,
     pinned = false,
     novelHref = null,
+    zoom = null,
+    onZoom,
+    onUnpin,
     onSettings,
     onJump,
     onJumpPage,
@@ -45,8 +48,14 @@
     favorites: string[];
     /** A first visit: the bar stays up until the first page turn. */
     pinned?: boolean;
-    /** 「小説はテキストで読めます」 — set only on pages of a novel part (lib/bookParts.ts). */
+    /** 「小説で読む」 — set only on pages of a novel part (lib/bookParts.ts). */
     novelHref?: string | null;
+    /** The page's zoom (1 = fit) in flip mode; null where there is none (scroll mode). */
+    zoom?: number | null;
+    /** − (−1), ＋ (1), or back to the whole page (0) — FlipSurface's own zoom. */
+    onZoom?: (dir: 1 | -1 | 0) => void;
+    /** A tap in the middle put the bar away: a first visit's pinned bar lets go. */
+    onUnpin?: () => void;
     onSettings: (patch: Partial<ReaderSettings>) => void;
     onJump: (sheet: number) => void;
     onJumpPage: (pageId: string) => void;
@@ -64,13 +73,25 @@
 
   // Phones get one flip/scroll button showing the mode it is in; wider bars keep both.
   let narrow = $state(false);
+  // A mouse gets the zoom in the bar (− 100% ＋); a finger pinches, and finds
+  // the same buttons in 設定 rather than in a bar that is already full.
+  let fine = $state(false);
   $effect(() => {
     const mq = window.matchMedia('(max-width: 520px)');
-    const sync = () => (narrow = mq.matches);
+    const mf = window.matchMedia('(hover: hover) and (pointer: fine)');
+    const sync = () => {
+      narrow = mq.matches;
+      fine = mf.matches;
+    };
     sync();
     mq.addEventListener('change', sync);
-    return () => mq.removeEventListener('change', sync);
+    mf.addEventListener('change', sync);
+    return () => {
+      mq.removeEventListener('change', sync);
+      mf.removeEventListener('change', sync);
+    };
   });
+  const zoomMax = ZOOM_STEPS[ZOOM_STEPS.length - 1];
 
   let panelOpen = $state(false);
   let tocOpen = $state(false);
@@ -156,8 +177,15 @@
   // while keyboard focus is inside it, or on a first visit before the first page
   // turn (`pinned` — the labels are how a new reader learns the controls).
   let idle = $state(false);
-  const hidden = $derived(idle && !pinned && !panelOpen && !tocOpen && !gridOpen);
+  // A centre tap puts the bar away even on a first visit (it used to stay
+  // pinned, so the guide's 「真ん中をタップでメニュー」 did nothing until a turn).
+  let tucked = $state(false);
+  const hidden = $derived((tucked || (idle && !pinned)) && !panelOpen && !tocOpen && !gridOpen);
   let idleAtPress = false; // whether the chrome was away when the current press began
+  // After a centre click hid it, the mouse's own small moves don't bring it back
+  // (it came straight back, so a click could only ever hide it): a press, a key,
+  // or the pointer at the top or bottom edge does.
+  let quietMoves = false;
   let restTimer = 0;
   function rest() {
     if (document.activeElement?.closest('.rc-top, .rc-bottom')) {
@@ -168,7 +196,13 @@
   }
   $effect(() => {
     const wake = (e?: Event) => {
+      if (e?.type === 'pointermove' && quietMoves) {
+        const p = e as PointerEvent;
+        if (p.pointerType === 'mouse' && p.clientY > 96 && p.clientY < innerHeight - 96) return;
+      }
       if (e?.type === 'pointerdown') idleAtPress = hidden;
+      quietMoves = false;
+      tucked = false;
       idle = false;
       clearTimeout(restTimer);
       restTimer = window.setTimeout(rest, 3000);
@@ -184,13 +218,16 @@
 
   /**
    * A tap in the middle of the page (FlipSurface): shows the menu if it was away,
-   * puts it away if it was up. The press itself already woke it, so what counts
-   * is how it was when the press began.
+   * puts it away if it was up — from the very first visit. The press itself
+   * already woke it, so what counts is how it was when the press began.
    */
   export function toggleMenu() {
     if (idleAtPress || panelOpen || tocOpen || gridOpen) return;
+    onUnpin?.();
     clearTimeout(restTimer);
     idle = true;
+    tucked = true;
+    quietMoves = true;
   }
 
   export function togglePanel() {
@@ -218,22 +255,34 @@
   </div>
 {/snippet}
 
-{#snippet modeIcon(mode: 'flip' | 'scroll')}
+{#snippet modeIcon(mode: 'flip' | 'scroll', cls = 'rc-ico')}
   {#if mode === 'flip'}
-    <svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"
+    <svg class={cls} viewBox="0 0 24 24" aria-hidden="true"
       ><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5 2-1.5 5-2 9-1.5V5c-4-.5-7 0-9 1.5Zm0 0v13" /></svg
     >
   {:else}
-    <svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"
+    <svg class={cls} viewBox="0 0 24 24" aria-hidden="true"
       ><rect x="7" y="2.5" width="10" height="8" rx="1" /><rect x="7" y="13.5" width="10" height="8" rx="1" /></svg
     >
   {/if}
 {/snippet}
 
+{#snippet zoomRow()}
+  <!-- the page's own zoom (FlipSurface): − , the level (a press goes back to the
+       whole page), ＋ -->
+  <button type="button" class="rc-zoom__btn" onclick={() => onZoom?.(-1)} disabled={(zoom ?? 1) <= 1} aria-label={i18n.t('rd.zoomOut')} title={i18n.t('rd.zoomOut')}>−</button>
+  <button type="button" class="mono rc-zoom__pct" onclick={() => onZoom?.(0)} disabled={(zoom ?? 1) <= 1} aria-label={`${zoomLabel(zoom ?? 1)} — ${i18n.t('rd.zoomFit')}`} title={i18n.t('rd.zoomFit')}>{zoomLabel(zoom ?? 1)}</button>
+  <button type="button" class="rc-zoom__btn" onclick={() => onZoom?.(1)} disabled={(zoom ?? 1) >= zoomMax} aria-label={i18n.t('rd.zoomIn')} title={i18n.t('rd.zoomIn')}>＋</button>
+{/snippet}
+
 <!-- Every control carries its name under its icon, on every screen: readers
-     didn't know where to tap, and "AA" read as a text-size button. -->
+     didn't know where to tap, and "AA" read as a text-size button. (An English
+     bar on a very narrow phone keeps the names of the plainly drawn ones — ← ♡ ▦
+     gear ? — in their tooltip only, so it stays one row.) -->
 <header class="rc-top" class:is-idle={hidden}>
-  <a class="mono rc-top__back" href={`/w/${work.slug}`}>← {i18n.t('rd.overview')}</a>
+  <a class="rc-tool rc-tool--iconic rc-top__back" href={`/w/${work.slug}`} data-vt="back" aria-label={i18n.t('rd.overview')} title={i18n.t('rd.overview')}
+    ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6" /></svg
+    ><span class="rc-tool__label">{i18n.t('rd.overview')}</span></a>
   <span class="mono rc-top__title">{work.title}</span>
   <div class="rc-top__actions">
     {#if hasNote}
@@ -253,22 +302,29 @@
     {/if}
     {#if chapterMarks.length}
       <button
-        class="rc-tool"
+        class="rc-tool rc-tool--iconic"
         class:is-active={tocOpen}
         bind:this={tocBtn}
         onclick={toggleToc}
         aria-expanded={tocOpen}
+        aria-label={i18n.t('rd.toc')}
+        title={i18n.t('rd.toc')}
       ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.1M4.5 12h.1M4.5 18h.1" /></svg
         ><span class="rc-tool__label">{i18n.t('rd.toc')}</span></button>
     {/if}
     {#if narrow}
-      <!-- Phones: one button, showing the mode it is in; a tap switches. -->
+      <!-- Phones: one button, a switch between the two ways to read — both drawn,
+           the one in use lit, its name under them (「めくり」 alone read like
+           "turn the page"). A tap switches. -->
       <button
-        class="rc-tool"
+        class="rc-tool rc-modeSwitch"
         onclick={() => onSettings({ mode: settings.mode === 'flip' ? 'scroll' : 'flip' })}
         title={i18n.t('rd.modeSwitch')}
-        aria-label={`${i18n.t('rd.modeSwitch')} — ${i18n.t(settings.mode === 'flip' ? 'rd.flip' : 'rd.scroll')}`}
-      >{@render modeIcon(settings.mode)}<span class="rc-tool__label">{i18n.t(settings.mode === 'flip' ? 'rd.flip' : 'rd.scroll')}</span></button>
+        aria-label={`${i18n.t('rd.modeNow').replace('{mode}', i18n.t(settings.mode === 'flip' ? 'rd.flip' : 'rd.scroll'))} — ${i18n.t('rd.modeSwitch')}`}
+      ><span class="rc-modeSwitch__icons" aria-hidden="true"
+          ><span class:is-on={settings.mode === 'flip'}>{@render modeIcon('flip', 'rc-ico rc-ico--sm')}</span
+          ><span class:is-on={settings.mode === 'scroll'}>{@render modeIcon('scroll', 'rc-ico rc-ico--sm')}</span></span
+        ><span class="rc-tool__label">{i18n.t(settings.mode === 'flip' ? 'rd.flip' : 'rd.scroll')}</span></button>
     {:else}
       <!-- Flip vs scroll lived only inside the AA panel, and readers never found it. -->
       <div class="rc-mode" role="group" aria-label={i18n.t('rd.mode')}>
@@ -283,19 +339,22 @@
       </div>
     {/if}
     <button
-      class="rc-tool rc-btn--heart"
+      class="rc-tool rc-tool--iconic rc-btn--heart"
       bind:this={heartEl}
       class:is-on={currentFaved}
       onclick={onToggleFavorite}
       aria-pressed={currentFaved}
+      aria-label={i18n.t('rd.fav')}
+      title={i18n.t('rd.fav')}
     ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d={HEART} /></svg
       ><span class="rc-tool__label">{i18n.t('rd.fav')}</span></button>
     <button
-      class="rc-tool"
+      class="rc-tool rc-tool--iconic"
       class:is-active={gridOpen}
       bind:this={gridBtn}
       onclick={() => (gridOpen ? closeDrawers() : openGrid())}
       title={i18n.t('rd.pages')}
+      aria-label={i18n.t('rd.grid')}
       aria-expanded={gridOpen}
     ><svg class="rc-ico rc-ico--grid" viewBox="0 0 24 24" aria-hidden="true"
         ><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect
@@ -305,14 +364,22 @@
           height="7"
         /><rect x="14" y="14" width="7" height="7" /></svg
       ><span class="rc-tool__label">{i18n.t('rd.grid')}</span></button>
+    {#if zoom !== null && fine}
+      <!-- 拡大: the lettering is small on some screens, and nobody found ctrl+wheel -->
+      <div class="rc-tool rc-zoom" role="group" aria-label={i18n.t('rd.zoom')} class:is-active={zoom > 1.001}>
+        <span class="rc-zoom__row">{@render zoomRow()}</span>
+        <span class="rc-tool__label">{i18n.t('rd.zoom')}</span>
+      </div>
+    {/if}
     <button class="rc-tool rc-btn--fs" onclick={fullscreen} title="Fullscreen (f)"
       ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" /></svg
       ><span class="rc-tool__label">{i18n.t('rd.full')}</span></button>
     <button
-      class="rc-tool"
+      class="rc-tool rc-tool--iconic"
       class:is-active={panelOpen}
       onclick={() => (panelOpen = !panelOpen)}
       title={`${i18n.t('rd.settings')} (s)`}
+      aria-label={i18n.t('rd.set')}
       aria-expanded={panelOpen}
     ><svg class="rc-ico rc-ico--gear" viewBox="0 0 24 24" aria-hidden="true"
         ><circle cx="12" cy="12" r="7.2" stroke-width="3" stroke-dasharray="2.83 2.83" stroke-linecap="butt" /><circle cx="12" cy="12" r="5.4" /><circle
@@ -321,7 +388,7 @@
           r="2"
         /></svg
       ><span class="rc-tool__label">{i18n.t('rd.set')}</span></button>
-    <button class="rc-tool" onclick={onHelp}
+    <button class="rc-tool rc-tool--iconic" onclick={onHelp} aria-label={i18n.t('rd.help')} title={i18n.t('rd.help')}
       ><svg class="rc-ico" viewBox="0 0 24 24" aria-hidden="true"
         ><circle cx="12" cy="12" r="9" /><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.9v.1" /></svg
       ><span class="rc-tool__label">{i18n.t('rd.help')}</span></button>
@@ -329,15 +396,16 @@
 </header>
 
 <footer class="rc-bottom" class:is-idle={hidden}>
-  {#if novelHref}
-    <!-- only on pages of a novel part (lib/bookParts.ts novelHere), and a real link -->
-    <a class="rc-novel" href={novelHref}>{i18n.t('nv.inText')} <span aria-hidden="true">→</span></a>
-  {/if}
   <span class="mono rc-bottom__counter">
     <span class="rc-bottom__num" bind:this={counterEl}>
       {String(cur + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
       {#if currentChapter}<span class="rc-bottom__ch">· {currentChapter}</span>{/if}
     </span>
+    {#if novelHref}
+      <!-- only on pages of a novel part (lib/bookParts.ts novelHere), a real link,
+           in the counter's row: as a pill above it, it sat 28px into the page -->
+      <a class="rc-novel" href={novelHref} title={i18n.t('nv.inText')}>{i18n.t('nv.inTextShort')} <span aria-hidden="true">→</span></a>
+    {/if}
     <span class="rc-bottom__dir">{rtl ? '◀ RTL' : 'LTR ▶'}</span>
   </span>
   <!-- RTL books fill the bar right→left so it moves the way the pages do -->
@@ -357,6 +425,9 @@
 </footer>
 
 {#if panelOpen}
+  <!-- a tap outside closes 設定 — and only that: it used to turn the page under
+       it and leave the panel open -->
+  <button class="rc-panel__scrim" tabindex="-1" aria-label={i18n.t('rd.close')} onclick={() => (panelOpen = false)}></button>
   <!-- Three named sections, so the language row reads as the screen's language,
        not the translation's — readers took 言語 under 翻訳 for the latter. -->
   <div class="rc-panel" role="dialog" aria-label={i18n.t('rd.settings')}>
@@ -377,13 +448,22 @@
           <button class="mono rc-opt" class:is-on={settings.mode === 'scroll'} onclick={() => onSettings({ mode: 'scroll' })}>{i18n.t('rd.scroll')}</button>
         </div>
       </div>
-      {#if settings.mode === 'flip'}
+      {#if settings.mode === 'flip' && settings.layout === 'double'}
+        <!-- curl for spreads (and the cover opening); single pages always slide -->
         <div class="rc-panel__group">
           <span class="mono rc-panel__label">{i18n.t('rd.curl')}</span>
           <div class="rc-panel__opts">
             <button class="mono rc-opt" class:is-on={settings.curl} onclick={() => onSettings({ curl: true })}>{i18n.t('rd.on')}</button>
             <button class="mono rc-opt" class:is-on={!settings.curl} onclick={() => onSettings({ curl: false })}>{i18n.t('rd.off')}</button>
           </div>
+        </div>
+      {/if}
+      {#if zoom !== null && !fine}
+        <!-- phones: the bar is full, so the zoom buttons live here (pinch works too) -->
+        <div class="rc-panel__group">
+          <span class="mono rc-panel__label">{i18n.t('rd.zoom')}</span>
+          <div class="rc-panel__opts rc-zoom rc-zoom--panel">{@render zoomRow()}</div>
+          <p class="rc-panel__hint">{i18n.t('rd.zoomPinch')}</p>
         </div>
       {/if}
       <div class="rc-panel__group">
@@ -395,10 +475,10 @@
       </div>
       {#if MUSIC}
         <div class="rc-panel__group">
-          <span class="mono rc-panel__label">SOUND</span>
+          <span class="mono rc-panel__label">{i18n.t('rd.sound')}</span>
           <div class="rc-panel__opts">
-            <button class="mono rc-opt" class:is-on={!soundOn} onclick={() => setSound(false)}>OFF</button>
-            <button class="mono rc-opt" class:is-on={soundOn} onclick={() => setSound(true)}>ON ♪</button>
+            <button class="mono rc-opt" class:is-on={!soundOn} onclick={() => setSound(false)}>{i18n.t('rd.off')}</button>
+            <button class="mono rc-opt" class:is-on={soundOn} onclick={() => setSound(true)}>{i18n.t('rd.soundOn')}</button>
           </div>
         </div>
       {/if}
@@ -545,27 +625,37 @@
 
 
 <style>
-  /* 「小説はテキストで読めます」 — a real button above the page counter, on novel pages only */
+  /* 「小説で読む →」 — a real link in the counter's row, on novel pages only. Its
+     box stays inside the page's bottom margin; the tap area reaches 44px tall
+     through an invisible extension above it. */
   .rc-novel {
-    justify-self: center;
+    position: relative;
+    flex-shrink: 0;
     display: inline-flex;
     align-items: center;
-    gap: 0.5em;
-    min-height: 2.5rem;
-    padding: 0.5em 1.1em;
+    gap: 0.4em;
+    padding: 0.2em 0.85em;
     border: 1px solid var(--accent);
     border-radius: 999px;
     background: rgba(12, 12, 13, 0.88);
     color: var(--fg);
     font-family: var(--font-display-authored);
-    font-size: 0.8rem;
+    font-size: 0.72rem;
     letter-spacing: 0.04em;
+    white-space: nowrap;
     text-decoration: none;
     pointer-events: auto;
     transition: background-color 0.25s var(--ease);
   }
-  .rc-novel:hover {
-    background: var(--accent);
+  .rc-novel::before {
+    content: '';
+    position: absolute;
+    inset: -0.9rem -0.3rem -0.5rem;
+  }
+  @media (hover: hover) {
+    .rc-novel:hover {
+      background: var(--accent);
+    }
   }
   .rc-bottom.is-idle .rc-novel {
     pointer-events: none;
@@ -587,13 +677,12 @@
   .rc-top > * {
     pointer-events: auto;
   }
-  .rc-top__back {
+  /* ← 概要: a labelled tool like the others — a full 44px target (it was 39×17
+     on a phone), and narrower than the inline 「← 概要」 it replaces */
+  .rc-top .rc-top__back {
     flex-shrink: 0;
-    align-self: center;
-    white-space: nowrap;
-  }
-  .rc-top__back:hover {
-    color: var(--accent);
+    min-width: 2.75rem;
+    text-decoration: none;
   }
   .rc-top__title {
     flex: 1 1 0;
@@ -690,6 +779,97 @@
   .rc-btn--heart.is-on .rc-ico {
     fill: currentColor;
   }
+  /* the phone's めくり/スクロール switch: both ways drawn, the one in use lit */
+  .rc-modeSwitch__icons {
+    display: flex;
+    gap: 0.1rem;
+  }
+  .rc-modeSwitch__icons > span {
+    display: grid;
+    place-items: center;
+    padding: 0.05rem 0.1rem;
+    border-radius: 3px;
+    opacity: 0.45;
+  }
+  .rc-modeSwitch__icons > span.is-on {
+    opacity: 1;
+    background: var(--accent);
+    color: var(--ink-fg);
+  }
+  .rc-ico--sm {
+    width: 0.85rem;
+    height: 0.85rem;
+  }
+  /* 拡大: − 100% ＋ in one labelled box */
+  .rc-zoom {
+    cursor: default;
+  }
+  .rc-zoom.is-active {
+    color: var(--fg);
+    border-color: var(--accent);
+  }
+  .rc-zoom__row {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+  }
+  .rc-zoom__btn,
+  .rc-zoom__pct {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.45rem;
+    height: 1.25rem;
+    padding: 0 0.2rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--fg);
+    font-size: 0.95rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .rc-zoom__pct {
+    min-width: 2.7rem;
+    font-size: 0.6875rem;
+    letter-spacing: 0.02em;
+  }
+  .rc-zoom__btn:disabled,
+  .rc-zoom__pct:disabled {
+    color: var(--fg-faint);
+    cursor: default;
+  }
+  @media (hover: hover) {
+    .rc-zoom__btn:not(:disabled):hover,
+    .rc-zoom__pct:not(:disabled):hover {
+      border-color: var(--accent);
+    }
+  }
+  .rc-zoom__btn:focus-visible,
+  .rc-zoom__pct:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  /* in 設定 on a phone: three real buttons */
+  .rc-zoom--panel .rc-zoom__btn,
+  .rc-zoom--panel .rc-zoom__pct {
+    flex: 1;
+    height: auto;
+    min-height: 2.75rem;
+    border-color: var(--line-strong);
+    font-size: 1.1rem;
+  }
+  .rc-zoom--panel .rc-zoom__pct {
+    font-size: 0.8rem;
+  }
+  /* a tap outside 設定 closes it, and nothing else */
+  .rc-panel__scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: transparent;
+    border: 0;
+    cursor: default;
+  }
   /* No fullscreen API on iPhone; the slot is worth more to the heart. */
   @media (pointer: coarse) and (max-width: 520px) {
     .rc-btn--fs {
@@ -709,9 +889,6 @@
     .rc-noteflag {
       display: none;
     }
-    .rc-top__back {
-      letter-spacing: 0.04em;
-    }
     .rc-top__actions {
       gap: 0.12rem;
     }
@@ -721,6 +898,18 @@
     }
     .rc-tool__label {
       letter-spacing: 0;
+    }
+  }
+  /* An English bar on a very narrow phone: the plainly drawn tools (← ♡ ▦ gear ?
+     目次) show their icon, their name in the tooltip and to screen readers, so the
+     bar stays one row (it wrapped to three, ~100px of the page). The translation
+     switch and the mode keep their words. Japanese fits as it is. */
+  @media (max-width: 420px) {
+    :global(html:not([lang='ja'])) .rc-tool--iconic .rc-tool__label {
+      display: none;
+    }
+    :global(html:not([lang='ja'])) .rc-tool--iconic {
+      min-width: 2.2rem;
     }
   }
   /* Idle: the chrome steps aside so the page is all there is. */
@@ -753,19 +942,30 @@
     bottom: 0;
     z-index: 40;
     display: grid;
+    /* never wider than the screen: a long chapter title ellipsises instead */
+    grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
     padding: 0 var(--pad) calc(0.7rem + env(safe-area-inset-bottom));
     pointer-events: none;
   }
   .rc-bottom__counter {
     display: flex;
+    align-items: center;
     justify-content: space-between;
-    gap: 1rem;
+    gap: 0.8rem;
     color: var(--fg-dim);
+  }
+  .rc-bottom__counter .rc-novel {
+    margin-left: auto;
   }
   /* inline-block so the MV punch (a `scale`) applies; inline boxes ignore transforms */
   .rc-bottom__num {
     display: inline-block;
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     transform-origin: left center;
   }
   .rc-bottom__ch {

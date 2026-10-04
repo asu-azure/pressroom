@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { BOOKS, ERAS, NEXT, READING_NOTE, TIMELINE_SLUGS, inTimeline, partHref, pick, type TimelineBook } from './timeline';
+import * as timeline from './timeline';
+import { BOOKS, ERAS, READING_NOTE, TIMELINE_SLUGS, inTimeline, partHref, pick, type TimelineBook } from './timeline';
 
 const parts = ERAS.flatMap((e) => e.parts);
 const strings = [
   READING_NOTE,
-  NEXT.title,
-  NEXT.source,
   ...ERAS.map((e) => e.title),
   ...parts.flatMap((p) => [p.part, p.note].filter((s) => s !== null)),
 ];
@@ -67,6 +66,18 @@ describe('timeline data', () => {
       expect(s!.en.trim()).not.toBe('');
       expect(s!.ja).not.toBe(s!.en);
     }
+  });
+
+  it('says when, not where: the eras name no place', () => {
+    expect(ERAS.map((e) => e.title.ja)).toEqual(['子ども時代', '3年後・中学1年', 'さらに3年後・高校時代']);
+    const all = strings.flatMap((s) => [s!.ja, s!.en]).join(' ');
+    expect(all).not.toMatch(/チャンタブリー|バンコク|Chanthaburi|Bangkok/);
+  });
+
+  it('promises no next book (the owner won’t commit to one)', () => {
+    expect('NEXT' in timeline).toBe(false);
+    const all = strings.flatMap((s) => [s!.ja, s!.en]).join(' ');
+    expect(all).not.toMatch(/次は|予定|あとがき|planned|afterword|Frank's story/i);
   });
 
   it('calls the characters by their names, never the old spellings', () => {

@@ -9,13 +9,15 @@
    */
   import { i18n } from '../../lib/i18n.svelte';
 
-  let { tone = 'ink' }: { tone?: 'ink' | 'paper' } = $props();
+  // kind 'novel': the novel reader keeps a place only — no ここすき there, so the
+  // note doesn't speak of them
+  let { tone = 'ink', kind = 'pages' }: { tone?: 'ink' | 'paper'; kind?: 'pages' | 'novel' } = $props();
 </script>
 
 <details class="bm" class:bm--paper={tone === 'paper'}>
   <summary class="bm__sum">{i18n.t('mark.about')}</summary>
   <ul class="bm__list">
-    <li>{i18n.t('mark.l1')}</li>
+    <li>{i18n.t(kind === 'novel' ? 'mark.l1n' : 'mark.l1')}</li>
     <li>{i18n.t('mark.l2')}</li>
     <li>{i18n.t('mark.l3')}</li>
     <li>{i18n.t('mark.l4')}</li>
@@ -38,7 +40,7 @@
     display: inline-flex;
     align-items: center;
     gap: 0.5em;
-    min-height: 2.2rem;
+    min-height: 2.75rem;
     font-family: var(--font-mono);
     font-size: 0.6875rem;
     letter-spacing: 0.1em;

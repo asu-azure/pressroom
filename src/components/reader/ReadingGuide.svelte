@@ -139,7 +139,11 @@
     inset: 0;
     z-index: 80;
     display: grid;
-    place-items: center;
+    /* centred by the card's auto margins, not place-items: a card taller than the
+       screen (a phone on its side) then starts at the top and scrolls, instead of
+       overflowing both ways with its top out of reach */
+    justify-items: center;
+    align-items: start;
     padding: calc(1rem + env(safe-area-inset-top)) 1rem calc(1rem + env(safe-area-inset-bottom));
     background: rgba(8, 8, 10, 0.72);
     overflow-y: auto;
@@ -161,6 +165,7 @@
   }
   .gd__card {
     width: min(26rem, 100%);
+    margin-block: auto;
     display: grid;
     gap: 1rem;
     padding: 1.3rem 1.2rem 1rem;
@@ -286,5 +291,36 @@
   .gd__tl:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
+  }
+  /* A phone on its side (844×390): the tips go two across, so the whole card
+     fits the screen; what still doesn't fits by scrolling (above). */
+  @media (max-height: 520px) and (min-width: 560px) {
+    .gd {
+      padding-block: calc(0.5rem + env(safe-area-inset-top)) calc(0.5rem + env(safe-area-inset-bottom));
+    }
+    .gd__card {
+      width: min(46rem, 100%);
+      gap: 0.6rem;
+      padding: 0.8rem 1rem 0.6rem;
+    }
+    .gd__tips {
+      grid-template-columns: 1fr 1fr;
+      gap: 0.6rem 1.2rem;
+    }
+    .gd__tip {
+      grid-template-columns: 2.2rem 1fr;
+      gap: 0.6rem;
+    }
+    .gd__ico {
+      width: 2.2rem;
+      height: 2.2rem;
+    }
+    .gd__tipBody {
+      font-size: 0.78rem;
+      line-height: 1.5;
+    }
+    .gd__ok {
+      min-height: 2.75rem;
+    }
   }
 </style>

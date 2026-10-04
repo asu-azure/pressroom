@@ -3,16 +3,17 @@
  * in release order — that half comes from the database (works.released_on) — and,
  * here, the story's three eras with the part of each book that is set in them.
  *
- * Written spoiler-free on purpose (the owner's call): eras, places and points of
- * view only, never what happens. Reading in release order is the intended way;
- * the books jump in time on purpose, and the page says so.
+ * Written spoiler-free on purpose (the owner's call): eras and points of view
+ * only — no places, never what happens, and nothing about a book that isn't out
+ * (the owner won't commit to the next one). Reading in release order is the
+ * intended way; the books jump in time on purpose, and the page says so.
  *
  * Page numbers are READER pages — 1-based, the cover is p.1, blank leaves count —
  * as the page counter, the grid and `?n=` (lib/readerLink.ts) number them.
  * Checked against the books on 2026-10-04:
  *   夜光虫編, 79 pages: childhood up to p.65; p.66 opens on 「で、三年たって」 and
  *     the epilogue runs to p.75 — p.76 is ほだかだけ's guest illustration, p.77
- *     the afterword (which announces Frank's story).
+ *     the afterword.
  *   雨上がりの空編, 84 pages: chapters 第一部 p.1–65 (novel) and 第二部 p.66–84
  *     (manga), whose story ends on p.82 「To be continued」 — p.83 is the
  *     afterword, p.84 the colophon.
@@ -58,12 +59,12 @@ export interface Era {
 export const ERAS: Era[] = [
   {
     id: 'childhood',
-    title: { ja: '子ども時代（チャンタブリー）', en: 'Childhood (Chanthaburi)' },
+    title: { ja: '子ども時代', en: 'Childhood' },
     parts: [{ book: BOOKS.yakochu, part: null, kind: 'manga', pages: [1, 65], note: null }],
   },
   {
     id: 'junior-high',
-    title: { ja: '3年後・中学1年（バンコク）', en: 'Three years later — first year of junior high (Bangkok)' },
+    title: { ja: '3年後・中学1年', en: 'Three years later — first year of junior high' },
     parts: [
       {
         book: BOOKS.amaagari,
@@ -95,12 +96,6 @@ export const ERAS: Era[] = [
     ],
   },
 ];
-
-/** The last stop on the line: announced, not yet out. */
-export const NEXT = {
-  title: { ja: '次は：フランクの物語（予定）', en: "Next: Frank's story (planned)" },
-  source: { ja: '『夜光虫編』のあとがきより', en: 'as announced in the afterword of 夜光虫編' },
-} satisfies Record<string, L10n>;
 
 /** Said once, at the top: release order is the way in. */
 export const READING_NOTE: L10n = {

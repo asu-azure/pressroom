@@ -5,7 +5,8 @@
    * Two views on one page: 刊行順 (the books as they came out — from the
    * database, works.released_on, ordered like the shelf by lib/release.ts) and
    * 物語の時系列 (the story's three eras, from src/data/timeline.ts). The second
-   * is spoiler-free on purpose: eras, places and points of view, never events.
+   * is spoiler-free on purpose: eras and points of view — no places, never
+   * events, and no promise of a next book.
    *
    * Data is fetched in the browser like the shelf's; a failure only costs the
    * covers and dates — the books fall back to the data file's list, and the
@@ -19,7 +20,7 @@
   import { loadUnlock } from '../../lib/persistence';
   import { converge } from '../../scripts/mv';
   import { i18n, type DictKey } from '../../lib/i18n.svelte';
-  import { BOOKS, ERAS, NEXT, READING_NOTE, SERIES, inTimeline, partHref, pick, type TimelinePart } from '../../data/timeline';
+  import { BOOKS, ERAS, READING_NOTE, SERIES, inTimeline, partHref, pick, type TimelinePart } from '../../data/timeline';
   import LangBar from '../library/LangBar.svelte';
   import type { PageRec, PageRow, Work } from '../../lib/types';
 
@@ -232,12 +233,6 @@
             </ul>
           </li>
         {/each}
-        <!-- announced, not out: the line runs on past the last book -->
-        <li class="tl-era tl-era--next">
-          <span class="tl-era__dot" aria-hidden="true"></span>
-          <p class="authored tl-era__title">{pick(NEXT.title, i18n.lang)}</p>
-          <p class="authored tl-era__source">{pick(NEXT.source, i18n.lang)}</p>
-        </li>
       </ol>
     </div>
   </section>
@@ -496,8 +491,8 @@
     display: grid;
     gap: 0.7rem;
   }
-  /* each era draws the line down to the next dot: solid through the books,
-     dashed amber into what is only announced */
+  /* each era draws the line down to the next dot; the last one stops at its own
+     end — the page says nothing about a book that isn't out (the owner's call) */
   .tl-era::before {
     content: '';
     position: absolute;
@@ -507,22 +502,8 @@
     width: 2px;
     background: var(--accent);
   }
-  /* the last era's books are out: its line stays solid to its end, and only
-     the stretch on to the next dot is dashed */
-  .tl-era:nth-last-child(2)::before {
+  .tl-era:last-child::before {
     bottom: 0;
-  }
-  .tl-era:nth-last-child(2)::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    height: calc(var(--gap) + 0.6rem);
-    left: calc(-1 * var(--inset));
-    width: 2px;
-    background: repeating-linear-gradient(180deg, #e8a31a 0 6px, transparent 6px 11px);
-  }
-  .tl-era--next::before {
-    display: none;
   }
   .tl-era__dot {
     position: absolute;
@@ -618,19 +599,6 @@
   .tl-btn:focus-visible {
     outline: 2px solid var(--fg);
     outline-offset: 2px;
-  }
-  .tl-era--next .tl-era__dot {
-    background: var(--bg);
-    border: 2px dashed #e8a31a;
-  }
-  .tl-era--next .tl-era__title {
-    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
-    color: var(--fg);
-  }
-  .tl-era__source {
-    margin-top: -0.4rem;
-    font-size: 0.86rem;
-    color: var(--fg-dim);
   }
   @media (max-width: 640px) {
     .tl-line {

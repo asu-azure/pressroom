@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lockReturn, lockedOverview, pageByNumber } from './readerLink';
+import { lockReturn, lockedOverview, pageByNumber, readerSearch, sectionParam, withoutParam } from './readerLink';
 
 const pages = ['a', 'b', 'c'].map((id) => ({ id }));
 
@@ -46,5 +46,32 @@ describe('lockedOverview / lockReturn', () => {
     ]) {
       expect(lockReturn(go, 'vol-2')).toBeNull();
     }
+  });
+});
+
+describe('readerSearch', () => {
+  it('keeps the address on the page being read, so a reload stays there', () => {
+    expect(readerSearch('?n=66', 'p70')).toBe('?p=p70');
+    expect(readerSearch('?ch=c2', 'p70')).toBe('?p=p70');
+    expect(readerSearch('?p=p1', 'p2')).toBe('?p=p2');
+    expect(readerSearch('', 'p2')).toBe('?p=p2');
+  });
+
+  it('keeps anything else it was given', () => {
+    expect(readerSearch('?lang=en&n=3', 'x')).toBe('?lang=en&p=x');
+    expect(readerSearch('?n=3', null)).toBe('');
+  });
+});
+
+describe('sectionParam / withoutParam', () => {
+  it('takes a section index inside the book, nothing else', () => {
+    expect(sectionParam('0', 11)).toBe(0);
+    expect(sectionParam('10', 11)).toBe(10);
+    for (const s of ['11', '-1', '1.5', 'x', '', null, undefined]) expect(sectionParam(s, 11)).toBeNull();
+  });
+
+  it('drops a used one-time parameter and keeps the rest', () => {
+    expect(withoutParam('?lang=ja&s=3', 's')).toBe('?lang=ja');
+    expect(withoutParam('?s=3', 's')).toBe('');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookParts, kanjiNumber, novelHere, novelSequel, partLabel, partName, partNote, partStart } from './bookParts';
+import { bookParts, kanjiNumber, novelHere, novelSequel, partLabel, partName, partNote, partStart, partsHero } from './bookParts';
 import type { Chapter } from './types';
 
 const t = (k: string) =>
@@ -139,5 +139,20 @@ describe('partNote', () => {
 
   it('says nothing it cannot know', () => {
     expect(partNote({ kind: null }, { translations: [] }, 'ja', t)).toBe('');
+  });
+});
+
+describe('partsHero', () => {
+  it('offers vol. 2 by its parts: the novel, then the manga after it', () => {
+    expect(partsHero([{ kind: 'novel' }, { kind: 'manga' }], true)).toEqual({ novel: 0, manga: 1 });
+    expect(partsHero([{ kind: null }, { kind: 'novel' }, { kind: 'manga' }], true)).toEqual({ novel: 1, manga: 2 });
+    expect(partsHero([{ kind: 'manga' }, { kind: 'novel' }], true)).toEqual({ novel: 1, manga: 0 });
+    expect(partsHero([{ kind: 'novel' }], true)).toEqual({ novel: 0, manga: -1 });
+  });
+
+  it('keeps the ordinary hero without a novel part, or without its text', () => {
+    expect(partsHero([{ kind: 'manga' }, { kind: 'manga' }], true)).toBeNull();
+    expect(partsHero([{ kind: 'novel' }, { kind: 'manga' }], false)).toBeNull();
+    expect(partsHero([], true)).toBeNull();
   });
 });

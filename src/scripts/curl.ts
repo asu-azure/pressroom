@@ -229,13 +229,19 @@ export class Curl {
     if (!this.s.backPic) this.backWrap.style.opacity = String(1 - Math.max(0, f.progress - 0.75) * 4);
   }
 
+  private rushed = false;
+  /** Land the running turn on its next frame — another turn was asked for. */
+  hurry() {
+    this.rushed = true;
+  }
+
   /** Animate the corner to `to` (host coords) and resolve when there. */
   run(to: Pt, ms: number, lift = 0): Promise<void> {
     const from = { x: this.s.leaf.x + this.p.x, y: this.s.leaf.y + this.p.y };
     const t0 = performance.now();
     return new Promise((resolve) => {
       const step = (now: number) => {
-        const t = Math.min(1, (now - t0) / ms);
+        const t = this.rushed ? 1 : Math.min(1, (now - t0) / ms);
         const e = 1 - Math.pow(1 - t, 3);
         const up = lift * Math.sin(Math.PI * e);
         this.set({ x: from.x + (to.x - from.x) * e, y: from.y + (to.y - from.y) * e - up });
@@ -262,14 +268,14 @@ export function mirrored(target: Rect, s: { leaf: Rect; hingeLeft: boolean }): R
   return { x: s.hingeLeft ? hingeX : hingeX - target.w, y: target.y, w: target.w, h: target.h };
 }
 
-// --- the single-page door turn ------------------------------------------------
+// --- the door turn: the closed cover opening ----------------------------------
 //
-// One page on screen has no facing page for a fold to land on, and a fold that
-// lands in the dark margin reads as a loose sheet. So a single page turns like a
-// door on its spine edge instead — the same motion as a shelf book's board —
+// A board turning on its spine edge — the same motion as a shelf book's cover —
 // under perspective: the front darkens as it turns, a shadow falls on the page
-// below, and past 100° the leaf fades out, gone by DOOR_MAX. Going back, the
-// previous page swings in from the spine side and closes over the current one.
+// below. FlipSurface uses it for the book's closed cover opening onto (and
+// closing over) the first spread, with `land`. It once turned every single page
+// too (past 100° the leaf faded out, gone by DOOR_MAX); single pages slide now —
+// the owner found the door odd on a phone — but the plain door is kept, tested.
 
 export const DOOR_MAX = 160;
 
@@ -412,12 +418,18 @@ export class Door {
     this.shadow.style.background = `linear-gradient(${this.s.hingeLeft ? 90 : 270}deg, rgba(0,0,0,.45), rgba(0,0,0,.12) 35%, transparent 70%)`;
   }
 
+  private rushed = false;
+  /** Land the running turn on its next frame — another turn was asked for. */
+  hurry() {
+    this.rushed = true;
+  }
+
   run(to: number, ms: number): Promise<void> {
     const from = this.angle;
     const t0 = performance.now();
     return new Promise((resolve) => {
       const step = (now: number) => {
-        const t = Math.min(1, (now - t0) / ms);
+        const t = this.rushed ? 1 : Math.min(1, (now - t0) / ms);
         const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // ease in-out
         this.set(from + (to - from) * e);
         if (t < 1) requestAnimationFrame(step);

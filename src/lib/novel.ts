@@ -156,6 +156,25 @@ export function chapters(sections: NovelSection[]): { index: number; title: stri
     .filter((c) => c.title || c.index === 0);
 }
 
+/**
+ * The overview's list of the novel's chapters under its part (この本の構成): the
+ * same entries as the novel reader's 目次 (chapters()), each a link into the
+ * reader at that section (`?s=`). The untitled opening reads はじまり / Opening.
+ * `rows` may be titles only (no bodies) — only the order and titles count.
+ */
+export function novelToc(
+  rows: unknown[],
+  base: string,
+  t: (key: string) => string,
+): { index: number; title: string; href: string }[] {
+  const sep = base.includes('?') ? '&' : '?';
+  return chapters(normalizeSections(rows)).map((c) => ({
+    index: c.index,
+    title: c.title ?? t('nv.opening'),
+    href: `${base}${sep}s=${c.index}`,
+  }));
+}
+
 /** The chapter a section belongs to: the nearest titled section at or before it (else the opening). */
 export function chapterOf(sections: NovelSection[], section: number): number {
   for (let i = Math.min(section, sections.length - 1); i > 0; i--) if (sections[i].title) return i;
@@ -181,6 +200,22 @@ export function chapterNumber(sections: NovelSection[], section: number): number
  */
 export interface SavedPlace extends NovelPlace {
   chapter: number;
+  /** the reader reached the last page (おわり, the way on to the manga) */
+  end?: boolean;
+}
+
+/**
+ * Whether a saved place is the finished book: the reader comes back to the last
+ * page, not to the page its last paragraph starts on — Back from the manga landed
+ * on 144 / 145 and looked unfinished.
+ */
+export function placeAtEnd(raw: string | null): boolean {
+  if (!raw) return false;
+  try {
+    return (JSON.parse(raw) as Partial<SavedPlace> | null)?.end === true;
+  } catch {
+    return false;
+  }
 }
 
 /**

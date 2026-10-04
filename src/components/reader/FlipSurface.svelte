@@ -1,18 +1,21 @@
 <script lang="ts">
   import { gsap } from 'gsap';
-  import type { Sheet, Direction, FitMode, Character } from '../../lib/types';
+  import type { Sheet, Direction, FitMode, Character, Layout } from '../../lib/types';
   import SheetImage from './SheetImage.svelte';
   import { Curl, Door, doorAngle, doorCommit, landingPage } from '../../scripts/curl';
   import { parseCropAttr, pictureLayer } from '../../lib/coverCrop';
+  import { turnStyle, zoomStep } from '../../lib/readerUi';
 
   let {
     sheets,
     direction,
     fit,
     cur,
+    layout = 'double',
     pageNumberOf,
     onNavigate,
     onMenu,
+    onZoom,
     translateOn = false,
     typesetOn = false,
     curl = true,
@@ -24,10 +27,14 @@
     direction: Direction;
     fit: FitMode;
     cur: number;
+    /** single: every turn slides; double: spreads curl, the closed cover opens */
+    layout?: Layout;
     pageNumberOf: (pageId: string) => number;
     onNavigate: (index: number) => void;
     /** A tap in the middle third: the menu, not a page turn (Reader → ReaderChrome.toggleMenu). */
     onMenu?: () => void;
+    /** The zoom, as a share of the fitted page — for the bar's − 100% ＋ (Reader). */
+    onZoom?: (scale: number) => void;
     translateOn?: boolean;
     typesetOn?: boolean;
     curl?: boolean;
@@ -61,16 +68,36 @@
 
   const targetX = $derived(-cur * width * s);
 
-  // Slide (or jump, reduced-motion) whenever the current sheet or size changes.
+  // Slide to the current sheet when it changes by one; anything else is put in
+  // place at once — the first placement, a resize, a jump (grid, chapter, Home).
+  // The first placement used to slide from sheet 0, across every sheet between,
+  // none of them mounted: a deep link to p.18 crossed 17 screens of empty floor,
+  // and a touch during that slide froze it there (below) — a black page.
+  let placed = -1;
+  let placedW = 0;
   $effect(() => {
     if (!track || !width) return;
-    gsap.to(track, {
-      x: targetX,
-      duration: reduced ? 0 : 0.45,
-      ease: 'power3.out',
-      overwrite: 'auto',
-    });
+    const x = targetX;
+    const far = placed < 0 || width !== placedW || Math.abs(cur - placed) > 1;
+    placed = cur;
+    placedW = width;
+    if (far || reduced) {
+      gsap.killTweensOf(track);
+      gsap.set(track, { x });
+      return;
+    }
+    gsap.to(track, { x, duration: 0.45, ease: 'power3.out', overwrite: 'auto' });
   });
+
+  /**
+   * Put the track back on the current sheet if something left it between two —
+   * a gesture that ended without a turn must never leave the reader on the floor.
+   */
+  function settleTrack() {
+    if (!track || !width || curlFx || doorFx || gsap.isTweening(track)) return;
+    const x = Number(gsap.getProperty(track, 'x'));
+    if (Math.abs(x - targetX) > 0.5) gsap.to(track, { x: targetX, duration: reduced ? 0 : 0.3, ease: 'power3.out' });
+  }
 
   // --- Gestures: full touch control so nothing fights the transform ---
   // The CURRENT sheet is positioned by translate(tx,ty) scale(scale). At 1x this
@@ -106,7 +133,12 @@
   let startX = 0;
   let startY = 0;
   let startT = 0;
-  let baseTrackX = 0; // track x at the start of a turn drag
+  let baseTrackX = 0; // track x when a turn drag began
+  let dragX0 = 0; // the pointer's x at that moment
+  // a press that began while a turn was still being drawn: a tap only (queued)
+  let busyPress = false;
+  // a turn asked for while another was drawn: its direction, run when that one lands
+  let queued: number | null = null;
   let baseTx = 0;
   let baseTy = 0;
 
@@ -168,7 +200,10 @@
       ty: clamp(m.y - cy - newScale * uy, -r.y, r.y),
     };
   }
+  // where a running zoom animation is headed: a second ＋ during it steps on from there
+  let zoomGoal = 1;
   function animateZoom(ns: number, nx: number, ny: number) {
+    zoomGoal = ns;
     zoomProxy.scale = scale;
     zoomProxy.tx = tx;
     zoomProxy.ty = ty;
@@ -192,7 +227,26 @@
     const r = panRange(target);
     // Snapping to 1x recentres horizontally but keeps vertical scroll position.
     animateZoom(target, clamp(tx, -r.x, r.x), clamp(ty, -r.y, r.y));
+    settleTrack(); // a pinch stopped any slide that was running
   }
+
+  // --- The bar's zoom (− 100% ＋, keys + − 0): the same zoom as pinch and
+  //     ctrl/⌘+wheel, anchored on the middle of the screen. ---
+  function zoomTo(ns: number) {
+    if (curlFx || doorFx) return;
+    ns = clamp(ns, 1, MAX_SCALE);
+    const { tx: nx, ty: ny } = anchoredTranslate(ns, { x: width / 2, y: stageHeight() / 2 });
+    animateZoom(ns, ns <= 1.001 ? 0 : nx, ny);
+  }
+  export function zoomBy(dir: 1 | -1) {
+    zoomTo(zoomStep(gsap.isTweening(zoomProxy) ? zoomGoal : scale, dir));
+  }
+  export function zoomFit() {
+    zoomTo(1);
+  }
+  $effect(() => {
+    onZoom?.(Math.round(scale * 100) / 100);
+  });
   // Position a too-tall page at its top (origin is centre, so +range shows top).
   function showTop() {
     tx = 0;
@@ -200,11 +254,13 @@
   }
 
   // --- Page curl (scripts/curl.ts) --------------------------------------------
-  // A one-sheet turn at 1x is drawn over the real page rects with overlays: a
-  // paper fold when the current sheet is a spread, a door turn on the spine when
-  // it is a single page (a fold has no facing page to land on there). The track
-  // jumps to the target underneath; anything else (jumps, zoom, reduced motion,
-  // the setting off, images not loaded yet) keeps the slide.
+  // A one-sheet turn at 1x in double layout is drawn over the real page rects
+  // with overlays: a paper fold when the current sheet is a spread, and the
+  // closed cover opening (or closing) like a board over the first spread. The
+  // track jumps to the target underneath. One page on screen — single layout,
+  // or a lone page — slides in reading direction instead (the door swing that
+  // used to turn it looked odd on a phone), as does anything else: jumps, zoom,
+  // reduced motion (which jumps), the setting off, images not loaded yet.
   let curlFx: Curl | null = null;
   let doorFx: Door | null = null;
   let doorForward = true;
@@ -251,19 +307,20 @@
   }
 
   function beginCurl(target: number, from: { x: number; y: number } | null): boolean {
-    if (!curl || reduced || scale !== 1 || curlBusy || curlFx || doorFx) return false;
+    if (scale !== 1 || curlBusy || curlFx || doorFx) return false;
     if (target < 0 || target >= sheets.length || Math.abs(target - cur) !== 1) return false;
+    // One page on screen slides (lib/readerUi.ts turnStyle); spreads curl, and
+    // the closed cover opens over the first spread — one sheet with the facing
+    // page on its back, turning 180° to land on that page.
+    const coverTurn = closedCover && Math.min(cur, target) === 0;
+    const style = turnStyle({ layout, curl, reduced, pages: sheets[cur]?.pages.length ?? 1, coverTurn });
+    if (style === 'slide') return false;
     const forward = target > cur;
     const turningRight = forward !== (direction === 'rtl');
     const now = pageEls(cur);
     if (!now.length) return false;
     const h0 = stage.getBoundingClientRect();
     const rel0 = (r: DOMRect, dx = 0) => ({ x: r.left - h0.left + dx, y: r.top - h0.top, w: r.width, h: r.height });
-
-    // One page on screen: the door turn. Opening or closing the cover over the
-    // first spread, the door is one sheet with the facing page on its back: it
-    // turns 180° and lands on that page.
-    const coverTurn = closedCover && Math.min(cur, target) === 0;
     const landOn = (leaf: { x: number; w: number }, hingeLeft: boolean, spread: { r: DOMRect; pic: string; ink?: HTMLElement }[], dx = 0) => {
       if (!coverTurn) return undefined;
       const rects = spread.map((p) => rel0(p.r, dx));
@@ -272,7 +329,7 @@
         ? undefined
         : { rect: rects[i], pic: spread[i].pic, floor: floorColour(), ink: spread[i].ink };
     };
-    if (now.length === 1 || (coverTurn && !forward)) {
+    if (style === 'door') {
       const hingeLeft = direction === 'ltr';
       if (forward) {
         if (!now[0].pic) return false;
@@ -352,7 +409,20 @@
       fx.destroy();
       if (doorFx === fx) doorFx = null;
       curlBusy = false;
+      drain();
     });
+  }
+
+  /** A turn asked for while one was drawn: finish that one now, then take this one. */
+  function hurry() {
+    curlFx?.hurry();
+    doorFx?.hurry();
+  }
+  function drain() {
+    if (queued === null) return;
+    const d = queued;
+    queued = null;
+    go(cur + d);
   }
 
   async function endCurl(commit: boolean, ms: number, lift = 0) {
@@ -367,14 +437,27 @@
       fx.destroy();
       if (curlFx === fx) curlFx = null;
       curlBusy = false;
+      drain();
     });
   }
 
   function onPointerDown(e: PointerEvent) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    if (curlBusy) return;
-    // Nav buttons own their own taps.
+    // Nav buttons (and a failed page's 再読み込み) own their own taps.
     if ((e.target as HTMLElement).closest('[data-nav]')) return;
+    // A turn still being drawn: finish it now; this press can only be a tap,
+    // and the turn it asks for runs next (quick taps used to be dropped).
+    if (curlBusy) {
+      hurry();
+      busyPress = true;
+      gesture = 'pending';
+      startX = e.clientX;
+      startY = e.clientY;
+      startT = performance.now();
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      return;
+    }
+    busyPress = false;
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
     // Second finger → pinch. Snapshot baselines; never turns the page.
@@ -406,10 +489,11 @@
       baseTy = ty;
     } else {
       // At 1x wait to see the axis: horizontal = turn, vertical = scroll tall page.
+      // The slide in progress is NOT stopped here: a press that turns out to be
+      // a tap for the menu, a long press or a vertical swipe used to freeze the
+      // track between two sheets — on the empty floor, a black page.
       gesture = 'pending';
-      baseTrackX = Number(gsap.getProperty(track, 'x'));
       baseTy = ty;
-      gsap.killTweensOf(track);
     }
   }
 
@@ -445,11 +529,21 @@
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
       if (Math.hypot(dx, dy) < 8) return; // wait for a decisive direction
+      if (busyPress) {
+        gesture = 'none'; // pressed during a turn: a tap or nothing
+        return;
+      }
       // Horizontal turns the page; vertical scrolls a tall page, else no-op
       // (so a stray vertical swipe on a page that fits can't flip it).
       if (Math.abs(dx) >= Math.abs(dy)) {
         gesture = 'turn';
         if (beginCurl(cur - Math.sign(dx * s), { x: startX, y: startY })) gesture = 'curl';
+        else {
+          // the finger takes the track from wherever a slide has got to
+          gsap.killTweensOf(track);
+          baseTrackX = Number(gsap.getProperty(track, 'x'));
+          dragX0 = e.clientX;
+        }
       } else gesture = panRange(1).y > 0 ? 'pany' : 'none';
     }
 
@@ -468,9 +562,8 @@
     }
 
     if (gesture === 'turn') {
-      const dx = e.clientX - startX;
       const [min, max] = bounds();
-      let x = baseTrackX + dx;
+      let x = baseTrackX + (e.clientX - dragX0);
       if (x < min) x = min + (x - min) * 0.3; // rubber-band past the ends
       if (x > max) x = max + (x - max) * 0.3;
       gsap.set(track, { x });
@@ -567,9 +660,13 @@
       return;
     }
     const r = panRange(scale);
-    if (r.y === 0) return;
+    // zoomed in, a trackpad's sideways scroll (or shift+wheel) pans across too
+    const dx = e.shiftKey && !e.deltaX ? e.deltaY : e.deltaX;
+    const dy = e.shiftKey && !e.deltaX ? 0 : e.deltaY;
+    if (r.y === 0 && (r.x === 0 || !dx)) return;
     e.preventDefault();
-    ty = clamp(ty - e.deltaY, -r.y, r.y);
+    if (r.x > 0 && dx) tx = clamp(tx - dx, -r.x, r.x);
+    if (r.y > 0) ty = clamp(ty - dy, -r.y, r.y);
   }
 
   // Wheel needs a non-passive listener to preventDefault the page scroll.
@@ -603,6 +700,14 @@
 
   function go(index: number, forceTween = false) {
     const clamped = Math.max(0, Math.min(sheets.length - 1, index));
+    if (curlBusy || curlFx || doorFx) {
+      // a turn is being drawn: finish it at once and take this one after it
+      if (!forceTween && clamped !== cur) {
+        queued = Math.sign(clamped - cur);
+        hurry();
+      }
+      return;
+    }
     // Taps and the ‹ › buttons curl too: lifted from the bottom corner, in an arc.
     if (!forceTween && clamped !== cur && beginCurl(clamped, null)) {
       if (doorFx) void endDoor(true, 560);

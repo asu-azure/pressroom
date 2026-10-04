@@ -33,3 +33,39 @@ export function lockReturn(go: string | null | undefined, slug: string): string 
   const own = new RegExp(`^/w/${escape(slug)}/(?:read|novel)(?:\\?[^?/]*)?$`);
   return own.test(go) ? go : null;
 }
+
+/**
+ * The reader's address kept in step with the page on screen (history.replaceState
+ * — no new entries): `?p=<that page>`, and the entry links that brought the reader
+ * in (`?n=`, `?ch=`) dropped. They outrank the saved place, so a reload — iOS
+ * reloads a tab left in the background — sent the reader back to the page they
+ * came in on. Anything else in the query stays.
+ */
+export function readerSearch(search: string, pageId: string | null): string {
+  const q = new URLSearchParams(search);
+  q.delete('n');
+  q.delete('ch');
+  if (pageId) q.set('p', pageId);
+  else q.delete('p');
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}
+
+/**
+ * The novel reader's `?s=` (a section index, from the overview's chapter list):
+ * a whole number inside the book, else nothing. It is used once and dropped from
+ * the address, so a reload resumes from the saved place instead.
+ */
+export function sectionParam(raw: string | null | undefined, sections: number): number | null {
+  if (raw === null || raw === undefined || raw === '' || !/^\d+$/.test(raw)) return null;
+  const i = Number(raw);
+  return i < sections ? i : null;
+}
+
+/** The address without one parameter — what's left after a one-time link was used. */
+export function withoutParam(search: string, name: string): string {
+  const q = new URLSearchParams(search);
+  q.delete(name);
+  const s = q.toString();
+  return s ? `?${s}` : '';
+}

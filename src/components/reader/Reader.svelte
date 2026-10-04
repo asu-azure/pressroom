@@ -6,7 +6,8 @@
   import { resolveSheets, sheetIndexOf } from '../../lib/resolveSheets';
   import { sortedChapters } from '../../lib/chapterOrder';
   import { novelHere, partStart } from '../../lib/bookParts';
-  import { openingLayout, pickedLayout, NARROW_QUERY } from '../../lib/readerUi';
+  import { openingLayout, pickedLayout, novelCardDue, NARROW_QUERY } from '../../lib/readerUi';
+  import { langName } from '../../lib/bookInfo';
   import { i18n } from '../../lib/i18n.svelte';
   import {
     loadSettings, saveSettings, loadProgress, saveProgress, loadUnlock, clearUnlock,
@@ -20,7 +21,7 @@
   import ReadingGuide, { type GuideTip } from './ReadingGuide.svelte';
   import { sfx } from '../../scripts/sound';
   import { saveShelfmarks } from '../../lib/shelfmarks';
-  import { pageByNumber, lockedOverview } from '../../lib/readerLink';
+  import { pageByNumber, lockedOverview, readerSearch } from '../../lib/readerLink';
   import { inTimeline } from '../../data/timeline';
   import type { Work, PageRec, Chapter, ChapterMark, ReaderSettings } from '../../lib/types';
 
@@ -39,8 +40,19 @@
   let toast = $state<string | null>(null);
   let peel = $state(false);
   let guideOpen = $state(false);
-  // A first visit keeps the labelled bar up until the first page turn.
+  // A first visit keeps the labelled bar up until the first page turn (or until
+  // the reader puts it away with a tap in the middle).
   let barPinned = $state(!seenHint('bar'));
+  function unpinBar() {
+    if (!barPinned) return;
+    barPinned = false;
+    markHint('bar');
+  }
+  // The flip surface's zoom, for the bar's − 100% ＋ (and keys + − 0).
+  let flip = $state<FlipSurface | null>(null);
+  let zoom = $state(1);
+  // a mouse: the guide speaks of clicks and keys, the bar carries the zoom
+  const mouse = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   const coverSolo = $derived(work?.cover_solo ?? true);
   const sheets = $derived(
@@ -89,20 +101,59 @@
       : null,
   );
 
-  // The reading guide's four tips, for the mode and direction in use.
+  // 「このパートは小説です」: vol. 2 opens on its novel part as scanned Thai pages,
+  // and readers didn't learn the text reads in Japanese in the novel reader. A
+  // small card (not a wall) the first time a novel part is on screen this
+  // session; dismissed — or left behind by reading on out of the part — it stays
+  // away for the session (sessionStorage).
+  const cardKey = $derived(work ? `pressroom:novelcard:${work.id}` : '');
+  let cardDismissed = $state(false);
+  let cardShown = false;
+  const onNovelPart = $derived(
+    Boolean(currentSheet && chapters.some((c) => c.kind === 'novel') && novelHere(chapters, currentSheet.pages)),
+  );
+  const novelCard = $derived(
+    status === 'ready' && novelCardDue({ onNovelPart, hasText: Boolean(novelHref), dismissed: cardDismissed }),
+  );
+  function dismissCard() {
+    cardDismissed = true;
+    try {
+      sessionStorage.setItem(cardKey, '1');
+    } catch {
+      /* private mode: gone for this page view only */
+    }
+  }
+  $effect(() => {
+    if (novelCard) cardShown = true;
+    else if (cardShown && !onNovelPart && !cardDismissed) dismissCard();
+  });
+
+  // The reading guide's four tips, for the mode, the direction and the pointer
+  // in use: a mouse clicks, has ← → and the bar's zoom; a finger taps and pinches.
   const guideTips = $derived.by((): GuideTip[] => {
     const t = i18n.t.bind(i18n);
     const flip = settings.mode === 'flip';
     const rtl = work?.direction === 'rtl';
+    const setBody = !flip
+      ? anyBubbles ? 'gd.setBody' : 'gd.setBodyNoTrans'
+      : mouse
+        ? anyBubbles ? 'gd.setBodyZoom' : 'gd.setBodyZoomNoTrans'
+        : anyBubbles ? 'gd.setBodyTouch' : 'gd.setBodyTouchNoTrans';
     return [
       flip
-        ? { icon: rtl ? 'turn-rtl' : 'turn-ltr', title: t('gd.turn'), body: t(rtl ? 'gd.turnRtl' : 'gd.turnLtr') }
+        ? mouse
+          ? { icon: rtl ? 'turn-rtl' : 'turn-ltr', title: t('gd.turnClick'), body: t(rtl ? 'gd.turnRtlClick' : 'gd.turnLtrClick') }
+          : { icon: rtl ? 'turn-rtl' : 'turn-ltr', title: t('gd.turn'), body: t(rtl ? 'gd.turnRtl' : 'gd.turnLtr') }
         : { icon: 'scroll', title: t('gd.scroll'), body: t('gd.scrollBody') },
       flip
-        ? { icon: 'menu', title: t('gd.menu'), body: t('gd.menuBody') }
+        ? mouse
+          ? { icon: 'menu', title: t('gd.menuClick'), body: t('gd.menuClickBody') }
+          : { icon: 'menu', title: t('gd.menu'), body: t('gd.menuBody') }
         : { icon: 'menu', title: t('gd.menuScroll'), body: t('gd.menuScrollBody') },
-      { icon: 'settings', title: t('gd.set'), body: t(anyBubbles ? 'gd.setBody' : 'gd.setBodyNoTrans') },
-      { icon: 'fav', title: t('gd.fav'), body: t('gd.favBody') },
+      { icon: 'settings', title: t('gd.set'), body: t(setBody) },
+      mouse
+        ? { icon: 'fav', title: t('gd.favClick'), body: t('gd.favClickBody') }
+        : { icon: 'fav', title: t('gd.fav'), body: t('gd.favBody') },
     ];
   });
 
@@ -125,6 +176,28 @@
       at: at >= 0 ? at : null,
       favs: favorites.map((id) => pageOrder.indexOf(id)).filter((i) => i >= 0),
     });
+  });
+
+  // The address follows the page on screen (lib/readerLink.ts readerSearch): the
+  // link a reader came in by (?p= ?n= ?ch=) outranks the saved place, so a reload
+  // — iOS reloads background tabs — sent them back to where they entered.
+  // replaceState only (no history entries), and not on every scroll report:
+  // Safari refuses more than 100 calls in 30 s.
+  let urlTimer = 0;
+  $effect(() => {
+    if (status !== 'ready') return;
+    const id = sheets[cur]?.pages[0]?.id ?? null;
+    clearTimeout(urlTimer);
+    urlTimer = window.setTimeout(() => {
+      const next = readerSearch(location.search, id);
+      if (next === location.search) return;
+      try {
+        history.replaceState(history.state, '', `${location.pathname}${next}${location.hash}`);
+      } catch {
+        /* throttled — the next turn tries again */
+      }
+    }, 400);
+    return () => clearTimeout(urlTimer);
   });
 
   const currentChapter = $derived(
@@ -208,13 +281,21 @@
       pageByNumber(params.get('n'), [...pages].sort((a, b) => (a.sortKey < b.sortKey ? -1 : 1)));
     const target = requested ?? loadProgress(work.id);
     if (target) {
-      const idx = sheetIndexOf(
-        resolveSheets(pages, { layout: settings.layout, coverSolo: work.cover_solo }),
-        target,
-      );
-      if (idx > 0) cur = idx;
+      const opened = resolveSheets(pages, { layout: settings.layout, coverSolo: work.cover_solo });
+      const idx = sheetIndexOf(opened, target);
+      if (idx > 0) {
+        cur = idx;
+        // arriving by a link (a part, the timeline, a shared page) is a place
+        // too: a reader who leaves before turning a page comes back here
+        if (requested) saveProgress(work.id, opened[idx].pages[0].id);
+      }
     }
     favorites = loadFavorites(work.id);
+    try {
+      cardDismissed = sessionStorage.getItem(`pressroom:novelcard:${work.id}`) === '1';
+    } catch {
+      cardDismissed = false;
+    }
     status = 'ready';
 
     // First visit to the page reader: the guide (which also teaches the
@@ -386,23 +467,32 @@
     }
   }
 
-  // --- Preload neighbours (n±2) with the browser's own srcset selection ---
-  const warmed = new Set<string>();
+  // --- Preload neighbours (n±2) with the browser's own srcset selection. Only
+  //     the window's links stay in <head>: they used to pile up for every page
+  //     read, holding every picture of the book in memory on a phone. ---
+  const warmed = new Map<string, HTMLLinkElement>();
   $effect(() => {
     if (status !== 'ready' || settings.mode === 'scroll') return;
+    const keep = new Set<string>();
     for (let i = Math.max(0, cur - 2); i <= Math.min(sheets.length - 1, cur + 2); i++) {
       for (const page of sheets[i].pages) {
         const pic = pictureOf(page, typesetOn);
         const key = pic.clean ? `${page.id}:clean` : page.id; // switching to typeset warms the clean pictures
+        keep.add(key);
         if (warmed.has(key)) continue;
-        warmed.add(key);
         const link = document.createElement('link');
         link.rel = 'preload';
         link.as = 'image';
         link.setAttribute('imagesrcset', `${pic.med} 900w, ${pic.full} 1600w`);
         link.setAttribute('imagesizes', sheets[i].kind === 'spread' ? '50vw' : '100vw');
         document.head.appendChild(link);
+        warmed.set(key, link);
       }
+    }
+    for (const [key, link] of warmed) {
+      if (keep.has(key)) continue;
+      link.remove();
+      warmed.delete(key);
     }
   });
 
@@ -421,6 +511,25 @@
       return;
     }
     if (settings.mode !== 'flip') return;
+    // the bar's zoom from the keyboard: + − and 0 for the whole page (never with
+    // ctrl/⌘ — that is the browser's own zoom)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === '+' || e.key === '=') {
+        e.preventDefault();
+        flip?.zoomBy(1);
+        return;
+      }
+      if (e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        flip?.zoomBy(-1);
+        return;
+      }
+      if (e.key === '0') {
+        e.preventDefault();
+        flip?.zoomFit();
+        return;
+      }
+    }
     switch (e.key) {
       case 'ArrowLeft':
         setCur(cur - dirSign);
@@ -487,13 +596,16 @@
         />
       {:else}
         <FlipSurface
+          bind:this={flip}
           {sheets}
           direction={work.direction}
           fit={settings.fit}
           {cur}
+          layout={settings.layout}
           {pageNumberOf}
           onNavigate={setCur}
           onMenu={() => chrome?.toggleMenu()}
+          onZoom={(z) => (zoom = z)}
           translateOn={notesOn}
           {typesetOn}
           curl={settings.curl}
@@ -541,7 +653,10 @@
       pages={orderedPages}
       {favorites}
       pinned={barPinned}
-      {novelHref}
+      novelHref={novelCard ? null : novelHref}
+      zoom={settings.mode === 'flip' ? zoom : null}
+      onZoom={(dir) => (dir === 0 ? flip?.zoomFit() : flip?.zoomBy(dir))}
+      onUnpin={unpinBar}
       onSettings={patchSettings}
       onJump={jump}
       onJumpPage={jumpToPage}
@@ -550,6 +665,19 @@
       onShare={sharePage}
       onHelp={() => (guideOpen = true)}
     />
+    {#if novelCard && novelHref && !guideOpen}
+      <!-- a small card, not a wall: the page stays readable and turnable -->
+      <aside class="reader__novelCard" aria-label={i18n.t('ov.parts')}>
+        <!-- one sentence a line: wrapped as one, it broke inside 小説リーダー -->
+        <p class="reader__novelText">
+          {#each i18n.t('rd.novelCard').replace('{lang}', langName(i18n.lang, i18n.lang)).split(/(?<=[。.])\s*/) as line, li (li)}<span>{line}</span>{/each}
+        </p>
+        <div class="reader__novelBtns">
+          <a class="mono reader__novelGo" href={novelHref} data-sfx="open">{i18n.t('rd.novelCardGo')} →</a>
+          <button type="button" class="mono reader__novelStay" onclick={dismissCard}>{i18n.t('rd.novelCardStay')}</button>
+        </div>
+      </aside>
+    {/if}
     {#if guideOpen}
       <ReadingGuide tips={guideTips} onClose={closeGuide} timeline={inTimeline(work?.slug)} />
     {/if}
@@ -592,6 +720,82 @@
   .reader__peel.mk-peel--left {
     left: 0;
   }
+  /* 「このパートは小説です」 — above the page counter, clear of the bar's controls */
+  .reader__novelCard {
+    position: fixed;
+    left: 50%;
+    bottom: calc(3.6rem + env(safe-area-inset-bottom));
+    z-index: 45;
+    translate: -50% 0;
+    width: min(24rem, calc(100vw - 2 * var(--pad)));
+    display: grid;
+    gap: 0.7rem;
+    padding: 0.9rem 1rem;
+    background: rgba(12, 12, 13, 0.95);
+    border: 1px solid var(--accent);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .reader__novelCard {
+      animation: reader-card 0.3s var(--ease) both;
+    }
+  }
+  @keyframes reader-card {
+    from {
+      opacity: 0;
+      translate: -50% 0.6rem;
+    }
+  }
+  .reader__novelText {
+    margin: 0;
+    font-family: var(--font-display-authored);
+    font-size: 0.86rem;
+    line-height: 1.6;
+    color: var(--fg);
+    word-break: auto-phrase;
+  }
+  .reader__novelText > span {
+    display: block;
+  }
+  .reader__novelBtns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .reader__novelGo,
+  .reader__novelStay {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0 1em;
+    font-size: 0.68rem;
+    letter-spacing: 0.06em;
+    text-align: center;
+    cursor: pointer;
+  }
+  .reader__novelGo {
+    background: var(--accent);
+    color: var(--ink-fg);
+    text-decoration: none;
+  }
+  .reader__novelStay {
+    background: none;
+    border: 1px solid var(--line-strong);
+    color: var(--fg-dim);
+  }
+  @media (hover: hover) {
+    .reader__novelGo:hover {
+      background: #1d33c4;
+    }
+    .reader__novelStay:hover {
+      color: var(--fg);
+      border-color: var(--fg-dim);
+    }
+  }
+  /* Toasts sit under the top bar, never over a control: at the bottom they hid
+     「小説で読む」 and the page counter on a phone. */
   .reader__toast {
     white-space: pre-line; /* the ここすき toast is two lines: what, and where */
     line-height: 1.7;
@@ -600,9 +804,9 @@
     width: max-content;
     position: fixed;
     left: 50%;
-    bottom: calc(3.4rem + env(safe-area-inset-bottom));
+    top: calc(4.9rem + env(safe-area-inset-top));
     z-index: 60;
-    translate: -50% 0.6rem;
+    translate: -50% -0.6rem;
     max-width: calc(100vw - 2 * var(--pad));
     padding: 0.55em 1em;
     background: rgba(12, 12, 13, 0.94);

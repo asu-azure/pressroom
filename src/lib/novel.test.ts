@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chapters, chapterOf, chapterName, chapterNumber, groupBoxes, novelProgress, placeKey, resumeLabel, savedProgress, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, rowsFor, tcyPieces } from './novel';
+import { chapters, novelToc, placeAtEnd, chapterOf, chapterName, chapterNumber, groupBoxes, novelProgress, placeKey, resumeLabel, savedProgress, normalizeBlock, normalizeSections, pageCount, pagePitch, parsePlace, pickLang, progressOf, rowsFor, tcyPieces } from './novel';
 import type { NovelBlock, NovelPara, NovelSection } from './types';
 
 const sec = (sort_key: string, body: unknown[], lang = 'ja'): NovelSection =>
@@ -190,5 +190,50 @@ describe('novel progress outside the novel', () => {
     expect(resumeLabel(12, 'en', (k) => (k === 'nv.resume' ? 'CONTINUE ({at})' : k))).toBe('CONTINUE (CH. 12)');
     expect(chapterName(6, 'ja', t)).toBe('第六話');
     expect(chapterName(6, 'th', t)).toBe('CH. 6');
+  });
+});
+
+describe('novelToc', () => {
+  // the vol. 2 shape: an untitled opening, titled chapters, untitled continuations
+  const rows = [
+    { lang: 'ja', sort_key: 's03', title: '第二話　人間氷山アイスブレイク作戦' },
+    { lang: 'ja', sort_key: 's01', title: '' },
+    { lang: 'ja', sort_key: 's02', title: '第一話　氷の壁と太陽' },
+    { lang: 'ja', sort_key: 's04', title: '' },
+    { lang: 'ja', sort_key: 's05', title: '第三話　僕たちは、友だちじゃない' },
+  ];
+  const t = (k: string) => (k === 'nv.opening' ? 'はじまり' : k);
+
+  it('lists the reader’s 目次 entries, titles only, in reading order', () => {
+    expect(novelToc(rows, '/w/b/novel?lang=ja', t).map((c) => [c.index, c.title])).toEqual([
+      [0, 'はじまり'],
+      [1, '第一話　氷の壁と太陽'],
+      [2, '第二話　人間氷山アイスブレイク作戦'],
+      [4, '第三話　僕たちは、友だちじゃない'],
+    ]);
+  });
+
+  it('links each into the novel reader at its section', () => {
+    const toc = novelToc(rows, '/w/b/novel?lang=ja', t);
+    expect(toc[1].href).toBe('/w/b/novel?lang=ja&s=1');
+    expect(novelToc(rows, '/w/b/novel', t)[3].href).toBe('/w/b/novel?s=4');
+  });
+
+  it('is empty without rows', () => {
+    expect(novelToc([], '/w/b/novel', t)).toEqual([]);
+  });
+});
+
+describe('placeAtEnd', () => {
+  it('knows a finished book from a place inside it', () => {
+    expect(placeAtEnd(JSON.stringify({ section: 10, block: 70, chapter: 6, end: true }))).toBe(true);
+    expect(placeAtEnd(JSON.stringify({ section: 10, block: 70, chapter: 6 }))).toBe(false);
+    expect(placeAtEnd(null)).toBe(false);
+    expect(placeAtEnd('junk')).toBe(false);
+  });
+
+  it('still parses as a place (the reader ignores the flag there)', () => {
+    const s = [sec('a', [{ t: 'p', text: 'x' }])];
+    expect(parsePlace(JSON.stringify({ section: 0, block: 0, chapter: 0, end: true }), normalizeSections(s))).toEqual({ section: 0, block: 0 });
   });
 });

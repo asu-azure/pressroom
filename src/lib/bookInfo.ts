@@ -38,6 +38,16 @@ export function langName(code: string, ui: UiLang): string {
   }
 }
 
+/**
+ * A language name for a chrome LABEL: the English chrome speaks in capitals
+ * (「IN JAPANESE」, 「THAI ONLY」), so the name is capitalised with it — a mixed
+ * 「IN Japanese」 read as a mistake. Japanese is unchanged. Prose uses langName.
+ */
+export function langLabel(code: string, ui: UiLang): string {
+  const name = langName(code, ui);
+  return ui === 'ja' ? name : name.toUpperCase();
+}
+
 type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label' | 'released_on' | 'novel_langs'>;
 
 export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
@@ -45,7 +55,7 @@ export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
   const items: InfoItem[] = [];
   const lang = work.book_lang?.trim();
   if (lang) {
-    items.push({ key: 'lang', label: t('ov.origLang'), value: langName(lang, ui) });
+    items.push({ key: 'lang', label: t('ov.origLang'), value: langLabel(lang, ui) });
     // only meaningful next to the original language: "翻訳 なし" tells a
     // Japanese visitor the Thai book has no Japanese yet
     const trans = (work.translations ?? []).filter((c) => c && c !== lang);
@@ -53,7 +63,7 @@ export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
     // too: vol. 2 said なし while its whole novel reads in Japanese
     const novelOnly = (work.novel_langs ?? []).filter((c) => c && c !== lang && !trans.includes(c));
     const part = (name: string) => (ui === 'ja' ? `${name}（${t('ov.novelPart')}）` : `${name} (${t('ov.novelPart')})`);
-    const names = [...trans.map((c) => langName(c, ui)), ...novelOnly.map((c) => part(langName(c, ui)))];
+    const names = [...trans.map((c) => langLabel(c, ui)), ...novelOnly.map((c) => part(langLabel(c, ui)))];
     items.push({
       key: 'trans',
       label: t('rd.translate'),

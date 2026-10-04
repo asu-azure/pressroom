@@ -21,7 +21,7 @@
   import { loadUnlock, clearUnlock, takeHint, seenHint, markHint } from '../../lib/persistence';
   import { i18n } from '../../lib/i18n.svelte';
   import { novelSequel, partLabel, partName } from '../../lib/bookParts';
-  import { lockedOverview } from '../../lib/readerLink';
+  import { lockedOverview, sectionParam, withoutParam } from '../../lib/readerLink';
   import { inTimeline } from '../../data/timeline';
   import ReadingGuide, { type GuideTip } from '../reader/ReadingGuide.svelte';
   import BookmarkNote from '../reader/BookmarkNote.svelte';
@@ -33,6 +33,7 @@
     pickLang,
     placeKey,
     parsePlace,
+    placeAtEnd,
     progressOf,
     pagePitch,
     pageCount,
@@ -74,6 +75,7 @@
   }
   function patch(p: Partial<Settings>) {
     const keep = currentPlace();
+    atEnd = status === 'ready' && onEndPage();
     settings = { ...settings, ...p };
     try {
       localStorage.setItem(SETTINGS, JSON.stringify(settings));
@@ -140,7 +142,25 @@
     } catch {
       /* ignore */
     }
-    pending = parsePlace(saved, sections) ?? { section: 0, block: 0 };
+    // ?s=<section> (the overview's chapter list) opens at that chapter — once:
+    // it is dropped from the address, so a reload resumes the saved place
+    const params = new URLSearchParams(location.search);
+    const askedSection = sectionParam(params.get('s'), sections.length);
+    if (params.has('s')) {
+      try {
+        history.replaceState(history.state, '', `${location.pathname}${withoutParam(location.search, 's')}${location.hash}`);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (askedSection !== null) {
+      pending = { section: askedSection, block: 0 };
+    } else {
+      // a reader who finished comes back to the last page (the way on to the
+      // manga), not the page before it
+      atEnd = placeAtEnd(saved);
+      pending = parsePlace(saved, sections) ?? { section: 0, block: 0 };
+    }
     status = 'ready';
     if (takeHint('guide-novel')) guideOpen = true;
     // the book's parts, for the last page — chapters are public even while the
@@ -154,8 +174,11 @@
   }
 
   // --- layout (vertical) ---
+  let root = $state<HTMLElement | null>(null);
   let stage = $state<HTMLElement | null>(null);
   let strip = $state<HTMLElement | null>(null);
+  // land on the last page (the reader had finished): set by load(), used once
+  let atEnd = false;
   let step = $state(1); // page width, whole columns
   let pages = $state(1);
   let page = $state(0);
@@ -199,11 +222,16 @@
     pages = pageCount(strip.scrollWidth, step);
     const target = pending ?? currentPlace();
     pending = null;
-    if (target) page = Math.min(pages - 1, pageOf(target));
+    if (atEnd) {
+      atEnd = false;
+      page = pages - 1;
+    } else if (target) page = Math.min(pages - 1, pageOf(target));
   }
 
+  /** The block in whichever layout is on screen: the vertical strip or the
+      horizontal column (looking in the strip alone, 縦→横 lost the place). */
   function blockEl(p: NovelPlace): HTMLElement | null {
-    return strip?.querySelector<HTMLElement>(`[data-s="${p.section}"][data-b="${p.block}"]`) ?? null;
+    return root?.querySelector<HTMLElement>(`[data-s="${p.section}"][data-b="${p.block}"]`) ?? null;
   }
 
   function pageOf(p: NovelPlace): number {
@@ -247,14 +275,27 @@
   }
 
   let place = $state<NovelPlace>({ section: 0, block: 0 });
+  /** On the last page — 「おわり」 and the way on: a finished book is kept as
+      finished, so coming back (Back from the manga) lands there, not a page short. */
+  function onEndPage(): boolean {
+    if (vertical) return pages > 1 && page >= pages - 1;
+    const end = root?.querySelector<HTMLElement>('.nv-end');
+    if (!end || !scroller) return false;
+    return end.getBoundingClientRect().top < scroller.getBoundingClientRect().bottom - 40;
+  }
   function remember() {
-    const p = currentPlace();
-    if (!p || !work) return;
+    if (!work || status !== 'ready') return;
+    // the last page holds no paragraph (おわり and the way on): keep the book's
+    // last block, marked finished — it used to save nothing there at all
+    const last = sections.length - 1;
+    const p = currentPlace() ?? (onEndPage() && last >= 0 ? { section: last, block: Math.max(0, sections[last].body.length - 1) } : null);
+    if (!p) return;
     place = p;
     try {
       // the chapter's number rides along: the overview and the shelf can't see the
       // text of a locked book, but can say 「続きから読む（第三話）」 (lib/novel.ts)
       const saved: SavedPlace = { ...p, chapter: chapterNumber(sections, p.section) };
+      if (onEndPage()) saved.end = true;
       localStorage.setItem(placeKey(work.id, lang), JSON.stringify(saved));
     } catch {
       /* ignore */
@@ -267,7 +308,12 @@
     if (status !== 'ready') return;
     requestAnimationFrame(() => {
       if (vertical) layout();
-      else if (pending) {
+      else if (atEnd) {
+        atEnd = false;
+        pending = null;
+        quietUntil = performance.now() + 800;
+        root?.querySelector('.nv-end')?.scrollIntoView({ block: 'end' });
+      } else if (pending) {
         quietUntil = performance.now() + 800;
         blockEl(pending)?.scrollIntoView({ block: 'start' });
         pending = null;
@@ -309,13 +355,18 @@
     const toc = { icon: 'toc' as const, title: t('gd.nvToc'), body: t('gd.nvTocBody') };
     return vertical
       ? [
-          { icon: 'turn-rtl', title: t('gd.nvTurn'), body: t('gd.nvTurnBody') },
-          { icon: 'menu', title: t('gd.menu'), body: t('gd.menuBody') },
+          mouse
+            ? { icon: 'turn-rtl', title: t('gd.nvTurnClick'), body: t('gd.nvTurnClickBody') }
+            : { icon: 'turn-rtl', title: t('gd.nvTurn'), body: t('gd.nvTurnBody') },
+          mouse
+            ? { icon: 'menu', title: t('gd.menuClick'), body: t('gd.menuClickBody') }
+            : { icon: 'menu', title: t('gd.menu'), body: t('gd.menuBody') },
           set,
           toc,
         ]
       : [{ icon: 'scroll', title: t('gd.nvScroll'), body: t('gd.nvScrollBody') }, set, toc];
   });
+  const mouse = typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   function openGuide() {
     panel = null;
     guideOpen = true;
@@ -351,6 +402,11 @@
     else (chrome ? (chrome = false) : poke());
   }
   function onKey(e: KeyboardEvent) {
+    if (e.key === 'Escape' && panel && !guideOpen) {
+      e.preventDefault();
+      panel = null;
+      return;
+    }
     if (status !== 'ready' || !vertical || guideOpen || (e.target as HTMLElement)?.closest('input, select, textarea')) return;
     if (e.key === 'ArrowLeft' || e.key === 'PageDown' || e.key === ' ') {
       e.preventDefault();
@@ -430,6 +486,7 @@
 {:else if work}
   <div
     class="nv"
+    bind:this={root}
     class:is-v={vertical}
     class:is-h={!vertical}
     class:is-gothic={settings.face === 'gothic'}
@@ -437,22 +494,25 @@
     lang={lang}
     style={`--fs:${fs}px;--lh:${lh}px;--step:${step}px`}
   >
-    <header class="nv-bar mono">
-      <a class="nv-bar__back" href={`/w/${slug}`} data-vt="back">← {i18n.t('rd.overview')}</a>
+    <!-- the page reader's bar, in paper: each control its icon and its name
+         under it, every one a full 44px target (they were 28px here) -->
+    <header class="nv-bar mono" lang={i18n.lang}>
+      <a class="nv-tool nv-bar__back" href={`/w/${slug}`} data-vt="back"
+        ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m6-6-6 6 6 6" /></svg
+        ><span class="nv-tool__label">{i18n.t('rd.overview')}</span></a>
       <span class="nv-bar__title authored">{work.title}</span>
-      <!-- named like the page reader's: 目次 · 設定 (was "Aa") · ？ 使い方 -->
       <span class="nv-bar__tools">
-        <button type="button" onclick={() => (panel = panel === 'toc' ? null : 'toc')} aria-expanded={panel === 'toc'}
+        <button type="button" class="nv-tool" class:is-active={panel === 'toc'} onclick={() => (panel = panel === 'toc' ? null : 'toc')} aria-expanded={panel === 'toc'}
           ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.1M4.5 12h.1M4.5 18h.1" /></svg
-          >{i18n.t('rd.toc')}</button>
-        <button type="button" onclick={() => (panel = panel === 'settings' ? null : 'settings')} aria-expanded={panel === 'settings'}
+          ><span class="nv-tool__label">{i18n.t('rd.toc')}</span></button>
+        <button type="button" class="nv-tool" class:is-active={panel === 'settings'} onclick={() => (panel = panel === 'settings' ? null : 'settings')} aria-expanded={panel === 'settings'}
           ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="12" cy="12" r="7.2" stroke-width="3" stroke-dasharray="2.83 2.83" stroke-linecap="butt" /><circle cx="12" cy="12" r="5.4" /><circle cx="12" cy="12" r="2" /></svg
-          >{i18n.t('rd.set')}</button>
-        <button type="button" onclick={openGuide}
+          ><span class="nv-tool__label">{i18n.t('rd.set')}</span></button>
+        <button type="button" class="nv-tool" onclick={openGuide}
           ><svg class="nv-ico" viewBox="0 0 24 24" aria-hidden="true"
             ><circle cx="12" cy="12" r="9" /><path d="M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.6M12 16.9v.1" /></svg
-          >{i18n.t('rd.help')}</button>
+          ><span class="nv-tool__label">{i18n.t('rd.help')}</span></button>
       </span>
     </header>
 
@@ -484,8 +544,13 @@
       <span class="nv-foot__bar" aria-hidden="true"><span style={`width:${percent}%`}></span></span>
     </footer>
 
+    {#if panel}
+      <!-- a tap outside closes the panel, and does nothing else -->
+      <button type="button" class="nv-scrim" tabindex="-1" aria-label={i18n.t('rd.close')} onclick={() => (panel = null)}></button>
+    {/if}
     {#if panel === 'toc'}
       <div class="nv-panel" role="dialog" aria-label={i18n.t('rd.toc')}>
+        <p class="nv-panel__head mono" lang={i18n.lang}>{i18n.t('rd.toc')}</p>
         <ol>
           {#each toc as c (c.index)}
             <li><button type="button" class="authored" class:is-on={c.index === chapterNow} onclick={() => jumpTo(c.index)}>{c.title ?? i18n.t('nv.opening')}</button></li>
@@ -493,27 +558,40 @@
         </ol>
       </div>
     {:else if panel === 'settings'}
-      <div class="nv-panel mono" role="dialog" aria-label={i18n.t('rd.settings')}>
-        {#if lang === 'ja'}
+      <!-- named sections, like the page reader's 設定 -->
+      <div class="nv-panel mono" role="dialog" aria-label={i18n.t('rd.settings')} lang={i18n.lang}>
+        <p class="nv-panel__head">{i18n.t('rd.settings')}</p>
+        <section class="nv-sec-set" aria-labelledby="nv-sec-view">
+          <h2 class="nv-panel__title" id="nv-sec-view">{i18n.t('rd.secView')}</h2>
+          {#if lang === 'ja'}
+            <div class="nv-opt">
+              <span>{i18n.t('nv.dir')}</span>
+              <button type="button" class:is-on={settings.dir === 'v'} onclick={() => patch({ dir: 'v' })}>{i18n.t('nv.vertical')}</button>
+              <button type="button" class:is-on={settings.dir === 'h'} onclick={() => patch({ dir: 'h' })}>{i18n.t('nv.horizontal')}</button>
+            </div>
+          {/if}
           <div class="nv-opt">
-            <button type="button" class:is-on={settings.dir === 'v'} onclick={() => patch({ dir: 'v' })}>{i18n.t('nv.vertical')}</button>
-            <button type="button" class:is-on={settings.dir === 'h'} onclick={() => patch({ dir: 'h' })}>{i18n.t('nv.horizontal')}</button>
+            <span>{i18n.t('nv.size')}</span>
+            {#each [0, 1, 2] as n (n)}
+              <button type="button" class:is-on={settings.size === n} onclick={() => patch({ size: n as 0 | 1 | 2 })} style={`font-size:${0.7 + n * 0.12}rem`}>A</button>
+            {/each}
           </div>
-        {/if}
-        <div class="nv-opt">
-          <span>{i18n.t('nv.size')}</span>
-          {#each [0, 1, 2] as n (n)}
-            <button type="button" class:is-on={settings.size === n} onclick={() => patch({ size: n as 0 | 1 | 2 })} style={`font-size:${0.7 + n * 0.12}rem`}>A</button>
-          {/each}
-        </div>
-        {#if lang !== 'th'}
-        <div class="nv-opt">
-          <span>{i18n.t('nv.face')}</span>
-          <button type="button" class:is-on={settings.face === 'mincho'} onclick={() => patch({ face: 'mincho' })}>{i18n.t('nv.mincho')}</button>
-          <button type="button" class:is-on={settings.face === 'gothic'} onclick={() => patch({ face: 'gothic' })}>{i18n.t('nv.gothic')}</button>
-        </div>
-        {/if}
-        <div class="nv-mark"><BookmarkNote tone="paper" /></div>
+          {#if lang !== 'th'}
+            <div class="nv-opt">
+              <span>{i18n.t('nv.face')}</span>
+              <button type="button" class:is-on={settings.face === 'mincho'} onclick={() => patch({ face: 'mincho' })}>{i18n.t('nv.mincho')}</button>
+              <button type="button" class:is-on={settings.face === 'gothic'} onclick={() => patch({ face: 'gothic' })}>{i18n.t('nv.gothic')}</button>
+            </div>
+          {/if}
+        </section>
+        <section class="nv-sec-set" aria-labelledby="nv-sec-lang">
+          <h2 class="nv-panel__title" id="nv-sec-lang">{i18n.t('rd.secLang')}</h2>
+          <div class="nv-opt">
+            <button type="button" class:is-on={i18n.lang === 'ja'} onclick={() => i18n.set('ja')}>日本語</button>
+            <button type="button" class:is-on={i18n.lang === 'en'} onclick={() => i18n.set('en')}>EN</button>
+          </div>
+        </section>
+        <div class="nv-mark"><BookmarkNote tone="paper" kind="novel" /></div>
       </div>
     {/if}
 
@@ -641,8 +719,6 @@
   .nv.is-v:not(.is-chrome) .nv-foot {
     opacity: 0;
   }
-  .nv-bar a,
-  .nv-bar button,
   .nv-panel button {
     color: inherit;
     background: none;
@@ -652,8 +728,69 @@
     cursor: pointer;
     padding: 0.35rem 0.5rem;
   }
-  .nv-bar a:hover,
-  .nv-bar button:hover {
+  /* one control: its icon and its name under it, 44px — the page reader's .rc-tool in paper */
+  .nv-tool {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.22rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0.32rem 0.45rem 0.28rem;
+    background: rgba(255, 253, 247, 0.7);
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    color: var(--dim);
+    font: inherit;
+    letter-spacing: inherit;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.25s var(--ease), border-color 0.25s var(--ease);
+  }
+  .nv-tool.is-active {
+    color: var(--ink);
+    border-color: var(--accent);
+  }
+  @media (hover: hover) {
+    .nv-tool:hover {
+      color: var(--ink);
+      border-color: var(--accent);
+    }
+  }
+  .nv-tool__label {
+    font-size: 0.6875rem; /* 11px, as the page reader's */
+    line-height: 1.1;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    text-transform: uppercase; /* no-op on Japanese */
+  }
+  /* a tap outside a panel closes it */
+  .nv-scrim {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    background: transparent;
+    border: 0;
+    cursor: default;
+  }
+  .nv-panel__head {
+    margin: 0 0 0.6rem;
+    color: var(--ink);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+  }
+  .nv-sec-set {
+    display: grid;
+    gap: 0.2rem;
+    padding: 0.7rem 0 0.5rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .nv-panel__title {
+    margin: 0 0 0.2rem;
+    font-family: var(--font-display-authored);
+    font-size: 0.86rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     color: var(--ink);
   }
   .nv-bar__title {
@@ -670,15 +807,8 @@
   }
   .nv-bar__tools {
     display: flex;
-    gap: 0.2rem;
+    gap: 0.3rem;
     flex-shrink: 0;
-  }
-  .nv-bar__tools button {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35em;
-    font-size: 0.6875rem; /* 11px */
-    white-space: nowrap;
   }
   .nv-ico {
     width: 1rem;
@@ -1026,9 +1156,9 @@
   /* ---- panels ---- */
   .nv-panel {
     position: absolute;
-    top: calc(2.8rem + env(safe-area-inset-top));
+    top: calc(4rem + env(safe-area-inset-top));
     right: clamp(0.8rem, 3vw, 1.6rem);
-    z-index: 3;
+    z-index: 4;
     min-width: min(18rem, calc(100vw - 2rem));
     max-height: 70svh;
     overflow-y: auto;
@@ -1066,10 +1196,16 @@
     min-width: 6.5em;
   }
   .nv-opt button {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
     border: 1px solid rgba(0, 0, 0, 0.12);
     color: var(--ink);
   }
   .nv-opt button.is-on {
     border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .nv-panel ol button {
+    min-height: 2.75rem;
   }
 </style>

@@ -8,7 +8,7 @@
  */
 import type { Chapter, ChapterKind, PageRec, Work } from './types';
 import { sortedChapters } from './chapterOrder';
-import { langName } from './bookInfo';
+import { langLabel } from './bookInfo';
 
 type UiLang = 'ja' | 'en' | 'th';
 type T = (key: string) => string;
@@ -129,7 +129,7 @@ export function partNote(
   const orig = work.book_lang?.trim() || null;
   const sep = ui === 'ja' ? '・' : ' / ';
   const other = (list: string[] | undefined) => (list ?? []).filter((c) => c && c !== orig);
-  const names = (codes: string[]) => codes.map((c) => langName(c, ui)).join(sep);
+  const names = (codes: string[]) => codes.map((c) => langLabel(c, ui)).join(sep);
   if (part.kind === 'novel') {
     const langs = other(work.novel_langs);
     if (langs.length) return t('part.readsIn').replace('{lang}', names(langs));
@@ -137,5 +137,22 @@ export function partNote(
     const langs = other(work.translations);
     if (langs.length) return t('rd.transOn').replace('{lang}', names(langs));
   }
-  return orig ? t('part.origOnly').replace('{lang}', langName(orig, ui)) : '';
+  return orig ? t('part.origOnly').replace('{lang}', langLabel(orig, ui)) : '';
+}
+
+/**
+ * The overview's hero for a book whose part is a novel with text (vol. 2): the
+ * parts are the way in — the novel part (in the novel reader) and the manga part
+ * after it (in the page reader) — instead of one 「読み始める」 that opened the
+ * whole book as scanned pages, the Thai novel first. Indices into `parts`; manga
+ * is -1 when the book has none. Null keeps the ordinary hero.
+ */
+export function partsHero(
+  parts: Pick<BookPart, 'kind'>[],
+  hasText: boolean,
+): { novel: number; manga: number } | null {
+  const novel = parts.findIndex((p) => p.kind === 'novel');
+  if (novel < 0 || !hasText) return null;
+  const after = parts.findIndex((p, i) => i > novel && p.kind === 'manga');
+  return { novel, manga: after >= 0 ? after : parts.findIndex((p) => p.kind === 'manga') };
 }

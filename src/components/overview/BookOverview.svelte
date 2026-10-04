@@ -12,11 +12,12 @@
   import { tidyForeword } from '../../lib/foreword';
   import { frontOnly, cropImgStyle } from '../../lib/coverCrop';
   import { seriesRun, kindKey } from '../../lib/series';
-  import { novelProgress, resumeLabel } from '../../lib/novel';
+  import { novelProgress, novelToc, resumeLabel, chapterName } from '../../lib/novel';
+  import { langLabel } from '../../lib/bookInfo';
   import { lockReturn } from '../../lib/readerLink';
   import { inTimeline } from '../../data/timeline';
   import { bookInfo } from '../../lib/bookInfo';
-  import { bookParts, partLabel, partNote } from '../../lib/bookParts';
+  import { bookParts, partLabel, partNote, partsHero } from '../../lib/bookParts';
   import { shareLink } from '../../lib/share';
   import { i18n, type DictKey } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
@@ -87,12 +88,12 @@
     return work ? novelProgress(work.id, work.novel_langs, i18n.lang) : null;
   });
   // the novel reader opens in the reader's language when the text exists in it
-  const novelHref = $derived.by(() => {
+  const novelLang = $derived.by(() => {
     const langs = work?.novel_langs ?? [];
     if (!langs.length) return null;
-    const lang = novelSaved?.lang ?? (langs.includes(i18n.lang) ? i18n.lang : langs[0]);
-    return `/w/${slug}/novel?lang=${lang}`;
+    return novelSaved?.lang ?? (langs.includes(i18n.lang) ? i18n.lang : langs[0]);
   });
+  const novelHref = $derived(novelLang ? `/w/${slug}/novel?lang=${novelLang}` : null);
   const novelLabel = $derived(
     novelSaved ? resumeLabel(novelSaved.chapter, i18n.lang, (k) => i18n.t(k as DictKey)) : i18n.t('nv.read'),
   );
@@ -197,6 +198,70 @@
     openLock(() => partHref(bookParts(chapters, ordered).find((p) => p.id === part.id) ?? part), e);
   }
 
+  // --- A book whose part is a novel (vol. 2): the hero offers the PARTS — the
+  //     novel in the novel reader, the manga in the page reader — and the whole
+  //     book as scanned pages becomes a quiet link. 「読み始める」 opened those
+  //     scans of the Thai novel, and readers never learned the Japanese text
+  //     existed (lib/bookParts.ts partsHero). ---
+  const hero = $derived(showParts ? partsHero(parts, Boolean(novelHref)) : null);
+  const t = (k: string) => i18n.t(k as DictKey);
+  /** the page-reader place is inside the manga part (only knowable once the pages are in) */
+  const inManga = $derived.by(() => {
+    if (!hero || hero.manga < 0 || !continueAt) return false;
+    return ordered.find((p) => p.id === continueAt)?.chapterId === parts[hero.manga].id;
+  });
+  const heroNovelLabel = $derived.by(() => {
+    if (!hero) return '';
+    const part = partLabel(hero.novel + 1, i18n.lang);
+    if (novelSaved) return `${part} ${resumeLabel(novelSaved.chapter, i18n.lang, t)}`;
+    return t('ov.partNovel').replace('{part}', part).replace('{lang}', novelLang ? langLabel(novelLang, i18n.lang) : '');
+  });
+  const heroManga = $derived.by(() => {
+    if (!hero || hero.manga < 0) return null;
+    const p = parts[hero.manga];
+    const part = partLabel(hero.manga + 1, i18n.lang);
+    return inManga
+      ? { label: t('ov.partMangaResume').replace('{part}', part), href: continueHref }
+      : { label: t('ov.partManga').replace('{part}', part), href: partHref(p) ?? `/w/${slug}/read?ch=${encodeURIComponent(p.id)}` };
+  });
+  const origLabel = $derived(
+    t('ov.origPages').replace('{lang}', work?.book_lang ? langLabel(work.book_lang, i18n.lang) : ''),
+  );
+
+  // The novel's chapters under its part (the novel reader's 目次, lib/novel.ts
+  // novelToc), each a link into the reader there (?s=). A locked book's sections
+  // are hidden until this tab has the password: then the list comes through
+  // unlock_novel; before that, the part shows just its button.
+  let tocRows = $state<unknown[]>([]);
+  const novelChapters = $derived(novelHref && tocRows.length ? novelToc(tocRows, novelHref, t) : []);
+  let tocFor = '';
+  async function loadNovelToc() {
+    if (!work || !hero || !novelLang) return;
+    const key = `${work.id}:${novelLang}:${unlocked}`;
+    if (key === tocFor) return;
+    tocFor = key;
+    try {
+      let { data } = await supabase
+        .from('novel_sections')
+        .select('sort_key,title,lang')
+        .eq('work_id', work.id)
+        .eq('lang', novelLang)
+        .order('sort_key');
+      if (!data?.length && work.read_locked) {
+        const pass = loadUnlock(work.id);
+        if (!pass) return; // locked, and not opened in this tab: the button alone
+        ({ data } = await supabase.rpc('unlock_novel', { p_work_id: work.id, p_password: pass, p_lang: novelLang }));
+      }
+      if (key === tocFor) tocRows = (data ?? []) as unknown[];
+    } catch {
+      tocRows = []; // the part keeps its button
+    }
+  }
+  $effect(() => {
+    void [status, hero, novelLang, unlocked];
+    if (status === 'ready') void loadNovelToc();
+  });
+
   function openLock(href: string | (() => string | null) | null, e?: Event) {
     e?.preventDefault();
     pendingHref = href;
@@ -267,10 +332,27 @@
 
   // Fade the "scroll for more" cue once the reader starts scrolling.
   let scrolled = $state(false);
+  // The floating back chip + language switch: away while scrolling down, back on
+  // a solid chip scrolling up, as they were at the top (html[data-ovchrome]).
   $effect(() => {
-    const onScroll = () => (scrolled = window.scrollY > 40);
+    const html = document.documentElement;
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      scrolled = y > 40;
+      if (y < 80) {
+        delete html.dataset.ovchrome;
+        lastY = y;
+      } else if (Math.abs(y - lastY) > 8) {
+        html.dataset.ovchrome = y > lastY ? 'away' : 'solid';
+        lastY = y;
+      }
+    };
     window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      delete html.dataset.ovchrome;
+    };
   });
   function scrollDown() {
     document.getElementById('ov-more')?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
@@ -507,6 +589,39 @@
             <p class="ov-cw__items">{warnings.join('・')}</p>
           </div>
         {/if}
+        {#if hero && novelHref}
+          <!-- a book in parts with its novel as text: the parts are the way in,
+               the scanned pages a quiet link (see `hero`) -->
+          <div class="ov-hero__actions ov-hero__actions--parts" use:reveal={{ delay: 0.2 }}>
+            <a
+              class="ov-btn mono"
+              data-sfx="open"
+              href={novelHref}
+              onclick={(e) => locked && openLock(novelHref, e)}
+            >
+              {#if locked}<span aria-hidden="true">🔒 </span>{/if}{heroNovelLabel} →
+            </a>
+            {#if heroManga}
+              <a
+                class="ov-btn mono"
+                data-sfx="open"
+                href={heroManga.href}
+                onclick={(e) => locked && openLock(heroManga.href, e)}
+              >
+                {#if locked}<span aria-hidden="true">🔒 </span>{/if}{heroManga.label} →
+              </a>
+            {/if}
+            <button type="button" class="ov-btn ov-btn--ghost mono" onclick={share}>
+              {shareNote || i18n.t('ov.share')}
+            </button>
+            <span class="ov-live" aria-live="polite">{shareNote}</span>
+            <a
+              class="ov-quiet"
+              href={continueAt && !inManga ? continueHref : readHref}
+              onclick={(e) => locked && openLock(continueAt && !inManga ? continueHref : readHref, e)}
+            >{origLabel} <span aria-hidden="true">→</span></a>
+          </div>
+        {:else}
         <div class="ov-hero__actions" use:reveal={{ delay: 0.2 }}>
           <a
             class="ov-btn mono"
@@ -546,6 +661,7 @@
           </button>
           <span class="ov-live" aria-live="polite">{shareNote}</span>
         </div>
+        {/if}
         <!-- the place and the ここすき live in this browser only — say so where
              「続きから読む」 promises them -->
         <div class="ov-marknote" use:reveal={{ delay: 0.22 }}>
@@ -599,6 +715,17 @@
                     {#if note}<span class="ov-part__lang">{note}</span>{/if}
                   </p>
                 </div>
+                {#if part.kind === 'novel' && novelChapters.length}
+                  <!-- the novel's chapters, as its reader's 目次 lists them; each opens there -->
+                  <nav class="ov-part__toc" aria-label={i18n.t('ov.novelToc')}>
+                    <p class="mono ov-part__tocHead">{i18n.t('ov.novelToc')}</p>
+                    <ol class="ov-part__tocList">
+                      {#each novelChapters as c (c.index)}
+                        <li><a class="authored ov-part__ch" href={c.href} data-sfx="open">{c.title}</a></li>
+                      {/each}
+                    </ol>
+                  </nav>
+                {/if}
                 <a
                   class="ov-btn mono ov-part__go"
                   class:ov-btn--ghost={pi > 0}
@@ -1605,6 +1732,117 @@
   }
   .ov-marknote {
     max-width: 36em;
+  }
+  /* the novel's chapters, a full row under its part */
+  .ov-part__toc {
+    grid-column: 1 / -1;
+    order: 2;
+    display: grid;
+    gap: 0.4rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+  .ov-part__tocHead {
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    color: var(--fg-faint);
+  }
+  .ov-part__tocList {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    gap: 0.1rem 1.2rem;
+  }
+  .ov-part__ch {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0.2rem 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--fg);
+    font-size: 0.95rem;
+    line-height: 1.45;
+    text-decoration: none;
+    transition: color 0.25s var(--ease), border-color 0.25s var(--ease);
+  }
+  .ov-part__ch::after {
+    content: '→';
+    margin-left: auto;
+    padding-left: 0.8em;
+    color: var(--fg-faint);
+  }
+  @media (hover: hover) {
+    .ov-part__ch:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+  }
+  .ov-part__ch:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* the whole book as scanned pages: a quiet way in, under the parts */
+  .ov-hero__actions--parts .ov-quiet {
+    flex-basis: 100%;
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    min-height: 2.75rem;
+    width: fit-content;
+    font-family: var(--font-display-authored);
+    font-size: 0.86rem;
+    color: var(--fg-dim);
+    text-decoration: underline;
+    text-decoration-color: var(--line-strong);
+    text-underline-offset: 0.3em;
+  }
+  @media (hover: hover) {
+    .ov-hero__actions--parts .ov-quiet:hover {
+      color: var(--fg);
+      text-decoration-color: var(--accent);
+    }
+  }
+  .ov-hero__actions--parts .ov-quiet:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  /* The floating 「← 書庫」 and the language switch: over the text once scrolled
+     (they blend by difference and read as noise there). Scrolling down they step
+     away; scrolling up they come back on a solid chip. */
+  :global(html[data-ovchrome] .langbar),
+  .ov-backchip {
+    transition: opacity 0.25s var(--ease), translate 0.25s var(--ease), background-color 0.25s var(--ease);
+  }
+  :global(html[data-ovchrome='away'] .langbar),
+  :global(html[data-ovchrome='away']) .ov-backchip {
+    opacity: 0;
+    translate: 0 -150%;
+    pointer-events: none;
+  }
+  :global(html[data-ovchrome='solid'] .langbar),
+  :global(html[data-ovchrome='solid']) .ov-backchip {
+    mix-blend-mode: normal;
+    opacity: 1;
+    padding: 0.45rem 0.75rem;
+    background: var(--ink-bg, #0c0c0d);
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    color: var(--ink-fg);
+  }
+  :global(html[data-ovchrome='solid']) .ov-backchip {
+    translate: 0 -0.45rem;
+  }
+  :global(html[data-ovchrome='solid'] .langbar) {
+    translate: 0 -0.45rem;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(html[data-ovchrome] .langbar),
+    .ov-backchip {
+      transition: none;
+    }
   }
 
   /* ---- contents ---- */

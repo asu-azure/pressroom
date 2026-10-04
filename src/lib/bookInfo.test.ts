@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bookInfo, langName } from './bookInfo';
+import { bookInfo, langLabel, langName } from './bookInfo';
 
 const t = (k: string) => `<${k}>`;
 
@@ -12,6 +12,14 @@ describe('langName', () => {
 
   it('falls back to the code for junk', () => {
     expect(langName('!!', 'ja')).toBe('!!');
+  });
+});
+
+describe('langLabel', () => {
+  it('capitalises with the English chrome, leaves Japanese alone', () => {
+    expect(langLabel('ja', 'en')).toBe('JAPANESE');
+    expect(langLabel('th', 'th')).toBe('THAI');
+    expect(langLabel('th', 'ja')).toBe('タイ語');
   });
 });
 
@@ -40,9 +48,11 @@ describe('bookInfo', () => {
     // vol. 2: no manga translation, but the whole novel reads in Japanese — never なし
     const vol2 = { book_lang: 'th', translations: [], novel_langs: ['ja', 'th'] };
     expect(bookInfo(vol2, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('日本語（小説パート）');
-    expect(bookInfo(vol2, 'en', (k) => (k === 'ov.novelPart' ? 'novel part' : k)).find((i) => i.key === 'trans')!.value).toBe(
-      'Japanese (novel part)',
+    // the English chrome is capitals throughout — 'TRANSLATION Japanese (novel part)' mixed them
+    expect(bookInfo(vol2, 'en', (k) => (k === 'ov.novelPart' ? 'NOVEL PART' : k)).find((i) => i.key === 'trans')!.value).toBe(
+      'JAPANESE (NOVEL PART)',
     );
+    expect(bookInfo(vol2, 'en', (k) => k).find((i) => i.key === 'lang')!.value).toBe('THAI');
     // a language the pages are translated into already says it all
     expect(bookInfo({ ...vol2, translations: ['ja'] }, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('日本語');
     expect(bookInfo({ ...vol2, translations: ['en'] }, 'ja', t2).find((i) => i.key === 'trans')!.value).toBe('英語・日本語（小説パート）');

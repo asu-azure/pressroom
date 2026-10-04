@@ -237,6 +237,21 @@ visitors it is written for are Japanese; the books are Thai.
   locked, so titles and kinds show; ranges and landing pages wait for the pages (`bookParts(…, null)`),
   and a locked part's button hands LockGate a *function* (`pendingHref`), resolved once the
   unlocked rows are in.
+- **A book whose part is a novel with text leads with its parts** (`partsHero` in `lib/bookParts.ts`,
+  tested; vol. 2): the hero's buttons are 「第一部 小説を読む（日本語）」 (the novel reader; with a
+  saved place 「第一部 続きから読む（第三話）」) and 「第二部 マンガを読む」 (the page reader at that part;
+  「マンガの続きから」 when the page-reader place is inside it), then 共有; the whole book as pages is a
+  quiet link 「原本をページで見る（タイ語）」 (the saved page-reader place, else p.1). 「読み始める」 used to
+  open the scans of the Thai novel, and readers never learned the Japanese text existed. Other
+  books keep the plain hero.
+- **The novel's chapters under its part** (`novelToc` in `lib/novel.ts`, tested): はじまり, 第一話 …
+  第六話 — the novel reader's own 目次 (`chapters()`), titles in the language the novel button opens
+  in, each a link into the reader at that section (`?s=`). Read from `novel_sections` (titles only);
+  a locked book's sections are hidden, so the list appears once this tab has the password (through
+  `unlock_novel`, also right after the gate opens) — **before that the part shows just its button**.
+- **The floating 「← 書庫」 and language switch** (`html[data-ovchrome]`, BookOverview): they blend by
+  difference and read as noise over text, so scrolling down they step away and scrolling up they come
+  back on a solid ink chip; at the top they are as before.
 - **The novel button remembers** (`novelProgress` / `resumeLabel` in `lib/novel.ts`, tested): with a
   place saved in the novel reader (this browser only), the hero's novel button and the novel part's
   button read 「続きから読む（第三話）」 and open the novel in that place's language, where it resumes.
@@ -298,13 +313,14 @@ Which order to read the books in, and when each part is set — the books jump i
   front cover, Nº + year, every printing (`releaseLines`), format (マンガ / 小説+マンガ, from
   `works.formats`), 本編/外伝 and a link to its overview. A later book that joins the series
   (`series_title`) appears by itself. Offline: the data file's books, without covers or dates.
-- **物語の時系列** — three eras on a vertical line (子ども時代（チャンタブリー） · 3年後・中学1年（バンコク）
-  · さらに3年後・高校時代), each listing the part of each book set there with its reader page range, a
-  小説/マンガ tag, the point of view when the book says so, and a button: the novel reader for the
-  novel part, the page reader at the part's first page for manga (`?n=`, below). The line runs on,
-  dashed amber, to 「次は：フランクの物語（予定）」 (announced in vol. 1's afterword).
-- **Spoiler-free on purpose (the owner's call)**: eras, places and points of view only, never what
-  happens. Don't add events; era 3 deliberately names no place.
+- **物語の時系列** — three eras on a vertical line (子ども時代 · 3年後・中学1年 · さらに3年後・高校時代),
+  each listing the part of each book set there with its reader page range, a 小説/マンガ tag, the
+  point of view when the book says so, and a button: the novel reader for the novel part, the page
+  reader at the part's first page for manga (`?n=`, below). The line ends at the last era.
+- **Spoiler-free and uncommitted on purpose (the owner's calls)**: eras and points of view only —
+  no places (チャンタブリー / バンコク were removed 2026-10-05), never what happens, and nothing about
+  a book that isn't out: the closing 「次は：フランクの物語（予定）」 and its afterword credit were
+  removed, the owner won't commit to the next book. `timeline.test.ts` guards both.
 - **The content is a typed data file** (`src/data/timeline.ts`, JA + EN strings, `timeline.test.ts`):
   slugs, reader page ranges (inside the book, no page in two eras, the p.65→66 time skip), both
   languages present. Ranges are **reader pages** (cover = p.1, blanks counted), checked against the
@@ -726,19 +742,45 @@ that pages could be single or double, that the translation could be switched, th
 bookmark existed, or where they were kept. So:
 
 - **Every control in the top bar has its name under its icon, on every screen** (`.rc-tool`, labels
-  11px — never smaller): 翻訳 switch · 目次 (with chapters) · めくり/スクロール · ここすき · 一覧 (the page
-  grid) · 全画面 (not on touch phones) · 設定 (a drawn gear; it was "AA", which read as text size) ·
-  使い方. Phones (≤ 520px) drop the title and the note flag (the rail still shows the note) and get
-  one めくり/スクロール button showing the mode it is in; spacing is tuned so a 390-wide phone holds
-  the widest bar (原文 + スクロール) on one row — narrower ones wrap rather than lose a button, and
-  「← 概要」 never wraps. `:hover` is pointer-gated (it stuck after a tap and lit the switch's off).
+  11px — never smaller): ← 概要 (a 44px tool like the rest; the inline 「← 概要」 was a 39×17 target)
+  · 翻訳 switch · 目次 (with chapters) · めくり/スクロール · ここすき · 一覧 (the page grid) · 拡大 (mouse
+  only, below) · 全画面 (not on touch phones) · 設定 (a drawn gear; it was "AA", which read as text
+  size) · 使い方. Phones (≤ 520px) drop the title and the note flag (the rail still shows the note)
+  and get one mode button that draws both ways — book and scroll, the one in use lit — with its name
+  under them (a lone 「めくり」 read like "turn the page"). JA holds one row at 360 and 390; an English
+  bar at ≤ 420px shows ← ♡ ▦ gear ? 目次 as icons with their names in `title`/`aria-label` (it wrapped
+  to three rows at 360) — the switch and the mode keep their words. `:hover` is pointer-gated.
+- **拡大 — the page reader's zoom, visible** (`lib/readerUi.ts` `ZOOM_STEPS`/`zoomStep`, tested): the
+  lettering is small on some screens and nobody found ctrl+wheel. FlipSurface exports `zoomBy` /
+  `zoomFit` over its one existing zoom (pinch, ctrl/⌘+wheel) and reports the scale (`onZoom`). With a
+  mouse the bar has − 「100%」 ＋ (the % goes back to the whole page); keys + − 0 (never with ctrl/⌘);
+  phones keep pinch and get the same three buttons in 設定 → 表示. Steps 100–400 %, a press during the
+  animation steps on from where it is headed. Zoomed in, drag (and wheel, sideways too) pans and a
+  press never turns the page (the 'pan' gesture); ‹ › and the keys still turn, which resets it.
+  Flip mode only — scroll mode has no zoom.
+- **The address follows the page** (`readerSearch` in `lib/readerLink.ts`, tested): `?p=<page on
+  screen>` by `history.replaceState` (400 ms after a turn — Safari refuses > 100 calls in 30 s), and
+  `?n=`/`?ch=` dropped once used. The entry link outranks the saved place, so a reload (iOS reloads
+  background tabs) sent the reader back to the page they came in on. Arriving by a link also saves
+  the place at once (it waited for the first turn).
+- **「このパートは小説です」** (`novelCardDue`, tested): on a page of a novel part whose text exists in
+  the reader's language, a small card above the counter (not a wall — pages still turn) —
+  「…日本語の本文は小説リーダーで読めます」 + 「小説リーダーで読む」 / 「このまま原本を見る」. Dismissed, or left
+  behind by reading out of the part, it stays away for the session (`sessionStorage`
+  `pressroom:novelcard:{workId}`); the compact 「小説で読む →」 link stays in the counter row.
 - **The translation switch is a real toggle** (only when the book has bubbles): its label is its
   state, 「翻訳：日本語」 / 「原文：タイ語」 (`translationLabel`, tested; one shape for both, and the
   narrowest that fits). The old 「◫ 翻訳」 chip looked like a switch and did nothing.
-- **設定 is three named sections**: 表示 (単ページ/見開き, めくり/スクロール, 紙のめくり, ページの合わせ方,
-  SOUND), 翻訳 (on/off in the switch's words, 翻訳の出し方 + explanation), 画面の言語（ボタンの表示）
-  — readers took 言語 under 翻訳 for the translation's language. Then 「しおりについて」. The panel
-  scrolls on a short screen.
+- **設定 is three named sections**: 表示 (単ページ/見開き, めくり/スクロール, 紙のめくり（見開き） — shown in
+  double layout only, 拡大 on touch screens, ページの合わせ方, 効果音), 翻訳 (on/off in the switch's words,
+  翻訳の出し方 + explanation), 画面の言語（ボタンの表示） — readers took 言語 under 翻訳 for the
+  translation's language. Then 「しおりについて」. The panel scrolls on a short screen. **A tap outside
+  closes it and does nothing else** (a transparent scrim over the page and the bar — it used to turn
+  the page and stay open); Esc closes it too. The novel reader's panels behave the same.
+- **English labels are capitals throughout**: language names inside chrome labels go through
+  `langLabel` (`lib/bookInfo.ts`, tested) — 「IN JAPANESE」, 「ORIGINAL: THAI」, 「THAI ONLY (NOT
+  TRANSLATED)」, 「JAPANESE (NOVEL PART)」; mixed 「IN Japanese」 read as a mistake. Prose keeps
+  `langName`. 目次 is CHAPTERS everywhere in English (it was TOC in the bars).
 - **A phone held upright opens single pages** (`openingLayout`, tested; `NARROW_QUERY` is
   FlipSurface's own phone rule), whatever `works.default_layout` says; wide screens keep the
   default. A layout the reader picked in 設定 still wins — `ReaderSettings.layoutChosen` marks it,
@@ -749,7 +791,10 @@ bookmark existed, or where they were kept. So:
   the 3 s auto-hide as before. **A tap in the middle third shows or hides it** (FlipSurface
   `onMenu` → `toggleMenu`; the outer thirds turn) — on a phone there was no way to bring the bar back
   without turning the page. What counts is whether the bar was away when the press began (the
-  press itself wakes it). With a mouse, moving shows it, so a centre click hides it.
+  press itself wakes it). It works from the very first visit: a centre tap unpins the bar
+  (`onUnpin`; the guide promised it and nothing happened until a turn). With a mouse, a centre click
+  that hid it holds it hidden against the mouse's own small moves (`quietMoves`) — a press, a key or
+  the pointer at the top/bottom edge brings it back — so a centre click toggles too.
 - **The reading guide** (`ReadingGuide.svelte`, shared with the novel reader): four tips with drawn
   icons — tap left/right to turn (RTL-aware; scroll mode says scroll), the middle for the menu,
   設定 for layout/mode/translation, long-press for ここすき and where to find them (一覧 → ここすき).
@@ -757,26 +802,34 @@ bookmark existed, or where they were kept. So:
   reopens it. A tap anywhere or Esc closes it; `role="dialog"` + `aria-modal`, focus on the button,
   Tab stays there, focus goes back on close; the reader ignores keys while it is open. Reduced
   motion: no animation. The old first-visit toasts (mode, long-press) are gone — the guide says both.
+  **With a mouse** (`(hover: hover) and (pointer: fine)`) the tips say クリック, ← → keys and ‹ ›, and
+  設定's tip points at 拡大 (＋ key); on touch it mentions 拡大 and pinch. The card is centred by auto
+  margins and the overlay scrolls, and on a short wide screen (a phone on its side) the tips go two
+  across — centred by `place-items` its top was out of reach at 844×390.
 - **No ‹ › on touch screens** (`@media (hover: none)` in FlipSurface): they floated over the page
   edge and blurred the margin notes. Mice keep them.
 - **The first save says where it went**: the first page turn, or the first ここすき, toasts
   「…このブラウザに保存しました」 once per browser (hint key `saved`; scroll mode's mount report isn't a
   turn). **Every ここすき added also says where they live**: a second line 「「一覧」→「ここすき」で見られます」
   (the toast is `pre-line` and `width: max-content` — with `left: 50%` a shrink-to-fit box was capped
-  at half the screen and wrapped every few characters).
+  at half the screen and wrapped every few characters). **Toasts sit under the top bar**, never over
+  a control: at the bottom they covered the novel link and the counter on a phone.
 - **The drawers (一覧, 目次) close four ways**: a visible 「× 閉じる」 in a sticky bar at their top (in
   reach however far the grid scrolls), a tap on the dimmed page beside them (the drawer is 82–84vw on
   a phone — the grid used to cover 92% with a 31px strip as the only way out), Esc, or their button.
   Focus goes to × on open and back to the bar's button on close. Esc also closes 設定.
-- **「小説はテキストで読めます →」 is a pill above the page counter**, a real link, shown only on pages of
-  a novel part (`novelHere`, tested — a book whose chapters carry no kind keeps offering it
-  everywhere) and only when the text exists in the reader's language. It used to sit in the bar on
-  every page, manga included, looking like a label.
+- **「小説で読む →」 is a small pill in the page counter's row**, a real link (its tap area reaches
+  44px through an invisible extension), shown only on pages of a novel part (`novelHere`, tested — a
+  book whose chapters carry no kind keeps offering it everywhere) and only when the text exists in
+  the reader's language; hidden while the 「このパートは小説です」 card shows. It sat in the bar on every
+  page once, then as a pill above the counter that reached 28px into the page. The bottom bar is
+  `minmax(0, 1fr)`: a long part title ellipsises instead of pushing ◀ RTL off the screen.
 - **Deep links**: `?p=pageId` (thumbnails, parts, SHARE), `?ch=chapterId` — the start of a part
   (`partStart`), for the novel reader's last page — and `?n=66`, a page number (the timeline); the
   last two exist because a locked book's page rows are hidden. All win over saved progress, `p`
-  first. A locked reader that can't unlock goes to the overview with `?go=` (the gate opens and
-  brings the visitor back — see the overview section).
+  first — which is why the address is kept on the page being read (above). A locked reader that
+  can't unlock goes to the overview with `?go=` (the gate opens and brings the visitor back — see
+  the overview section).
 - The page-curl setting now reaches FlipSurface (it was passed to ScrollSurface, which has no such
   prop — 紙のめくり オフ did nothing). ScrollSurface's grid columns are `minmax(0, 1fr)`: in
   fit-height on a phone an auto track grew to a page's min-content and widened the document (and the
@@ -805,7 +858,7 @@ mode — renamed from 一覧, which is now the page grid's label) with a one-lin
   Not interactive (no `data-bub`): taps turn pages, long-press still faves. The rail shows notes
   only in this mode.
 - **notes**: the original hotspots + tooltips + the side rail.
-- **Page turns carry the lettering**: the curl and door overlays are CSS backgrounds, so FlipSurface
+- **Page turns carry the lettering**: the curl and cover overlays are CSS backgrounds, so FlipSurface
   clones the page's `.ts` layer (`inkOf`, boxed in % of the page) into the leaf, the still half and
   the pre-mirrored back (`CurlSetup.leafInk/staticInk/backInk`, `DoorSetup.ink`, `land.ink`).
   Without that the turning page showed Thai for the whole turn.
@@ -879,6 +932,20 @@ chip) even while the book is locked.
 - **The place carries its chapter's number** (`{section, block, chapter}` under `placeKey`, see the
   overview): the overview and the shelf say 「続きから読む（第三話）」 / 「小説しおり 第三話」 without
   reading a locked book's text. `parsePlace` ignores the extra field.
+- **A finished book is kept as finished** (`end: true`, `placeAtEnd`, tested): the last page holds no
+  paragraph, so nothing was saved there and Back from the manga landed a page short (144 / 145) — now
+  the last block is saved with `end`, and the reader opens on the last page again (both modes;
+  switching 縦/横 on it keeps it).
+- **`?s=<section index>`** (`sectionParam`, tested) opens at that section — the overview's chapter
+  list uses it — once: it is removed from the address straight away, so a reload resumes the saved
+  place.
+- **縦→横 keeps the place**: `blockEl` looks in the whole reader (`root`), not in the vertical strip —
+  after the switch the strip was gone and the reader landed on the title page at 0 % (横 resume and
+  目次 jumps were broken the same way).
+- **Its bar and 設定 match the page reader's**: 44px tools with their names under the icons (← 概要 ·
+  目次 · 設定 · 使い方; they were 28px text buttons), 設定 in named sections — 表示 (文字の向き 縦書き/横書き,
+  文字サイズ, 書体) and 画面の言語 — then 「しおりについて」 in its novel wording (`BookmarkNote kind="novel"`:
+  a place only — no ここすき in the novel). A tap outside a panel closes it (scrim), Esc too.
 - `.nv` pins its one column to `minmax(0, 1fr)`: an auto column grew to the bar's min-content (back +
   title + labelled tools) and the page pitch, measured from it, came out wider than a phone.
 - **The last page belongs to the book** (`novelSequel`, tested): when the book also has a manga part,
@@ -957,13 +1024,37 @@ chip) even while the book is locked.
   the right way round; otherwise it is the paper's reverse with the print showing through).
   The real `.si` boxes and their iOS width calc are never touched. Falls back to the slide for
   jumps, zoom > 1, reduced motion, unloaded images, or the PAGE CURL setting off
-  (`settings.curl`, default on). The long-press guard is unchanged.
-- **A single page turns like a door, not a fold** (`Door` in `curl.ts`): with one page on screen
-  a fold has no facing page to land on and ends as a loose sheet in the dark margin — the owner
-  found that strange. So the leaf rotates on its spine edge (left for LTR, right for RTL) under
-  perspective, front darkening, a shadow on the page below, fading out past 100°; going back, the
-  previous page swings in from the spine. Spreads keep the fold. `doorAngle`/`doorCommit` tested.
-  **Test on a real iPhone before trusting it** — the harness is desktop Chromium.
+  (`settings.curl`, default on — it means "curl for spreads": 設定 shows it in double layout only).
+  The long-press guard is unchanged.
+- **One page on screen slides; spreads curl** (`turnStyle` in `lib/readerUi.ts`, tested). Single
+  layout (phones) — including a forced spread shown there — and a lone page in double layout turn
+  as a plain horizontal slide in reading direction (RTL: the next page comes in from the left),
+  following the finger on a drag. The door swing that turned single pages (2026-10-04) looked odd on
+  a phone (the owner, 2026-10-05). Double layout keeps the spread curl and the closed cover's
+  opening (`Door` with `land`, below); reduced motion jumps. The plain `Door` (fade past 100°) and
+  `doorAngle`/`doorCommit` stay in `curl.ts`, tested, used only by the cover now.
+- **A turn asked for while one is drawn is never dropped** (FlipSurface `queued` + `Curl/Door.hurry()`):
+  a tap or ‹ › during a curl lands the running one on its next frame and then turns again — taps
+  300 ms apart used to lose every other one (6 taps → 3 pages).
+- **The black page (2026-10-05, vol. 1 p.18 on an iPhone)**: root cause in FlipSurface, reproduced in
+  WebKit (iPhone 13) and Chromium. `onPointerDown` stopped the track's slide (`killTweensOf`) on every
+  press, before knowing what the press was; a press that turned out to be a centre tap (menu), a
+  long press (ここすき) or a vertical swipe never restarted it, so the track stayed **between two
+  sheets — on the empty dark floor** — until the next turn; switching to scroll remounted it. Slides
+  ran where the door refused: on a phone, going back from p.20 onto the p.18–19 forced spread (single
+  layout shows it as one two-page sheet), and on every first placement, which slid from sheet 0
+  across all the unmounted sheets before it (a deep link to p.18 crossed 17 black screens, and a
+  tap then froze it there). Now a press only takes the track when it becomes a horizontal drag, any
+  gesture that ends without a turn puts it back (`settleTrack`), and the first placement, a resize
+  or a jump of more than one sheet is set at once, never slid.
+- **A page is never a black box** (`SheetImage`, `bust`/`LOAD_TIMEOUT` in `lib/readerUi.ts`): `.si` is
+  paper, not #101012; while the picture loads the blurred thumbnail sits on paper with a small loader
+  (after 350 ms, so quick loads don't flash it; the typeset lettering waits for the picture); a failed
+  load (error, or an eager picture still loading after 30 s) is retried once with `?r=1`, then the page says
+  「画像を読み込めませんでした」 with 「再読み込み」 (`data-nav`, so the tap isn't a page turn). Each picture ×
+  attempt is its own `<img>` (`{#key}`), so the clean swap or a retry starts from loading instead of
+  inheriting "loaded"; `decode()` and `complete` back up Safari's skipped load event. The preload
+  `<link>`s now keep only the ±2 window (they piled up for every page read).
 - **The book opens on its front cover, not the wraparound** (`src/lib/coverCrop.ts`, tested). The
   cover page is the whole wraparound and `works.cover_crop` marks the front; the reader used to
   show the whole sheet, so the first door turn hinged on the far edge of the back cover (the owner
@@ -989,9 +1080,12 @@ chip) even while the book is locked.
   facing page on its back, turning the full 180° (`COVER_MAX`) and landing exactly on that page
   (`landingPage` picks it across the spine; at 90°, edge-on, the leaf trades the cover's box for
   the page's — `mirrored`); until then that half shows the reader's floor, like a closed book on
-  a table. Closing runs it backwards. Single layout keeps the plain door. Tested geometry in
+  a table. Closing runs it backwards. Single layout slides (above). Tested geometry in
   `curl.test.ts`; harness frames checked on desktop and a 390-wide phone.
 - Reader harness (scratchpad, not in the repo): Playwright `page.route` serves a fake unlocked
   6-page book (works/pages/chapters REST + generated page images) — never the real DB, never a
   password. The UX harness (`ux-audit/lib.mjs`, `ux-phase1/run.mjs`) mocks both real books, vol. 2
-  split into its two parts, at iPhone 13 / 360 / 1440×900.
+  split into its two parts, at iPhone 13 / 360 / 1440×900. `ux-1b/` adds vol. 1's real forced
+  spreads (p.18–19, 48–49, 58–59), its lettered pages served locally so a picture can be slowed or
+  failed per request, and **Playwright WebKit** with the iPhone 13 profile (`npx playwright install
+  webkit` in the doujin tool folder) — the black page reproduced there, and in Chromium.
