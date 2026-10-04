@@ -11,7 +11,7 @@
 export const SOURCES = {
   starfall: {
     timeline: '../music/music-repo/visualizer/player2/songs/starfall-mv/timeline.json',
-    audio: '../music/starfall/final/HQ_starfall_nocturne_v07i.mp3',
+    audio: '../music/starfall/final/HQ_starfall_nocturne_v07j.mp3',
     motifMovement: 3, // IV. Hallway Echo
   },
 };
