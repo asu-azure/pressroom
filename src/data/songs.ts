@@ -49,8 +49,9 @@ export const SONGS: Song[] = [
     // cover F2 of music-repo/_work/cover_options (Jun, 4 Oct); the poster is the MV's own title frame
     art: { cover: 'starfall-cover', poster: 'starfall-screen' },
     copy: 'ost',
-    // A stand-in cut until the premiere is scheduled — swap for the final id.
-    mv: { youtube: 'YmjVI7A2gIs', offset: 0 },
+    // The MV as published (premiere 10 Oct 2026 21:00 JST). It starts on the song's own t = 0
+    // (the final render's audio is v07i from its first sample), so the room needs no offset.
+    mv: { youtube: 'XpEp6WpBBC8', offset: 0 },
     // Follows the MV's looks, darker for type.
     moods: [
       ['#241d16', '#0c0c0d', 'day'], // I     Prologue — memory
