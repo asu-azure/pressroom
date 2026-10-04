@@ -10,12 +10,18 @@
  *   twist  the charm turning on its chain (rotateY), a torsion spring; past a
  *          half turn you see the back (the QR).
  *
- *   - hover : the pointer brushes it; its speed is the push.
+ *   - hover : only the charm itself reacts, never the empty stage around it. A hand
+ *             that comes to rest on it steadies it (Jun, 4 Oct: it ran away from the
+ *             cursor and could never be picked up); only a quick swipe through it
+ *             brushes it, once per pass.
+ *   - press : catches it — the swing stops in your hand, the plate gives a little
+ *             (and a phone buzzes once). Let go without moving and it is a click.
  *   - drag  : hold the charm and the chain hangs from the hook to your hand —
  *             pull it taut, or bring it up and watch the chain go slack; a
  *             sideways flick spins it; letting go keeps the momentum.
  *   - scroll: a fast page scroll sets it swaying, like a keychain on a bag.
  *   - click : a click that was not a drag goes to `onPress`.
+ *   - settle(): bring it to rest, front face out (before the scan reads its code).
  *
  * The CSS lays out the resting pose; this only adds offsets, so the page is
  * right before (and without) any script. No frame loop at rest; reduced motion
@@ -31,6 +37,8 @@ export interface DangleHandle {
   destroy(): void;
   /** Give it a push: swing and twist, in degrees per second. */
   nudge(swing: number, twist?: number): void;
+  /** Calm it and turn the front face out; resolves once it hangs still (≤ 1.2 s). */
+  settle(): Promise<void>;
 }
 
 const LINKS = 12;
@@ -42,7 +50,7 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
   const charm = stage.querySelector<HTMLElement>('[data-kc]');
   const beads = [...stage.querySelectorAll<HTMLElement>('.kc__bead')];
   const links = stage.querySelector<SVGPolylineElement>('[data-kc-links]');
-  const noop: DangleHandle = { destroy() {}, nudge() {} };
+  const noop: DangleHandle = { destroy() {}, nudge() {}, settle: () => Promise.resolve() };
   if (!charm) return noop;
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -110,8 +118,23 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
   // --- simulation ----------------------------------------------------------------------
   let held = false;
   let hold = { x: 0, y: 0 };
+  // calming: a hand resting on it (until `steadyUntil`), or settle() bringing it to rest
+  let steadyUntil = 0;
+  let settling = false;
 
   const step = () => {
+    const calm = settling ? 0.88 : performance.now() < steadyUntil ? 0.955 : 1;
+    if (calm < 1) {
+      om *= calm;
+      twv *= calm;
+    }
+    if (settling) {
+      // turn back to the front face, the short way round
+      const t = ((((tw + face) % 360) + 540) % 360) - 180;
+      face = 0;
+      tw = t;
+      twv += -60 * tw * DT;
+    }
     const end = rope[LINKS];
     if (held) {
       // the hand holds the ring's end; the chain can't be stretched past its length
@@ -123,7 +146,7 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
       end.x = anchor.x + dx * k;
       end.y = anchor.y + dy * k;
     }
-    stepRope(rope, link, g, DT);
+    stepRope(rope, link, g, DT, calm < 1 ? 0.985 * calm : 0.985);
 
     // the ring's acceleration drives the pendulum (and the charm tugs it back)
     const ax = (end.x - 2 * lastEnd.x + lastEnd2.x) / (DT * DT);
@@ -166,13 +189,22 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
     }
   };
 
-  // --- hover: brush it --------------------------------------------------------------
+  // --- hover: a hand on it -----------------------------------------------------------
+  // Only the charm reacts — the stage around it is much bigger, and pushing it from
+  // there made it swing away before the pointer ever arrived. On the charm, a slow
+  // hand steadies it so it can be picked up; a quick swipe through brushes it once.
   let lastX = 0;
   let lastT = 0;
+  let brushed = false;
   const local = (e: PointerEvent) => {
     const r = stage.getBoundingClientRect();
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
+  const onCharm = (e: PointerEvent, pad = 10) => {
+    const r = charm.getBoundingClientRect();
+    return e.clientX > r.left - pad && e.clientX < r.right + pad && e.clientY > r.top - pad && e.clientY < r.bottom + pad;
+  };
+  const SWIPE = 700; // px/s: slower than this is a hand coming to rest
   const onMove = (e: PointerEvent) => {
     const now = performance.now();
     const dt = Math.max(8, now - lastT);
@@ -181,15 +213,32 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
     lastT = now;
     if (pressed) return drag(e, vx);
     if (e.pointerType !== 'mouse') return;
-    const push = Math.max(-900, Math.min(900, vx));
+    const now_over = onCharm(e);
+    stage.classList.toggle('is-over', now_over);
+    if (!now_over) {
+      brushed = false;
+      return;
+    }
+    if (Math.abs(vx) < SWIPE) {
+      steadyUntil = now + 220;
+      kick();
+      return;
+    }
+    if (brushed) return;
+    brushed = true;
+    const push = Math.max(-1100, Math.min(1100, vx)) * 0.55;
     rope[LINKS].px -= push * DT * 0.02;
     om += push * 0.0012;
-    twv += push * 0.03;
+    twv += push * 0.01;
     kick();
   };
-  const onLeave = () => (lastT = 0);
+  const onLeave = () => {
+    lastT = 0;
+    brushed = false;
+    stage.classList.remove('is-over');
+  };
 
-  // --- drag: hold it --------------------------------------------------------------------
+  // --- press: catch it; drag: hold it -----------------------------------------------------
   let pressed = false;
   let dragging = false;
   let start = { x: 0, y: 0 };
@@ -197,24 +246,34 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
   let suppress = false;
   const onDown = (e: PointerEvent) => {
     if (e.button !== 0) return;
+    // a press beside the charm is not a grab: it stays a plain click on the stage
+    if (!onCharm(e, e.pointerType === 'mouse' ? 10 : 24)) return;
     pressed = true;
     dragging = false;
     start = { x: e.clientX, y: e.clientY };
     const p = local(e);
     const end = rope[LINKS];
     grab = { x: p.x - end.x, y: p.y - end.y };
+    // caught: the swing stops in the hand, the plate gives a little
+    held = true;
+    hold = { x: end.x, y: end.y };
+    stage.classList.add('is-held');
+    if (e.pointerType !== 'mouse') navigator.vibrate?.(8);
+    kick();
   };
   function drag(e: PointerEvent, vx: number) {
     if (!dragging) {
       const dx = e.clientX - start.x;
       const dy = e.clientY - start.y;
       if (Math.abs(dy) > DRAG_THRESHOLD && Math.abs(dy) > Math.abs(dx) && e.pointerType !== 'mouse') {
-        pressed = false; // a vertical touch move is the page scrolling
+        // a vertical touch move is the page scrolling: let go
+        pressed = held = false;
+        stage.classList.remove('is-held');
+        kick();
         return;
       }
       if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
       dragging = true;
-      held = true;
       suppress = true;
       stage.setPointerCapture(e.pointerId);
       stage.classList.add('is-dragging');
@@ -225,10 +284,19 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
     kick();
   }
   const onUp = (e: PointerEvent) => {
+    const wasHeld = held;
     pressed = false;
-    if (!dragging) return;
-    dragging = false;
     held = false;
+    stage.classList.remove('is-held');
+    if (!dragging) {
+      // a tap: it was caught and let go in place — it hangs on, calmer than before
+      if (wasHeld) {
+        steadyUntil = performance.now() + 400;
+        kick();
+      }
+      return;
+    }
+    dragging = false;
     stage.classList.remove('is-dragging');
     if (stage.hasPointerCapture(e.pointerId)) stage.releasePointerCapture(e.pointerId);
     // settle on whichever face the spin is nearer to
@@ -281,6 +349,21 @@ export function dangle(stage: HTMLElement, opts: DangleOptions = {}): DangleHand
       om += (s * Math.PI) / 180;
       twv += t;
       kick();
+    },
+    settle() {
+      settling = true;
+      kick();
+      return new Promise<void>((done) => {
+        const t0 = performance.now();
+        const check = () => {
+          const still = ropeEnergy(rope) < 0.05 && Math.abs(om) < 0.02 && Math.abs(th) < 0.01 && Math.abs(tw) < 0.6;
+          if (still || performance.now() - t0 > 1200) {
+            settling = false;
+            done();
+          } else requestAnimationFrame(check);
+        };
+        requestAnimationFrame(check);
+      });
     },
     destroy() {
       cancelAnimationFrame(raf);

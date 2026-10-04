@@ -507,21 +507,31 @@ export function initSongPage() {
     scanning = true;
     const code = document.querySelector<HTMLElement>('#ost .kc__front [data-kc-wave]');
     const art = document.querySelector<HTMLElement>('#ost .kc__front .kc__art');
-    const r = code?.getBoundingClientRect();
-    if (r && !reduced) {
-      // the viewfinder closes on the code, then a line reads it and the bars light
-      finder.style.setProperty('--fx', `${r.left}px`);
-      finder.style.setProperty('--fy', `${r.top}px`);
-      finder.style.setProperty('--fw', `${r.width}px`);
-      finder.style.setProperty('--fh', `${r.height}px`);
+    if (code && !reduced) {
+      // Hold it still, front out, before reading: measured mid-swing (or showing its back)
+      // the viewfinder landed beside the code (Jun, 4 Oct). It then follows the code
+      // every frame, so any last sway carries the finder with it.
+      await kc.settle();
+      let follow = 0;
+      const place = () => {
+        const r = code.getBoundingClientRect();
+        finder.style.setProperty('--fx', `${r.left}px`);
+        finder.style.setProperty('--fy', `${r.top}px`);
+        finder.style.setProperty('--fw', `${r.width}px`);
+        finder.style.setProperty('--fh', `${r.height}px`);
+        follow = requestAnimationFrame(place);
+      };
+      place();
       finder.classList.add('is-on');
       await wait(320);
       finder.classList.add('is-reading');
-      code!.classList.add('is-scanning');
+      code.classList.add('is-scanning');
       await wait(520);
       chime();
       await wait(140);
+      cancelAnimationFrame(follow);
     }
+    const r = code?.getBoundingClientRect();
     if (r) {
       document.documentElement.style.setProperty('--scan-x', `${r.left + r.width / 2}px`);
       document.documentElement.style.setProperty('--scan-y', `${r.top + r.height / 2}px`);

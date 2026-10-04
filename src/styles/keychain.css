@@ -18,8 +18,10 @@
   perspective: 1400px;
   perspective-origin: 50% 30%;
   touch-action: pan-y;
-  cursor: grab;
 }
+/* only the charm is something to take hold of (dangle.ts sets these) */
+.kc__stage.is-over { cursor: grab; }
+.kc__stage.is-held,
 .kc__stage.is-dragging { cursor: grabbing; }
 
 /* the resting geometry, shared by the chain, the charm and the physics */
@@ -113,6 +115,12 @@
   width: var(--W);
   height: var(--H);
   transform-style: preserve-3d;
+  transition: scale 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+/* caught in the hand: the plate gives a little, and springs back on release */
+.kc__stage.is-held .kc__body { scale: 0.965; transition-duration: 0.12s; }
+@media (prefers-reduced-motion: reduce) {
+  .kc__body { transition: none; }
 }
 
 .kc__face {
