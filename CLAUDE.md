@@ -224,7 +224,7 @@ With no crop, the back is plain stock. Binding side comes from the wraparound, e
 
 ### The book overview (`/w/[slug]`, `BookOverview.svelte`)
 
-Order: hero → (この本の構成) → 収録内容 → 登場人物 → spoiler band + あらすじ → シリーズ → foot. The
+Order: hero → (この本の構成) → 収録内容 → 登場人物 (a night set, below) → spoiler band + あらすじ → シリーズ → foot. The
 visitors it is written for are Japanese; the books are Thai.
 
 - **この本の構成** (`lib/bookParts.ts`, tested): a book with 2+ chapters lists its parts above the
@@ -285,6 +285,31 @@ visitors it is written for are Japanese; the books are Thai.
 - **Locked contents is one bar**, not a box: with no `password_hint` it says 限定公開 — 合言葉を
   お持ちの方のみ読めます and never where the password comes from (the owner hands it out in closed
   circles). LockGate says the same.
+- **登場人物 is a night set in the STARFALL MV's language** (`CastStage.svelte`, rules in
+  `lib/castView.ts`, tested; the owner asked for "beautiful, with style, like the MV"). Letterbox
+  bars, static bokeh, window-light beams (scrubbed sideways), faint grain, and the title in front of
+  a slit of light — the series' door left ajar. Each **main** character (`Character.main`; none
+  marked → the first two) is a scene: a taped photo print of `portraitUrl` (else the first gallery
+  image, else the icon) with the name hand-written on its margin, their `quote` set vertically
+  beside it with （name） above — the MV's subtitles — then role · `age`, the name (Japanese large,
+  Latin spaced under it — `splitName` reads the Studio's 「タイム/Time」), the real name, the
+  spoiler-free `bio` and 「プロフィールを見る」. Scenes alternate sides; two lights ride an orbit behind
+  the first two (the MV's pair of stars, scrubbed). The rest are smaller prints pinned in a row.
+  **Black-and-white art is duotoned in CSS** (`portraitMono`): ink → a deep shade of the
+  character's colour, paper → warm cream, plus a corner light leak; colour art lends the set its
+  own light (the picture blurred behind the scene). The file keeps the real picture. Motion: prints
+  drop in and settle, the line is written top to bottom (clip), names converge — all reversible or
+  scrubbed, final state under reduced motion. The prints never zoom their picture; hover lifts the
+  paper.
+  **The cast sits above the spoiler band, so `bio` is spoiler-free**; what the book reveals goes in
+  `secret`, shown in the cast file behind 「⚠ ネタバレを含むプロフィール」 (a `<details>`). The file also
+  shows `age`, the `quote` and the portrait first in its gallery (`galleryOf`). Studio's character
+  editor has every field (main, age, line, portrait + B/W switch, spoilers).
+  Faces: `PR Cast Mincho` (Shippori Mincho B1) for names, titles and lines, `PR Cast Hand` (ダーツ
+  フォント — the MV's handwriting) for the print captions — renamed OFL subsets cut by
+  `scripts/cast-fonts.py` from `scripts/cast-glyphs.txt`, which writes `src/styles/cast-fonts.css`
+  (exact unicode-range: a missing kanji falls through to the authored stack). Imported by the
+  overview page only. **Add a new name's kanji to cast-glyphs.txt and re-run the script.**
 - **The synopsis stays open** (the owner's call) behind a full-width amber spoiler band with a skip
   link to `#ov-after` (the series section, or the foot). The section nav comes after the band —
   book 1's headings are spoilers themselves.

@@ -22,6 +22,7 @@
   import { i18n, type DictKey } from '../../lib/i18n.svelte';
   import LangBar from '../library/LangBar.svelte';
   import CastFile from './CastFile.svelte';
+  import CastStage from './CastStage.svelte';
   import LockGate from './LockGate.svelte';
   import BookmarkNote from '../reader/BookmarkNote.svelte';
   import { hasProfile } from '../../lib/types';
@@ -841,48 +842,9 @@
     </div>
   </section>
 
-  <!-- ACT III: cast — who's who (paper) -->
+  <!-- ACT III: cast — who's who, staged like the STARFALL MV (night set) -->
   {#if castList.length}
-    <section class="ov-cast spread spread--paper">
-      <div class="paper-grid" aria-hidden="true"></div>
-      <div class="crop crop--tl" aria-hidden="true"></div>
-      <div class="crop crop--tr" aria-hidden="true"></div>
-      <div class="crop crop--bl" aria-hidden="true"></div>
-      <div class="crop crop--br" aria-hidden="true"></div>
-      <div class="regmark ov-cast__reg" aria-hidden="true"></div>
-      <span class="watermark ov-cast__wm" aria-hidden="true">登場人物</span>
-      <div class="ov-cast__inner">
-        <header class="ov-cast__head" use:reveal>
-          <span class="index-num" aria-hidden="true">人</span>
-          <h2 class="serif ov-cast__title" use:headingIn use:converge>{i18n.t('ov.cast')}</h2>
-          <span class="ov-cast__rule" aria-hidden="true"></span>
-          <span class="mono">{pad2(castList.length)}</span>
-        </header>
-        <div class="ov-cast__grid" use:revealChildren>
-          {#each castList as c, i (c.id)}
-            <button
-              type="button"
-              class="ov-castTile"
-              style={`--c:${c.color}`}
-              onclick={() => openCast(i)}
-            >
-              <span class="ov-castTile__frame">
-                {#if c.iconUrl}
-                  <img src={c.iconUrl} alt="" loading="lazy" draggable="false" />
-                {:else}
-                  <span class="serif authored ov-castTile__ph" aria-hidden="true">{c.name.slice(0, 1)}</span>
-                {/if}
-                <span class="mono ov-castTile__num">{pad2(i + 1)}</span>
-              </span>
-              <span class="serif authored ov-castTile__name">{c.name}</span>
-              {#if c.role}
-                <span class="mono ov-castTile__role">{c.role}</span>
-              {/if}
-            </button>
-          {/each}
-        </div>
-      </div>
-    </section>
+    <CastStage cast={castList} onOpen={openCast} />
   {/if}
 
   <!-- ACT IV: synopsis — the spoiler leaf, last before the imprint (paper) -->
@@ -1256,142 +1218,6 @@
     /* the front is portrait: a little narrower keeps the title in the first screen */
     .ov-hero__cover.is-cropped {
       max-width: min(58vw, 15rem);
-    }
-  }
-
-  /* ---- cast (paper leaf: who's who) ---- */
-  .ov-cast {
-    position: relative;
-    z-index: 1;
-    padding: clamp(5rem, 12vh, 8rem) var(--pad);
-    isolation: isolate;
-    overflow: hidden;
-  }
-  .ov-cast__reg {
-    top: 2.4rem;
-    left: 10%;
-  }
-  .ov-cast__wm {
-    top: 6%;
-    right: 3%;
-    font-size: clamp(5rem, 16vw, 13rem);
-  }
-  .ov-cast__inner {
-    position: relative;
-    z-index: 2;
-    max-width: 1100px;
-    margin: 0 auto;
-    display: grid;
-    gap: clamp(1.8rem, 4.5vh, 2.8rem);
-  }
-  .ov-cast__head {
-    display: flex;
-    align-items: baseline;
-    gap: 1.2rem;
-    position: relative;
-  }
-  .ov-cast__head .index-num {
-    position: absolute;
-    top: -0.55em;
-    left: -0.12em;
-    z-index: -1;
-    font-size: clamp(5rem, 13vw, 9rem);
-  }
-  .ov-cast__title {
-    font-size: clamp(1.8rem, 4.5vw, 2.8rem);
-  }
-  .ov-cast__rule {
-    flex: 1;
-    height: 1px;
-    background: var(--line-strong);
-  }
-  .ov-cast__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(clamp(7.5rem, 17vw, 10.5rem), 1fr));
-    gap: clamp(0.9rem, 2.2vw, 1.6rem);
-  }
-  /* Roster tile — the art site's gallery-tile recipe, framed in the
-     character's own colour. */
-  .ov-castTile {
-    display: grid;
-    gap: 0.55rem;
-    padding: 0;
-    background: none;
-    border: 0;
-    cursor: pointer;
-    text-align: left;
-    color: var(--fg);
-  }
-  .ov-castTile__frame {
-    position: relative;
-    display: block;
-    aspect-ratio: 1;
-    border: 1px solid var(--line-strong);
-    background: var(--bg-soft);
-    overflow: hidden;
-  }
-  .ov-castTile__frame img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: transform 0.65s var(--ease), filter 0.65s var(--ease);
-  }
-  .ov-castTile__frame::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border: 2px solid var(--c, var(--accent));
-    opacity: 0;
-    transition: opacity 0.3s var(--ease);
-    pointer-events: none;
-  }
-  /* Pointer-gated: cast tiles are buttons, and an unguarded :hover makes the
-     first tap on a phone do nothing but paint this state. */
-  @media (hover: hover) {
-    .ov-castTile:hover .ov-castTile__frame img {
-      transform: scale(1.06);
-    }
-    .ov-castTile:hover .ov-castTile__frame::after {
-      opacity: 1;
-    }
-  }
-  .ov-castTile:focus-visible .ov-castTile__frame img {
-    transform: scale(1.06);
-  }
-  .ov-castTile:focus-visible .ov-castTile__frame::after {
-    opacity: 1;
-  }
-  .ov-castTile__ph {
-    position: absolute;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    font-size: clamp(2.6rem, 7vw, 4rem);
-    font-style: italic;
-    color: color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
-    user-select: none;
-  }
-  .ov-castTile__num {
-    position: absolute;
-    top: 4px;
-    left: 5px;
-    font-size: 0.52rem;
-    color: #f4f1ea;
-    mix-blend-mode: difference;
-  }
-  .ov-castTile__name {
-    font-size: clamp(1.02rem, 1.8vw, 1.25rem);
-    line-height: 1.25;
-  }
-  .ov-castTile__role {
-    font-size: 0.55rem;
-    color: var(--fg-faint);
-  }
-  @media (max-width: 640px) {
-    .ov-cast__wm {
-      display: none;
     }
   }
 

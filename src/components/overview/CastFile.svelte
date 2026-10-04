@@ -3,6 +3,7 @@
   import { i18n } from '../../lib/i18n.svelte';
   import { toRichHtml } from '../../lib/richtext';
   import { assemble } from '../../scripts/text';
+  import { galleryOf, splitName } from '../../lib/castView';
   import type { Character } from '../../lib/types';
 
   let {
@@ -22,10 +23,10 @@
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const ch = $derived(characters[index]);
-  const gallery = $derived(
-    ch.images?.length ? ch.images : ch.iconUrl ? [{ url: ch.iconUrl, caption: undefined }] : [],
-  );
+  const gallery = $derived(galleryOf(ch));
+  const nm = $derived(splitName(ch.name));
   const bioHtml = $derived(ch.bio ? toRichHtml(ch.bio) : '');
+  const secretHtml = $derived(ch.secret ? toRichHtml(ch.secret) : '');
 
   let galleryIdx = $state(0);
   let frame: HTMLElement;
@@ -162,7 +163,7 @@
 
 <svelte:window onkeydown={onKey} />
 
-<div class="cf" role="dialog" aria-modal="true" aria-label={`${i18n.t('cast.file')} — ${ch.name}`}>
+<div class="cf" role="dialog" aria-modal="true" aria-label={`${i18n.t('cast.file')} — ${nm.ja}`}>
   <button class="cf__backdrop" bind:this={backdrop} aria-label={i18n.t('cast.close')} onclick={requestClose}></button>
 
   <!-- data-lenis-prevent: a stopped Lenis preventDefaults every touch/wheel it
@@ -223,21 +224,35 @@
         </div>
 
         <div class="cf__text">
-          {#if ch.role}
-            <p class="mono cf__role" use:sweep><span class="cf__roleIn">{ch.role}</span></p>
+          {#if ch.role || ch.age}
+            <p class="mono cf__tags">
+              {#if ch.role}<span class="cf__role" use:sweep><span class="cf__roleIn">{ch.role}</span></span>{/if}
+              {#if ch.age}<span class="cf__age">{ch.age}</span>{/if}
+            </p>
           {/if}
-          <h2 class="serif cf__name" use:nameIn>{ch.name}</h2>
+          <h2 class="cf__name" use:nameIn>{nm.ja}</h2>
+          {#if nm.en}<p class="cf__en">{nm.en}</p>{/if}
           {#if ch.realName}
-            <p class="serif cf__realName">
-              <span class="mono cf__realNameLabel" aria-hidden="true">本名 —</span>
+            <p class="serif authored cf__realName">
+              <span class="mono cf__realNameLabel">{i18n.t('cast.realName')}</span>
               {ch.realName}
             </p>
           {/if}
           <span class="cf__rule" aria-hidden="true"></span>
+          {#if ch.quote}
+            <blockquote class="cf__quote" lang="ja"><p>「{ch.quote}」</p></blockquote>
+          {/if}
           {#if bioHtml}
-            <div class="cf__bio serif">
+            <div class="cf__bio serif authored">
               {@html bioHtml}
             </div>
+          {/if}
+          {#if secretHtml}
+            <details class="cf__secret">
+              <summary class="mono"><span aria-hidden="true">⚠</span> {i18n.t('cast.secret')}</summary>
+              <p class="cf__secretNote">{i18n.t('cast.secretNote')}</p>
+              <div class="cf__bio serif authored">{@html secretHtml}</div>
+            </details>
           {/if}
         </div>
       </div>
@@ -439,12 +454,24 @@
     min-width: 0;
   }
   /* Selection-invert sweep: a char-coloured box wipes across the role label. */
+  .cf__tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.9rem;
+    margin: 0;
+  }
+  .cf__age {
+    font-size: 0.6875rem;
+    letter-spacing: 0.2em;
+    color: rgba(244, 241, 234, 0.6);
+  }
   .cf__role {
     position: relative;
     display: inline-block;
     justify-self: start;
     --sw: 0;
-    font-size: 0.62rem;
+    font-size: 0.6875rem;
     letter-spacing: 0.26em;
     color: #0c0c0d;
     padding: 0.35em 0.6em;
@@ -462,21 +489,77 @@
     opacity: calc(0.25 + var(--sw) * 0.75);
   }
   .cf__name {
+    font-family: 'PR Cast Mincho', var(--font-serif-authored);
+    font-weight: 400;
     font-size: clamp(2.2rem, 5.5vw, 3.8rem);
     line-height: 1.08;
-    letter-spacing: -0.01em;
+    letter-spacing: 0.12em;
     overflow-wrap: anywhere;
+  }
+  .cf__en {
+    margin: -0.35rem 0 0;
+    font-family: var(--font-display);
+    font-weight: 300;
+    font-size: 0.8rem;
+    letter-spacing: 0.55em;
+    text-transform: uppercase;
+    color: color-mix(in srgb, var(--c) 45%, #f4f1ea);
+  }
+  .cf__quote {
+    margin: 0.2rem 0 0.4rem;
+    padding-left: 1rem;
+    border-left: 2px solid color-mix(in srgb, var(--c) 70%, #f4f1ea);
+  }
+  .cf__quote p {
+    margin: 0;
+    font-family: 'PR Cast Mincho', var(--font-serif-authored);
+    font-size: clamp(1.05rem, 1.6vw, 1.25rem);
+    line-height: 1.8;
+    letter-spacing: 0.06em;
+    color: #f4f1ea;
+  }
+  .cf__secret {
+    border-top: 1px solid rgba(244, 241, 234, 0.14);
+    padding-top: 0.9rem;
+  }
+  .cf__secret summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    min-height: 44px;
+    padding: 0 1rem;
+    border: 1px solid rgba(232, 163, 26, 0.55);
+    border-radius: 999px;
+    color: #e8a31a;
+    font-size: 0.6875rem;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    list-style: none;
+  }
+  .cf__secret summary::-webkit-details-marker {
+    display: none;
+  }
+  .cf__secret[open] summary {
+    background: rgba(232, 163, 26, 0.12);
+  }
+  .cf__secret summary:focus-visible {
+    outline: 2px solid #e8a31a;
+    outline-offset: 3px;
+  }
+  .cf__secretNote {
+    margin: 0.8rem 0 0.6rem;
+    font-size: 0.8rem;
+    color: rgba(244, 241, 234, 0.5);
   }
   /* Real name rides beneath the nickname — present but secondary. */
   .cf__realName {
     margin-top: -0.3rem;
-    font-size: clamp(1.05rem, 1.8vw, 1.35rem);
-    font-style: italic;
-    color: rgba(244, 241, 234, 0.55);
+    font-size: clamp(0.95rem, 1.5vw, 1.1rem);
+    color: rgba(244, 241, 234, 0.6);
     overflow-wrap: anywhere;
   }
   .cf__realNameLabel {
-    font-size: 0.55rem;
+    font-size: 0.6875rem;
     font-style: normal;
     letter-spacing: 0.2em;
     color: color-mix(in srgb, var(--c) 75%, #f4f1ea);

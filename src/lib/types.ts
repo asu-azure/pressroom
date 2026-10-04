@@ -27,12 +27,20 @@ export interface Character {
   role?: string; // mono micro-label, e.g. "PROTAGONIST"
   iconUrl?: string; // square face crop for the roster tile
   images?: CastImage[]; // profile gallery, ordered
-  bio?: string; // rich HTML — sanitized through richtext.ts before render
+  bio?: string; // rich HTML — sanitized through richtext.ts before render. Spoiler-free:
+  //               the cast sits above the overview's spoiler warning
+  // The cast stage (CastStage.svelte, lib/castView.ts) — all optional, old rows just work:
+  main?: boolean; // gets a full scene; none marked → the first two do
+  age?: string; // short label for this book, e.g. 「13歳・中学1年」
+  quote?: string; // one of their lines from the book, set vertically beside the picture
+  secret?: string; // rich HTML — the spoiler half of the profile, behind a toggle in the file
+  portraitUrl?: string; // the card's picture (4:5); else the first gallery image, else the icon
+  portraitMono?: boolean; // black-and-white art: the card tints it in the character's colour
 }
 
 /** Cast-page visibility: bubble-only mob characters stay hidden automatically. */
 export function hasProfile(c: Character): boolean {
-  return Boolean(c.iconUrl || c.bio || c.images?.length);
+  return Boolean(c.iconUrl || c.bio || c.images?.length || c.portraitUrl);
 }
 
 /**
