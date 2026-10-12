@@ -71,6 +71,27 @@ describe('bookInfo', () => {
     expect(bookInfo({ released_on: '2026-03-08' }, 'en', t).find((i) => i.key === 'release')!.value).toBe('Mar 2026');
   });
 
+  it('credits sit right after the translation, the role in the chrome’s language', () => {
+    const nagi = { ja: '日本語校正', en: 'Japanese proofreading', name: 'なぎ' };
+    const vol1 = { book_lang: 'th', translations: ['ja'], formats: ['manga' as const], credits: [nagi] };
+    expect(bookInfo(vol1, 'ja', t).map((i) => [i.key, i.label, i.value])).toEqual([
+      ['lang', '<ov.origLang>', 'タイ語'],
+      ['trans', '<rd.translate>', '日本語'],
+      ['credit-0', '日本語校正', 'なぎ'],
+      ['format', '<ov.format>', '<fmt.manga>'],
+    ]);
+    // the English chrome (and the Thai, which reads it) speaks in capitals; the name stays as written
+    expect(bookInfo(vol1, 'en', t).find((i) => i.key === 'credit-0')).toMatchObject({ label: 'JAPANESE PROOFREADING', value: 'なぎ' });
+    expect(bookInfo(vol1, 'th', t).find((i) => i.key === 'credit-0')!.label).toBe('JAPANESE PROOFREADING');
+    // no English role: the Japanese one stands in
+    expect(bookInfo({ credits: [{ ja: '日本語校正', name: 'なぎ' }] }, 'en', t)[0]).toMatchObject({ label: '日本語校正', value: 'なぎ' });
+  });
+
+  it('skips a credit with no name or no role, and anything that is not a list', () => {
+    expect(bookInfo({ credits: [{ ja: ' ', name: 'なぎ' }, { ja: '日本語校正', name: '' }] }, 'ja', t)).toEqual([]);
+    expect(bookInfo({ credits: {} as never }, 'ja', t)).toEqual([]);
+  });
+
   it('shows nothing for a work without book info', () => {
     expect(bookInfo({}, 'ja', t)).toEqual([]);
     expect(bookInfo({ book_lang: ' ', formats: [], release_label: '' }, 'en', t)).toEqual([]);

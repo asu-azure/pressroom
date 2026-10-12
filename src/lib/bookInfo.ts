@@ -1,6 +1,7 @@
 /**
- * The overview's 奥付 row: original language, translations, format, release —
- * from the optional book-info columns (supabase/book-info.sql). Empty fields
+ * The overview's 奥付 row: original language, translations, credits, format,
+ * release — from the optional book-info columns (supabase/book-info.sql,
+ * credits.sql). Empty fields
  * are left out, so a work without them shows no row at all. Pure; tested in
  * bookInfo.test.ts.
  */
@@ -8,7 +9,7 @@ import type { Work } from './types';
 import { releaseLines } from './release';
 
 export interface InfoItem {
-  key: 'lang' | 'trans' | 'format' | 'release';
+  key: 'lang' | 'trans' | 'format' | 'release' | `credit-${number}`;
   label: string;
   value: string;
   /** the release, one printing per line — first release (初版) first (lib/release.ts) */
@@ -48,7 +49,7 @@ export function langLabel(code: string, ui: UiLang): string {
   return ui === 'ja' ? name : name.toUpperCase();
 }
 
-type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label' | 'released_on' | 'novel_langs'>;
+type InfoFields = Pick<Work, 'book_lang' | 'translations' | 'formats' | 'release_label' | 'released_on' | 'novel_langs' | 'credits'>;
 
 export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
   const sep = ui === 'ja' ? '・' : ' / ';
@@ -70,6 +71,16 @@ export function bookInfo(work: InfoFields, ui: UiLang, t: T): InfoItem[] {
       value: names.length ? names.join(sep) : t('ov.transNone'),
     });
   }
+  // credits (supabase/credits.sql) sit next to the translation they mostly belong
+  // to: 日本語校正 なぎ. The role is authored per chrome; the English one speaks
+  // in capitals like every English label, and falls back to the Japanese
+  const credits = Array.isArray(work.credits) ? work.credits : [];
+  credits.forEach((c, i) => {
+    const name = c?.name?.trim();
+    const role = (ui === 'ja' ? c?.ja : c?.en || c?.ja)?.trim();
+    if (!name || !role) return;
+    items.push({ key: `credit-${i}`, label: ui === 'ja' ? role : role.toUpperCase(), value: name });
+  });
   const formats = (work.formats ?? []).filter(Boolean);
   if (formats.length) items.push({ key: 'format', label: t('ov.format'), value: formats.map((f) => t(`fmt.${f}`)).join(' + ') });
   // the author's label, each printing on its own line; without one, the first

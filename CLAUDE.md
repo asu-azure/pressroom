@@ -94,7 +94,7 @@ text. See `src/lib/richtext.ts` and its tests.
 2. Run the add-on files (each idempotent, safe to re-run): `cover-and-blanks.sql`,
    `translations.sql`, `read-lock.sql`, `library-cards.sql`, `artist.sql`, `site-copy.sql`,
    `scenes.sql`, `book-info.sql`, `novel.sql`, `clean-pages.sql`, `chapter-kind.sql`,
-   `release-date.sql`.
+   `release-date.sql`, `credits.sql`.
    **The homepage will not load without `library-cards.sql`** — it defines the `library_cards()`
    RPC the grid reads. `artist.sql` adds `artist_profile` (a singleton, id must be 1), `artworks`,
    and the public `art` bucket; it also drops the never-used `series` table. `site-copy.sql` adds
@@ -282,6 +282,11 @@ visitors it is written for are Japanese; the books are Thai.
   Japanese visitor learns the Thai book has no Japanese yet. But a novel part that reads as text in
   another language (`novel_langs`) counts: vol. 2 says 「日本語（小説パート）」, never なし. Content notes sit above the read
   button, amber, `role="note"`. Studio META edits them all (content notes one per line).
+  **Credits** (`works.credits`, `supabase/credits.sql`): `[{ja, en, name}]`, one 奥付 item each right
+  after 翻訳 — both books carry 「日本語校正 なぎ」 (the friend who proofreads the Japanese; the name is
+  written as they want it, in hiragana). The role is authored per chrome, the English one shown in
+  capitals (JAPANESE PROOFREADING), the Japanese one standing in when there is no English. Studio
+  META has a row per credit; the save leaves the column out until `credits.sql` has run.
 - **Locked contents is one bar**, not a box: with no `password_hint` it says 限定公開 — 合言葉を
   お持ちの方のみ読めます and never where the password comes from (the owner hands it out in closed
   circles). LockGate says the same.
