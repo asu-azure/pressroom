@@ -32,10 +32,11 @@ const {
 } = Astro.props;
 
 const path = Astro.url.pathname.replace(/\/$/, '') || '/';
+// the work first (books, then music), then who made it — the homepage runs in the same order
 const nav = [
-  { href: '/#shelf', label: 'SHELF', current: path === '/' },
-  { href: '/asu', label: 'ASU AZURE', current: path === '/asu' },
+  { href: '/#shelf', label: 'BOOKS', current: path === '/' },
   ...(MUSIC ? [{ href: '/music', label: 'MUSIC ♪', current: path === '/music' || path.startsWith('/music/') }] : []),
+  { href: '/asu', label: 'ASU AZURE', current: path === '/asu' },
 ];
 
 const canonical = new URL(canonicalPath ?? Astro.url.pathname, Astro.site);

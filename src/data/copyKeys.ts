@@ -54,9 +54,9 @@ export const PAGE_GROUPS: PageGroup[] = [
   },
   {
     id: 'home',
-    label: 'THE SHELF',
+    label: 'THE HOMEPAGE',
     href: '/',
-    note: 'The bookshelf everyone lands on, and the banner under it that leads here.',
+    note: 'The bookshelf everyone lands on, the music under it, and the banner that leads here.',
   },
   {
     id: 'music',
@@ -106,7 +106,8 @@ export const SECTIONS: CopySection[] = [
   { id: 'comm',    page: 'asu', label: 'Commissions', note: 'Beside the craft list. Open/closed is a switch in PROFILE; these are the words around it.' },
   { id: 'contact', page: 'asu', label: 'Contact', note: 'The closing ink spread. Email and X come from PROFILE.' },
 
-  // --- / — the shelf
+  // --- / — the shelf, the music, the artist
+  { id: 'homeMusic', page: 'home', label: 'Music', note: 'The "02" section under the books: the CDs, and a link to the music page. Only there while music is switched on.' },
   { id: 'teaser',  page: 'home', label: 'Homepage banner', note: 'The dark "Who is Asu Azure?" band on the shelf, below the book grid.' },
   { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
 
@@ -136,6 +137,27 @@ export const COPY_FIELDS: CopyField[] = [
       th: 'Asu Azure — ภาพประกอบ & รับงานคอมมิชชั่น',
       ja: 'Asu Azure — イラスト & コミッション',
     },
+  },
+
+  // ---------------- Homepage music ----------------
+  {
+    key: 'home.music.kicker', section: 'homeMusic', label: 'Section label', type: 'line',
+    hint: 'After "02 —", like the shelf\'s "01 — 本棚".',
+    defaults: { en: 'MUSIC', th: 'เพลง', ja: '音楽' },
+  },
+  {
+    key: 'home.music.lede', section: 'homeMusic', label: 'Short paragraph', type: 'line',
+    hint: 'Beside the CDs.',
+    defaults: {
+      en: 'Songs from the world of 扉の向こうはヒマワリ畑. Pick up a CD to listen.',
+      th: 'เพลงจากโลกของ 扉の向こうはヒマワリ畑 หยิบซีดีขึ้นมาฟังได้เลย',
+      ja: '『扉の向こうはヒマワリ畑』の世界から生まれた曲たち。CDを手に取って聴いてください。',
+    },
+  },
+  {
+    key: 'home.music.cta', section: 'homeMusic', label: 'Button', type: 'line',
+    hint: 'Under the CDs, to the music page. The arrow is added automatically.',
+    defaults: { en: 'ALL THE CDs', th: 'ดูซีดีทั้งหมด', ja: 'すべてのCDを見る' },
   },
 
   // ---------------- Homepage banner ----------------

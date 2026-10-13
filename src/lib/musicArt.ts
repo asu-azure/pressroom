@@ -8,13 +8,14 @@
  *   spines.jpg          one column per CD (64 × 1300 each, in crate order), one texture for all
  *   inner.jpg           the inside of the booklet, seen when a case lies open
  *   posters/<id>.jpg    each video's YouTube still (1280 × 720), shown until the player loads
- *   crate-still.jpg     the crate itself, for the homepage and the share card (?still=1, see index.ts)
+ *   crate-still.png     the CDs on their plinth, transparent, for the homepage and the share card
+ *                       (scripts/crate-still.py renders it from the real scene)
  */
 import { getImage } from 'astro:assets';
 import type { ImageMetadata } from 'astro';
 import { RELEASES, type Release } from '../data/music';
 
-const ART = import.meta.glob<ImageMetadata>('../assets/music/**/*.jpg', { eager: true, import: 'default' });
+const ART = import.meta.glob<ImageMetadata>('../assets/music/**/*.{jpg,png}', { eager: true, import: 'default' });
 
 const pick = (path: string): ImageMetadata => {
   const hit = ART[`../assets/music/${path}`];
@@ -28,7 +29,7 @@ export const discArt = (slug: string) => pick(`${slug}-disc.jpg`);
 export const posterArt = (youtube: string) => pick(`posters/${youtube}.jpg`);
 export const spineAtlas = () => pick('spines.jpg');
 export const innerArt = () => pick('inner.jpg');
-export const crateStill = () => (has('crate-still.jpg') ? pick('crate-still.jpg') : null);
+export const crateStill = () => (has('crate-still.png') ? pick('crate-still.png') : null);
 
 /** Columns in spines.jpg: a CD's spine is the column at its place in the catalogue. */
 export const SPINE_COLUMNS = 4;

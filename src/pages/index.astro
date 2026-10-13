@@ -1,5 +1,5 @@
 ---
-import { Image } from 'astro:assets';
+import { Image, getImage } from 'astro:assets';
 import Base from '../layouts/Base.astro';
 import Library from '../components/library/Library.svelte';
 import Showcase from '../components/home/Showcase.astro';
@@ -32,6 +32,32 @@ try {
   /* the placeholder is a guess, never a blocker */
 }
 const shelfCount = bookCount;
+
+// 02 — the music, under the books (when music is on): a still of the CDs on their plinth, and the
+// CDs, each a link into /music opened on it. Imported only then, so a build with music off carries
+// none of it; the env read is spelled out (not MUSIC) so the build folds it to a constant. A still,
+// not the live crate: the hero already runs the page's one WebGL canvas (the press run).
+const music = import.meta.env.PUBLIC_MUSIC === 'true'
+  ? await (async () => {
+      const [{ RELEASES, releaseSeconds, fmtTime, cdPath }, { crateStill, jacketArt }] = await Promise.all([
+        import('../data/music'),
+        import('../lib/musicArt'),
+      ]);
+      const stillSrc = crateStill();
+      const still = stillSrc ? await getImage({ src: stillSrc, width: 1100, format: 'webp', quality: 74 }) : null;
+      const cds = await Promise.all(
+        RELEASES.map(async (r, i) => ({
+          href: cdPath(r.slug),
+          no: String(i + 1).padStart(2, '0'),
+          title: r.title,
+          tracks: r.tracks.length,
+          time: fmtTime(releaseSeconds(r)),
+          jacket: (await getImage({ src: jacketArt(r.slug), width: 160, format: 'webp', quality: 76 })).src,
+        })),
+      );
+      return { still, cds };
+    })()
+  : null;
 ---
 
 <Base>
@@ -108,6 +134,42 @@ const shelfCount = bookCount;
         </div>
       </Library>
     </div>
+
+    {/* ============ 02 — MUSIC ============
+        The songs, after the books and before the artist: the journey is the work first, then
+        who made it. The CDs as they stand on /music (a still, scripts/crate-still.py) and a list
+        of them; each opens its CD there. Ink like the shelf above, so the two read as one run. */}
+    {music && (
+      <section class="spread spread--ink tunes" id="music" aria-labelledby="tunes-k">
+        <header class="tunes__head">
+          <span class="mono tunes__k" id="tunes-k">02 — <span data-i18n="home.music.kicker">{t['home.music.kicker']}</span></span>
+          <span class="tunes__rule" aria-hidden="true"></span>
+        </header>
+        <div class="tunes__grid">
+          {music.still && (
+            <a class="tunes__still" href="/music" tabindex="-1" aria-hidden="true">
+              <img src={music.still.src} alt="" width={music.still.attributes.width} height={music.still.attributes.height} loading="lazy" decoding="async" />
+            </a>
+          )}
+          <div class="tunes__copy">
+            <p class="tunes__lede" data-i18n="home.music.lede">{t['home.music.lede']}</p>
+            <ol class="tunes__cds">
+              {music.cds.map((cd) => (
+                <li>
+                  <a href={cd.href}>
+                    <img src={cd.jacket} alt="" width="160" height="160" loading="lazy" decoding="async" />
+                    <span class="mono tunes__no">CD {cd.no}</span>
+                    <span class="tunes__name"><b class="authored">{cd.title.ja}</b> <span class="mono">{cd.title.en}</span></span>
+                    <span class="mono tunes__meta">{cd.tracks} <span data-i18n={cd.tracks === 1 ? 'music.track' : 'music.tracks'}>{t[cd.tracks === 1 ? 'music.track' : 'music.tracks']}</span> · {cd.time}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+            <a class="mono tunes__cta" href="/music"><span data-i18n="home.music.cta">{t['home.music.cta']}</span> <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+      </section>
+    )}
 
     {/* ============ ARTIST TEASER ============
         Sits AFTER the books, because the journey is shelf first, artist second —
@@ -506,6 +568,78 @@ const shelfCount = bookCount;
      bookshelf, so every extra centimetre here is one the reader scrolls past
      before reaching the books. The copy is untouched — it is laid out across
      the width instead of stacked down it, which roughly halves the height. */
+  /* ---------------- 02 — the music ---------------- */
+  .tunes {
+    position: relative;
+    z-index: 1;
+    padding: clamp(2.5rem, 7vh, 4.5rem) var(--pad) clamp(2.5rem, 7vh, 4rem);
+  }
+  /* the same slug line as the shelf's (Library.svelte .lib__head) */
+  .tunes__head { display: flex; align-items: center; gap: 1rem; }
+  .tunes__k { font-size: 0.62rem; letter-spacing: 0.18em; white-space: nowrap; color: var(--accent); }
+  .tunes__rule {
+    flex: 1;
+    height: 7px;
+    border-bottom: 1px solid var(--line-strong);
+    background: repeating-linear-gradient(90deg, var(--line-strong) 0 1px, transparent 1px 12px) bottom / 100% 4px no-repeat;
+  }
+  .tunes__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 4rem);
+    align-items: center;
+    max-width: 1240px;
+    margin: clamp(1.25rem, 3vh, 2rem) auto 0;
+  }
+  .tunes__still { display: block; }
+  .tunes__still img { display: block; width: 100%; height: auto; max-width: 620px; margin-inline: auto; }
+  .tunes__lede { max-width: 40ch; color: var(--fg-dim); font-size: clamp(0.9rem, 1.3vw, 1rem); line-height: 1.7; }
+  .tunes__cds { list-style: none; margin: 1.3rem 0 0; padding: 0; border-top: 1px solid var(--line); }
+  .tunes__cds a {
+    display: grid;
+    grid-template-columns: 3.2rem minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    column-gap: 1rem;
+    row-gap: 0.1rem;
+    align-items: center;
+    padding: 0.7rem 0.3rem;
+    border-bottom: 1px solid var(--line);
+    color: inherit;
+    text-decoration: none;
+    transition: background 0.25s var(--ease);
+  }
+  .tunes__cds a:hover,
+  .tunes__cds a:focus-visible { background: rgba(244, 241, 234, 0.04); }
+  .tunes__cds img {
+    grid-row: 1 / 4;
+    width: 3.2rem;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(244, 241, 234, 0.18);
+  }
+  .tunes__no { font-size: 0.55rem; letter-spacing: 0.2em; color: #d9b45a; }
+  .tunes__name b { font-weight: 800; font-size: 1.02rem; color: var(--fg); }
+  .tunes__name span { margin-left: 0.45em; font-size: 0.56rem; letter-spacing: 0.3em; color: var(--fg-dim); }
+  .tunes__meta { font-size: 0.56rem; letter-spacing: 0.12em; color: var(--fg-dim); }
+  .tunes__cta {
+    display: inline-block;
+    margin-top: 1.2rem;
+    padding: 0.75em 1.4em;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-size: 0.66rem;
+    letter-spacing: 0.14em;
+    color: var(--fg);
+    text-decoration: none;
+    transition: background 0.25s var(--ease), border-color 0.25s var(--ease), color 0.25s var(--ease);
+  }
+  .tunes__cta:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  @media (max-width: 760px) {
+    .tunes__grid { grid-template-columns: minmax(0, 1fr); }
+    .tunes__still img { max-width: 420px; }
+  }
+
   .teaser {
     position: relative;
     z-index: 1;
