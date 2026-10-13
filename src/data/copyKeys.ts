@@ -117,7 +117,7 @@ export const SECTIONS: CopySection[] = [
   { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
 
   // --- /lookbook — the six acts, in their own scroll order
-  { id: 'musicRack',  page: 'music', label: 'The rack', note: 'The heading above the keychains, and the small labels under them.' },
+  { id: 'musicRack',  page: 'music', label: 'The crate', note: 'The heading above the CD crate, the labels on a case you hover, and the buttons under a case you pull out.' },
 
   { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
   { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
@@ -632,7 +632,7 @@ export const COPY_FIELDS: CopyField[] = [
   },
   {
     key: 'ost.back', section: 'musicRack', label: 'Back-to-shelf link', type: 'line',
-    hint: 'At the foot of the rack. The arrow is added automatically.',
+    hint: 'At the foot of the crate. The arrow is added automatically.',
     defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
   },
   {
@@ -669,15 +669,15 @@ export const COPY_FIELDS: CopyField[] = [
     key: 'music.lede', section: 'musicRack', label: 'Short paragraph', type: 'line',
     hint: 'Under MUSIC. Also the description in link previews.',
     defaults: {
-      en: 'Songs from the world of 扉の向こうはヒマワリ畑, one keychain each. Pick one up to listen.',
-      th: 'เพลงจากโลกของ 扉の向こうはヒマワリ畑 เพลงละหนึ่งพวงกุญแจ หยิบขึ้นมาฟังได้เลย',
-      ja: '『扉の向こうはヒマワリ畑』の世界から生まれた曲たち。一曲にひとつのキーホルダー。手に取って聴いてください。',
+      en: 'Songs from the world of 扉の向こうはヒマワリ畑, one CD each in the crate. Pull one out to listen.',
+      th: 'เพลงจากโลกของ 扉の向こうはヒマワリ畑 เพลงละหนึ่งแผ่นในลัง หยิบออกมาฟังได้เลย',
+      ja: '『扉の向こうはヒマワリ畑』の世界から生まれた曲たち。箱の中に一曲一枚のCD。取り出して聴いてください。',
     },
   },
   {
     key: 'music.hint', section: 'musicRack', label: 'Hint', type: 'line',
     hint: 'The small line under the paragraph.',
-    defaults: { en: 'TAP A KEYCHAIN · GRAB IT TO SWING IT', th: 'แตะพวงกุญแจ · จับแล้วเหวี่ยงได้', ja: 'キーホルダーをタップ · つかんで揺らせます' },
+    defaults: { en: 'SWEEP ACROSS THE CRATE · TAP A CD TO PULL IT OUT', th: 'ลากผ่านลังได้ · แตะซีดีเพื่อหยิบออกมา', ja: 'ケースの上をなぞって · CDをタップして取り出す' },
   },
   {
     key: 'music.listen', section: 'musicRack', label: 'Under a song', type: 'line',
@@ -685,9 +685,24 @@ export const COPY_FIELDS: CopyField[] = [
     defaults: { en: 'LISTEN', th: 'ฟัง', ja: '聴く' },
   },
   {
-    key: 'music.coming', section: 'musicRack', label: 'Under a blank keychain', type: 'line',
-    hint: 'Songs not out yet hang as clear keychains with no title.',
+    key: 'music.coming', section: 'musicRack', label: 'A song not out yet', type: 'line',
+    hint: 'Songs not out yet sit in the crate as clear cases with a COMING sticker and no title.',
     defaults: { en: 'COMING SOON', th: 'เร็ว ๆ นี้', ja: 'COMING SOON' },
+  },
+  {
+    key: 'music.open', section: 'musicRack', label: 'Under a case you pulled out', type: 'line',
+    hint: 'How to handle the case once it is out of the crate.',
+    defaults: { en: 'TAP THE CASE TO OPEN IT · DRAG TO TURN IT', th: 'แตะกล่องเพื่อเปิด · ลากเพื่อหมุน', ja: 'ケースをタップで開く · ドラッグで回す' },
+  },
+  {
+    key: 'music.toSong', section: 'musicRack', label: 'To the song page', type: 'line',
+    hint: 'The button under a case you pulled out. The song goes on from where it was.',
+    defaults: { en: 'SONG PAGE', th: 'ไปหน้าเพลง', ja: '曲のページへ' },
+  },
+  {
+    key: 'music.close', section: 'musicRack', label: 'Put the case back', type: 'line',
+    hint: 'The button that puts the case back in the crate.',
+    defaults: { en: 'BACK IN THE CRATE', th: 'เก็บเข้าลัง', ja: '箱に戻す' },
   },
 ];
 

@@ -39,8 +39,10 @@ const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
 cacheShell(Astro);
 
-// Arriving from the QR (or a shared playlist link) opens the playlist directly.
+// Arriving from the QR (or a shared playlist link) opens the playlist directly. From the /music
+// crate it opens there too, but nothing was scanned, so no SCANNED flash.
 const scanned = Astro.url.searchParams.has('scan');
+const fromCrate = Astro.url.searchParams.get('from') === 'crate';
 
 const data = songData(song);
 const p = song.copy!;
@@ -88,7 +90,7 @@ const payload = {
     ))}
   </nav>
 
-  <main class="ost" id="ost" data-no-sfx data-art={head.src} data-state={scanned ? 'list' : 'key'} data-fresh={scanned ? '' : undefined}>
+  <main class="ost" id="ost" data-no-sfx data-art={head.src} data-state={scanned ? 'list' : 'key'} data-fresh={scanned && !fromCrate ? '' : undefined}>
     <div class="ost__sky" aria-hidden="true"></div>
     <canvas class="ost__stars" aria-hidden="true"></canvas>
 
