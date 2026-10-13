@@ -739,8 +739,8 @@ and script for every song; the song arrives as the `#song-data` payload), two vi
 
 Imported, never hand-edited: `node scripts/import-ost.mjs <slug> [--audio]`. Each slug's sources are
 in `scripts/songs.import.mjs` (STARFALL: the MV player's `timeline.json` in
-`../music/music-repo/visualizer/player2/songs/starfall-mv/`, the master in
-`../music/starfall/final/`). It keeps only duration, movements, lyrics (chunks with kana), accent
+`../music/visualizer/player2/songs/starfall-mv/` (the music repo, a sibling checkout), the master in the
+song folder `../music-files/starfall/final/`, a sibling folder outside git). It keeps only duration, movements, lyrics (chunks with kana), accent
 hits, the keychain `wave`, and the motif's right hand (`motifMovement`, for `motif.test.ts`).
 `--audio` copies the master to `public/ost/<slug>.mp3`. **The music project's notes name the
 composer personally — none of that may reach this repo;** the importer copies no credits and no
