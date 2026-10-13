@@ -17,15 +17,15 @@ const musicRoutes = {
   hooks: {
     'astro:config:setup': ({ injectRoute }) => {
       if (!music) return;
-      // the rack, and one page per song that is out (src/data/songs.ts)
+      // the crate (every CD, src/data/music.ts); the old song pages' addresses open their CD
       injectRoute({ pattern: '/music', entrypoint: './src/routes/music/index.astro' });
-      injectRoute({ pattern: '/music/[slug]', entrypoint: './src/routes/music/song.astro' });
-      // STARFALL's old address, kept for links and printed QRs
+      injectRoute({ pattern: '/music/[slug]', entrypoint: './src/routes/music/legacy.astro' });
+      // STARFALL's first address, kept for links and printed QRs
       injectRoute({ pattern: '/ost', entrypoint: './src/routes/ost-redirect.ts' });
       // the 扉の向こう moving score, kept unlisted (see the file's header)
       injectRoute({ pattern: '/ost/tobira', entrypoint: './src/routes/ost-tobira.astro' });
     },
-    // public/ost/ holds the songs' MP3s; with music off they must not ship.
+    // public/ost/ holds /ost/tobira's MP3; with music off it must not ship.
     // Removed from both the client dir and the Vercel static output, whichever
     // this hook runs before or after the adapter's copy.
     'astro:build:done': ({ dir }) => {

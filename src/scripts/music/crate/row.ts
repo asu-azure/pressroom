@@ -5,7 +5,8 @@
  * back on the one behind. The camera looks on from in front and above, turned so the row crosses
  * the screen: a horizontal sweep runs along it. The pointer is cast onto the upright plane through
  * the row to get its place `u`; the case under it rises (springs, so it bounces), its neighbours
- * part. Nothing runs once every case is still.
+ * part. Nothing runs once every case is still. Reduced motion: no wave and no bounce — the case
+ * pointed at stands up at once, and a tap on an empty case does nothing.
  */
 import type { Group, Object3D, Vector3 } from 'three';
 import { buildCrate, crateSize } from './crateBox';
@@ -52,7 +53,7 @@ export interface Row {
   onChange: (() => void) | null;
 }
 
-export function createRow(stage: Stage, kit: JewelKit, slots: CrateSlot[]): Row {
+export function createRow(stage: Stage, kit: JewelKit, slots: CrateSlot[], reduced = false): Row {
   const { THREE } = kit;
   const n = slots.length;
   const size = crateSize(n);
@@ -67,7 +68,7 @@ export function createRow(stage: Stage, kit: JewelKit, slots: CrateSlot[]): Row 
   const jewels = slots.map((s, i) => {
     const node = new THREE.Group();
     node.position.set(slotX(i), 0, 0);
-    const j = buildJewel(kit, s.kind);
+    const j = buildJewel(kit, s.kind, s.spine ?? -1);
     j.root.position.set(0, CASE.h / 2 + FOOT, 0);
     j.root.rotation.y = Math.PI / 2;
     node.add(j.root);
@@ -182,24 +183,36 @@ export function createRow(stage: Stage, kit: JewelKit, slots: CrateSlot[]): Row 
   // --- the frame -------------------------------------------------------------------------
   const tick = (dt: number) => {
     if (asleep) return false;
-    // the wave follows the pointer quickly, but never jumps
-    if (uWant === null) {
-      u = null;
+    if (reduced) {
+      // one case up, the rest at rest, no springs
+      u = uWant;
       speed = 0;
-    } else if (u === null) u = uWant;
-    else {
-      const prev = u;
-      u += (uWant - u) * (1 - Math.exp(-22 * dt));
-      speed += ((u - prev) / Math.max(dt, 1e-3) - speed) * (1 - Math.exp(-10 * dt));
+      const at = u === null ? null : Math.round(u);
+      for (let i = 0; i < n; i++) {
+        lift[i] = liftT[i] = at === i ? (slots[i].kind === 'blank' ? 0.72 : 1) : 0;
+        lean[i] = leanT[i] = at === i ? 0 : REST_LEAN;
+        liftV[i] = leanV[i] = 0;
+      }
+    } else {
+      // the wave follows the pointer quickly, but never jumps
+      if (uWant === null) {
+        u = null;
+        speed = 0;
+      } else if (u === null) u = uWant;
+      else {
+        const prev = u;
+        u += (uWant - u) * (1 - Math.exp(-22 * dt));
+        speed += ((u - prev) / Math.max(dt, 1e-3) - speed) * (1 - Math.exp(-10 * dt));
+      }
+      const amp = boost(speed);
+      for (let i = 0; i < n; i++) {
+        const h = slots[i].kind === 'blank' ? 0.72 : 1;
+        liftT[i] = liftAt(i, u) * h * amp;
+        leanT[i] = REST_LEAN * (1 - Math.min(1, liftAt(i, u))) + leanAt(i, u);
+      }
+      stepSprings(lift, liftV, liftT, dt);
+      stepSprings(lean, leanV, leanT, dt, 140, 10);
     }
-    const amp = boost(speed);
-    for (let i = 0; i < n; i++) {
-      const h = slots[i].kind === 'blank' ? 0.72 : 1;
-      liftT[i] = liftAt(i, u) * h * amp;
-      leanT[i] = REST_LEAN * (1 - Math.min(1, liftAt(i, u))) + leanAt(i, u);
-    }
-    stepSprings(lift, liftV, liftT, dt);
-    stepSprings(lean, leanV, leanT, dt, 140, 10);
     for (let i = 0; i < n; i++) {
       const l = Math.max(-0.02, lift[i]);
       nodes[i].position.y = l * LIFT;
@@ -239,6 +252,7 @@ export function createRow(stage: Stage, kit: JewelKit, slots: CrateSlot[]): Row 
       stage.kick();
     },
     rock(i) {
+      if (reduced) return;
       leanV[i] += i === 0 ? -3.5 : 3.5;
       liftV[i] += 2.5;
       stage.kick();

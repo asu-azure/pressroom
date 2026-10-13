@@ -1,8 +1,12 @@
 /**
  * The case you have pulled out of the crate, held in front of you: drag to turn it (it keeps a
  * little spin, then settles back to its resting tilt), tap to open the lid, and while the song
- * plays the disc turns. Twinkles run over its edges, and a dark veil drops between it and the
- * crate. Reduced motion: no sway, no twinkles, no spin, and the lid lands on its final angle.
+ * plays the disc turns. Twinkles run over its edges and it sways a little, for a few seconds after
+ * you last touched it (then it rests, and no frames are drawn); a dark veil drops between it and
+ * the crate. Reduced motion: no sway, no twinkles, no spin, and the lid lands on its final angle.
+ *
+ * The liner (the CD's tracklist and player) covers part of the stage: `setInset` says how much, on
+ * the right (wide screens) or at the bottom (narrow ones), and the case centres in what is left.
  *
  * The case hangs from the camera (camera → mount → turn → shift → case), so the crate's framing
  * never moves it: `turn` takes the drag, `shift` keeps an open case (lid beside it) centred.
@@ -27,6 +31,8 @@ export const HERO_DIST = 40;
 const HELD = 20;
 /** How dark the veil over the crate gets. */
 const VEIL = 0.8;
+/** Seconds after the last drag that the held case keeps swaying and twinkling (the last one fades). */
+const ALIVE = 6;
 
 export interface Hero {
   readonly jewel: Jewel | null;
@@ -39,6 +45,8 @@ export interface Hero {
   release(): Jewel | null;
   setOpen(open: boolean): void;
   setSpinning(on: boolean): void;
+  /** CSS px of the stage covered on the right and at the bottom (the liner). */
+  setInset(right: number, bottom: number): void;
   /** Called on a tap that was not a drag. */
   onTap: (() => void) | null;
   dispose(): void;
@@ -85,6 +93,7 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
 
   // the view at the case's distance; an open case is nearly twice as wide (the lid lies beside it)
   const vis = { w: 1, h: 1 };
+  const inset = { right: 0, bottom: 0 };
   stage.onResize(() => {
     vis.h = 2 * HERO_DIST * Math.tan(THREE.MathUtils.degToRad(stage.camera.fov / 2));
     vis.w = vis.h * stage.camera.aspect;
@@ -93,11 +102,16 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
     stage.kick();
   });
   // The open lid swings toward the camera on the turned case, so it looks bigger than its size:
-  // fit an open case with room to spare. The case sits a little high, clear of the deck under it.
+  // fit an open case with room to spare, in the part of the stage the liner leaves free.
   const place = (o: number) => {
-    turn.scale.setScalar(Math.min(1, (vis.w * 0.78) / (CASE.w * (1 + 1.15 * o)), (vis.h * (0.6 - 0.1 * o)) / CASE.h));
+    const r = (inset.right / stage.size.w) * vis.w;
+    const b = (inset.bottom / stage.size.h) * vis.h;
+    const w = vis.w - r;
+    const h = vis.h - b;
+    turn.scale.setScalar(Math.min(1, (w * 0.8) / (CASE.w * (1 + 1.15 * o)), (h * (0.74 - 0.08 * o)) / CASE.h));
     shift.position.x = CASE.w * 0.46 * o;
-    mount.position.y = vis.h * 0.06;
+    mount.position.x = -r / 2;
+    mount.position.y = b / 2;
   };
 
   // --- input: drag turns, a tap opens ------------------------------------------------------
@@ -139,7 +153,10 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
     const tap = down.moved < 6 && performance.now() - down.t < 450;
     down = null;
     dragging = false;
-    if (tap && jewel) hero.onTap?.();
+    if (tap && jewel) {
+      idle = Math.min(idle, 1.2);
+      hero.onTap?.();
+    }
     stage.kick();
   };
   input.addEventListener('pointerdown', onDown);
@@ -167,6 +184,9 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
     jewel.setOpen(Math.max(-0.04, Math.min(1.04, openCur)));
     place(Math.max(0, Math.min(1, openCur)));
 
+    // alive for a while after the last touch (sway, twinkles), then at rest: no frames
+    const calm = reduced ? 0 : Math.max(0, Math.min(1, ALIVE - idle));
+    twinkle.visible = calm > 0;
     if (!dragging) {
       rot.x += vel.x * dt;
       rot.y += vel.y * dt;
@@ -176,10 +196,10 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
       idle += dt;
       if (idle > 1.2) {
         // home to the resting tilt (taking the short way round), with a slow sway
-        const sway = reduced ? 0 : Math.sin(t * 0.5) * 0.09;
+        const sway = Math.sin(t * 0.5) * 0.09 * calm;
         const homeY = REST.y + sway + Math.round((rot.y - REST.y) / (Math.PI * 2)) * Math.PI * 2;
         const k = 1 - Math.exp(-1.6 * dt);
-        rot.x += (REST.x + (reduced ? 0 : Math.cos(t * 0.37) * 0.04) - rot.x) * k;
+        rot.x += (REST.x + Math.cos(t * 0.37) * 0.04 * calm - rot.x) * k;
         rot.y += (homeY - rot.y) * k;
       }
     }
@@ -193,8 +213,7 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
 
     const settling =
       Math.abs(openCur - target) > 0.002 || Math.abs(openVel) > 0.002 || Math.hypot(vel.x, vel.y) > 0.002 || spin > 0.01;
-    // with motion allowed the held case is alive (sway, twinkles); reduced motion stops at rest
-    return dragging || settling || veiling || !reduced;
+    return dragging || settling || veiling || calm > 0;
   };
   stage.add(tick);
 
@@ -218,7 +237,7 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
       rot.x = REST.x;
       rot.y = REST.y;
       vel.x = vel.y = 0;
-      idle = 2;
+      idle = 0;
       veilTarget = VEIL;
       // pose the hands first: `attach` keeps the case where it is relative to them
       turn.rotation.set(rot.x, rot.y, 0);
@@ -250,6 +269,12 @@ export function createHero(stage: Stage, kit: JewelKit, input: HTMLElement, redu
     },
     setSpinning(on) {
       spinning = on;
+      stage.kick();
+    },
+    setInset(right, bottom) {
+      inset.right = right;
+      inset.bottom = bottom;
+      if (jewel) place(Math.max(0, Math.min(1, openCur)));
       stage.kick();
     },
     dispose() {

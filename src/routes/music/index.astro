@@ -1,25 +1,29 @@
 ---
 /**
- * /music — the crate: every song is a clear CD case standing in a wooden crate, like a record
- * shop's bin (src/data/songs.ts, in catalogue order, then empty cases to fill the crate). Sweep
- * across it and the cases rise in a wave under the pointer; tap one and it comes out of the crate
- * into your hands — drag to turn it, tap to open the lid, and the disc spins while the song plays.
- * Songs not out yet are clear cases with a COMING sticker and no title (Jun, 4 Oct); a tap only
- * rocks them. The keychains live on the song pages and the shelf.
+ * /music — every song is a CD standing in a row on a dark plinth (src/data/music.ts, front of the
+ * row first, then empty clear cases to fill it; the code still calls the row "the crate" — it was a
+ * wooden one until 14 Oct). Sweep across it and the cases rise in a wave under the pointer; tap one
+ * and it comes into your hands with its liner beside it — the tracklist, the notes and credits, and
+ * the song's YouTube player. Tap the case and the lid opens, the song plays and the disc spins.
+ *
+ * Since 14 Oct 2026 this is the whole music section (Jun): every song is on YouTube, not every
+ * song has words, so the one-song page with its keychain and karaoke came down (tag
+ * starfall-songpage-v1) and /music/<slug> opens that CD here.
  *
  * The crate is one WebGL canvas (scripts/music/crate/, three.js, loaded by this page only). The
- * list under it is the real content: it is what you get with no WebGL, a lost context or reduced
- * data, and it stays in the page for screen readers and the keyboard once the canvas is up.
- * Words are author copy (the 'music' group in copyKeys.ts). Only exists when PUBLIC_MUSIC=true.
+ * list under it is real content: the index of CDs (hover lifts a case), the page itself with no
+ * WebGL or a lost context, and the keyboard's way in. Each CD's liner is written here, so it reads
+ * without JavaScript (?cd=<slug> opens one). Words are author copy (the 'music' group in
+ * copyKeys.ts); titles are the catalogue's. Only exists when PUBLIC_MUSIC=true.
  */
 import Base from '../../layouts/Base.astro';
-import { SONGS, songPath } from '../../data/songs';
-import { songLength, songData, songArt } from '../../lib/keychainServer';
+import { RELEASES, SLOTS, releaseBySlug, releaseSeconds, fmtTime, watchUrl, cdPath } from '../../data/music';
+import { crateArt, crateStill, jacketArt, SPINE_COLUMNS } from '../../lib/musicArt';
 import { getImage } from 'astro:assets';
 import { loadCopy, COPY_PAYLOAD_ID } from '../../lib/siteCopy';
 import { DEFAULT_LANG, LANGS, LANG_LABEL } from '../../lib/lang';
 import { cacheShell } from '../../lib/cache';
-import type { CrateSlot } from '../../scripts/music/crate/types';
+import type { CratePayload, CrateSlot } from '../../scripts/music/crate/types';
 
 export const prerender = false;
 
@@ -27,42 +31,36 @@ const copy = await loadCopy();
 const t = copy[DEFAULT_LANG];
 cacheShell(Astro);
 
-/** How many cases the crate holds: the songs, then empty cases (enough for the wave to read). */
-const SLOTS = 10;
+const art = await crateArt();
+const cds = RELEASES.map((r, i) => ({ r, i, art: art.cds[i], total: releaseSeconds(r) }));
 
-const songs: CrateSlot[] = await Promise.all(
-  SONGS.map(async (song): Promise<CrateSlot> => {
-    if (song.status !== 'out') return { slug: song.slug, kind: 'coming' };
-    const [cover, thumb] = await Promise.all([
-      getImage({ src: songArt(song), width: 1024, format: 'webp', quality: 82 }),
-      getImage({ src: songArt(song), width: 320, format: 'webp', quality: 78 }),
-    ]);
-    return {
-      slug: song.slug,
-      kind: 'song',
-      title: song.title!,
-      cover: cover.src,
-      thumb: thumb.src,
-      audio: song.audio!,
-      href: songPath(song.slug),
-      length: songLength(song),
-      movements: songData(song).movements.length,
-      album: song.album,
-    };
-  }),
-);
 const slots: CrateSlot[] = [
-  ...songs,
-  ...Array.from({ length: Math.max(0, SLOTS - songs.length) }, (_, i): CrateSlot => ({ slug: `empty-${i + 1}`, kind: 'blank' })),
+  ...cds.map(({ r, i, art: a }): CrateSlot => ({
+    slug: r.slug,
+    kind: 'cd',
+    title: r.title,
+    jacket: a.jacketL,
+    disc: a.disc,
+    spine: i,
+    tracks: r.tracks.map((tr, k) => ({ youtube: tr.youtube, poster: a.posters[k], seconds: tr.seconds })),
+  })),
+  ...Array.from({ length: Math.max(0, SLOTS - RELEASES.length) }, (_, i): CrateSlot => ({ slug: `empty-${i + 1}`, kind: 'blank' })),
 ];
+const payload: CratePayload = { slots, spines: art.spines, spineColumns: SPINE_COLUMNS, inner: art.inner };
 
-// The share card: the newest song's cover (for now STARFALL's, F2) until the crate has its own picture.
-const lead = SONGS.find((s) => s.status === 'out');
-const og = lead ? await getImage({ src: songArt(lead), width: 1200, format: 'jpg', quality: 82 }) : null;
-const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
+// ?cd=<slug> — a link to one CD: its liner is open in the HTML (no JavaScript needed), and a shared
+// link previews with its jacket and title
+const cd = releaseBySlug(Astro.url.searchParams.get('cd'));
+const ogSrc = cd ? jacketArt(cd.slug) : (crateStill() ?? jacketArt(RELEASES[0].slug));
+const og = await getImage({ src: ogSrc, width: 1200, format: 'jpg', quality: 82 });
+const ogImage = new URL(og.src, Astro.site).href;
+const title = cd ? `${cd.title.ja} — ${cd.title.en} · MUSIC · Pressroom — Asu Azure` : 'MUSIC · Pressroom — Asu Azure';
+
+const no = (i: number) => String(i + 1).padStart(2, '0');
+const CC_BY = 'https://creativecommons.org/licenses/by/3.0/';
 ---
 
-<Base title="MUSIC · Pressroom — Asu Azure" description={t['music.lede']} image={ogImage}>
+<Base title={title} description={t['music.lede']} image={ogImage} canonical={cd ? cdPath(cd.slug) : '/music'}>
   <nav class="crate__langs mono" aria-label="Language">
     {LANGS.map((l) => (
       <button type="button" data-lang={l} aria-pressed={l === DEFAULT_LANG ? 'true' : 'false'}>{LANG_LABEL[l]}</button>
@@ -77,66 +75,117 @@ const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
       <p class="mono crate__hint" data-i18n="music.hint">{t['music.hint']}</p>
     </header>
 
-    <section class="crate__stage" data-crate-stage aria-label="Songs">
-      <canvas class="crate__canvas" aria-hidden="true"></canvas>
+    <div class="crate__body">
+      <section class="crate__stage" data-crate-stage aria-label="CDs">
+        <canvas class="crate__canvas" aria-hidden="true"></canvas>
 
-      <!-- the songs, as a list: the page without WebGL, and the keyboard's way into the crate -->
-      <ol class="crate__list">
-        {slots.map((s, i) =>
-          s.kind === 'song' ? (
-            <li class="crate__item">
-              <a class="crate__card" href={s.href} data-slot={i} aria-label={`${s.title!.ja} — ${s.title!.en}`}>
-                <img class="crate__thumb" src={s.thumb} alt="" width="320" height="320" decoding="async" loading="lazy" />
-                <span class="crate__name"><b>{s.title!.ja}</b> <span class="mono">{s.title!.en}</span></span>
-                <span class="mono crate__meta">{s.movements} MOVEMENTS · {s.length}</span>
-                <span class="mono crate__go"><span data-i18n="music.listen">{t['music.listen']}</span> <span aria-hidden="true">→</span></span>
-              </a>
-            </li>
-          ) : s.kind === 'coming' ? (
-            <li class="crate__item crate__item--coming">
-              <button type="button" class="crate__card" data-slot={i}>
-                <span class="crate__thumb crate__thumb--blank" aria-hidden="true"></span>
-                <span class="mono crate__meta" data-i18n="music.coming">{t['music.coming']}</span>
+        <!-- the label that follows a case you hover -->
+        <p class="crate__tag" data-crate-tag aria-hidden="true" hidden>
+          <b class="authored" data-tag-ja></b> <span class="mono" data-tag-en></span>
+          <span class="mono crate__tagMeta" data-tag-meta></span>
+        </p>
+      </section>
+
+      <!-- each CD's liner: the CD you take out, as words and a player (scripts/music/crate/liner.ts) -->
+      <div class="crate__liners">
+        {cds.map(({ r, i, art: a, total }) => (
+          <section
+            class="liner"
+            data-liner={r.slug}
+            role="region"
+            aria-labelledby={`liner-${r.slug}`}
+            data-lenis-prevent
+            hidden={cd?.slug !== r.slug}
+            data-ssr-open={cd?.slug === r.slug ? '' : undefined}
+          >
+            <header class="liner__head">
+              <img class="liner__jacket" src={a.jacketS} alt="" width="512" height="512" decoding="async" loading="lazy" />
+              <div>
+                <p class="mono liner__no">
+                  CD {no(i)} · {r.tracks.length} <span data-i18n={r.tracks.length === 1 ? 'music.track' : 'music.tracks'}>{t[r.tracks.length === 1 ? 'music.track' : 'music.tracks']}</span> · {fmtTime(total)}
+                </p>
+                <h2 class="liner__title authored" id={`liner-${r.slug}`}>{r.title.ja}</h2>
+                <p class="mono liner__en">{r.title.en}</p>
+              </div>
+            </header>
+
+            <p class="mono liner__hint" data-i18n="music.open">{t['music.open']}</p>
+
+            <div class="liner__screen" data-liner-screen>
+              <img class="liner__poster" data-liner-poster src={a.posters[0]} alt="" width="1280" height="720" decoding="async" loading="lazy" />
+              <button type="button" class="liner__play mono" data-liner-play>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
+                <span data-i18n="music.listen">{t['music.listen']}</span>
               </button>
-            </li>
-          ) : null,
-        )}
-      </ol>
+              <div class="liner__player" data-player></div>
+            </div>
+            <p class="liner__blocked" data-liner-blocked aria-live="polite" hidden data-i18n="music.tapPlayer">{t['music.tapPlayer']}</p>
 
-      <!-- the label that follows a case you hover -->
-      <p class="crate__tag" data-crate-tag aria-hidden="true" hidden>
-        <b data-tag-ja></b> <span class="mono" data-tag-en></span>
-        <span class="mono crate__tagMeta" data-tag-meta></span>
-      </p>
+            <h3 class="mono liner__label" data-i18n="music.tracklist">{t['music.tracklist']}</h3>
+            <ol class="liner__tracks">
+              {r.tracks.map((tr, k) => (
+                <li>
+                  <a href={watchUrl(tr.youtube)} data-track={k} aria-current={k === 0 ? 'true' : undefined} target="_blank" rel="noopener">
+                    <span class="mono liner__n">{no(k)}</span>
+                    <span class="liner__name">
+                      <span class="authored">{r.title.ja}</span>
+                      {tr.version && <span class="liner__ver" data-ver-ja={tr.version.ja} data-ver-en={tr.version.en}>{tr.version.ja}</span>}
+                    </span>
+                    <span class="mono liner__len">{fmtTime(tr.seconds)}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
 
-      <!-- under the case you pulled out -->
-      <div class="crate__deck" data-crate-deck hidden>
-        <p class="mono crate__deckHint" data-i18n="music.open">{t['music.open']}</p>
-        <div class="crate__bar">
-          <button type="button" class="crate__btn crate__btn--play" data-crate-play aria-label="Play" aria-pressed="false">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="i-play" d="M8 5.5v13l10.5-6.5z" /><path class="i-pause" d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z" /></svg>
-          </button>
-          <span class="crate__now">
-            <b data-deck-ja></b>
-            <span class="mono crate__time" data-deck-time>0:00</span>
-          </span>
-          <a class="crate__btn crate__btn--song mono" data-crate-song href="#"><span data-i18n="music.toSong">{t['music.toSong']}</span> <span aria-hidden="true">→</span></a>
-          <button type="button" class="crate__btn crate__btn--close mono" data-crate-close>
-            <span aria-hidden="true">✕</span> <span data-i18n="music.close">{t['music.close']}</span>
-          </button>
-        </div>
+            <p class="liner__note" data-i18n={`music.${r.slug}.note`}>{t[`music.${r.slug}.note`]}</p>
+
+            <h3 class="mono liner__label" data-i18n="music.credits">{t['music.credits']}</h3>
+            <p class="mono liner__credits" data-i18n={`music.${r.slug}.credits`}>{t[`music.${r.slug}.credits`]}</p>
+            {r.slug === 'starfall' && (
+              <>
+                <p class="mono liner__credits" data-i18n="music.starfall.voices">{t['music.starfall.voices']}</p>
+                <p class="mono liner__credits">
+                  <span data-i18n="music.starfall.corpora">{t['music.starfall.corpora']}</span>{' '}
+                  <a href={CC_BY} target="_blank" rel="noopener license">CC BY 3.0</a>
+                </p>
+              </>
+            )}
+
+            <footer class="liner__foot">
+              <a class="liner__btn mono" data-liner-yt href={watchUrl(r.tracks[0].youtube)} target="_blank" rel="noopener">
+                <span data-i18n="music.onYouTube">{t['music.onYouTube']}</span> <span aria-hidden="true">↗</span>
+              </a>
+              <a class="liner__btn liner__btn--close mono" data-liner-close href="/music" role="button">
+                <span aria-hidden="true">✕</span> <span data-i18n="music.close">{t['music.close']}</span>
+              </a>
+            </footer>
+          </section>
+        ))}
       </div>
-    </section>
+
+      <!-- the CDs, as a list: the index under the crate (hover lifts a case), the page itself
+           without WebGL, and the keyboard's way in -->
+      <ol class="crate__list">
+        {cds.map(({ r, i, art: a, total }) => (
+          <li class="crate__item">
+            <a class="crate__card" href={cdPath(r.slug)} data-slot={i} aria-label={`CD ${no(i)}: ${r.title.ja} — ${r.title.en}`}>
+              <img class="crate__thumb" src={a.jacketS} alt="" width="512" height="512" decoding="async" loading="lazy" />
+              <span class="mono crate__no">CD {no(i)}</span>
+              <span class="crate__name"><b class="authored">{r.title.ja}</b> <span class="mono">{r.title.en}</span></span>
+              <span class="mono crate__meta" data-meta>{r.tracks.length} <span data-i18n={r.tracks.length === 1 ? 'music.track' : 'music.tracks'}>{t[r.tracks.length === 1 ? 'music.track' : 'music.tracks']}</span> · {fmtTime(total)}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </div>
 
     <footer class="crate__foot">
-      <a class="mono crate__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="ost.back">{t['ost.back']}</span></a>
+      <a class="mono crate__back" href="/" data-vt="back"><span aria-hidden="true">←</span> <span data-i18n="music.back">{t['music.back']}</span></a>
     </footer>
-
-    <audio data-crate-audio preload="none"></audio>
   </main>
 
   <script type="application/json" id={COPY_PAYLOAD_ID} set:html={JSON.stringify(copy)} is:inline />
-  <script type="application/json" id="crate-data" set:html={JSON.stringify(slots)} is:inline />
+  <script type="application/json" id="crate-data" set:html={JSON.stringify(payload)} is:inline />
 </Base>
 
 <script>
@@ -146,6 +195,9 @@ const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
 
 <style>
   .crate {
+    --stage-h: clamp(26rem, 74svh, 52rem);
+    --gold: #d9b45a;
+    --ink-hi: #f4f1ea;
     position: relative;
     min-height: 100svh;
     padding: calc(var(--topbar-h, 3.6rem) + clamp(1.5rem, 5vh, 3.5rem)) var(--pad) clamp(2rem, 6vh, 4rem);
@@ -181,18 +233,21 @@ const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
     font-size: clamp(3.4rem, 10vw, 8rem);
     line-height: 0.9;
     letter-spacing: 0.02em;
-    color: #f4f1ea;
+    color: var(--ink-hi);
     text-shadow: 0 0 40px rgba(143, 178, 255, 0.3);
   }
   .crate__lede { max-width: 44ch; color: var(--fg-dim); font-size: clamp(0.95rem, 1.4vw, 1.08rem); line-height: 1.7; }
   .crate__hint { font-size: 0.6rem; letter-spacing: 0.12em; color: var(--fg-faint); }
 
   /* ---------------- the stage ---------------- */
-  .crate__stage {
+  .crate__body {
     position: relative;
     max-width: 1240px;
     margin: 0 auto;
+    display: flex;
+    flex-direction: column;
   }
+  .crate__stage { position: relative; }
   .crate__canvas {
     position: absolute;
     inset: 0;
@@ -204,18 +259,17 @@ const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
     touch-action: pan-y;
     -webkit-tap-highlight-color: transparent;
   }
-  .crate[data-gl='on'] .crate__stage { height: clamp(26rem, 74svh, 52rem); }
+  .crate[data-gl='on'] .crate__stage { height: var(--stage-h); }
   .crate[data-gl='on'] .crate__canvas { opacity: 1; }
   .crate[data-gl='on'] .crate__canvas.is-held { touch-action: none; cursor: grab; }
   .crate[data-gl='on'] .crate__canvas.is-over { cursor: pointer; }
 
-  /* the list: a grid of covers without WebGL; with it, still there for the keyboard and
-     screen readers, but only seen as a focus ring around the case it lifts */
+  /* ---------------- the list: covers without WebGL, an index under the crate with it ---------------- */
   .crate__list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(min(13rem, 42vw), 1fr));
     gap: clamp(1rem, 3vw, 2rem);
-    margin: 0;
+    margin: clamp(1rem, 3vh, 2rem) 0 0;
     padding: 0;
     list-style: none;
   }
@@ -223,45 +277,49 @@ const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
     display: grid;
     gap: 0.35rem;
     width: 100%;
-    padding: 0;
-    background: none;
-    border: 0;
     color: inherit;
     text-align: left;
     text-decoration: none;
     font: inherit;
-    cursor: pointer;
   }
   .crate__thumb {
     width: 100%;
+    height: auto;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 3px;
     box-shadow: 0 0 0 1px rgba(244, 241, 234, 0.25), 0 18px 40px rgba(0, 0, 0, 0.5);
   }
-  .crate__thumb--blank {
-    display: block;
-    background: linear-gradient(135deg, rgba(244, 241, 234, 0.08), rgba(244, 241, 234, 0.02));
-  }
-  .crate__name b { font-family: var(--font-display); font-weight: 900; font-size: clamp(1.05rem, 1.6vw, 1.25rem); color: #f4f1ea; }
+  .crate__no { font-size: 0.56rem; letter-spacing: 0.2em; color: var(--gold); }
+  .crate__name b { font-weight: 800; font-size: clamp(1.05rem, 1.6vw, 1.25rem); color: var(--ink-hi); }
   .crate__name span { margin-left: 0.4em; font-size: 0.58rem; letter-spacing: 0.3em; color: var(--fg-dim); }
   .crate__meta { font-size: 0.58rem; letter-spacing: 0.12em; color: var(--fg-dim); }
-  .crate__item--coming .crate__meta { color: var(--fg-faint); letter-spacing: 0.24em; }
-  .crate__go { font-size: 0.58rem; letter-spacing: 0.14em; color: var(--accent); }
+  .crate__card:hover .crate__name b,
+  .crate__card:focus-visible .crate__name b { color: #fff; }
+  .crate__card:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 
+  /* with the crate drawn: one row of small entries under it */
   .crate[data-gl='on'] .crate__list {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    grid-template-columns: repeat(auto-fit, minmax(min(17rem, 100%), 1fr));
+    gap: 0.4rem 1.4rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(244, 241, 234, 0.1);
   }
-
-  .crate__tag[hidden],
-  .crate__deck[hidden] { display: none; }
+  .crate[data-gl='on'] .crate__card {
+    grid-template-columns: 3.4rem minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    column-gap: 0.9rem;
+    row-gap: 0.12rem;
+    align-items: center;
+    padding: 0.5rem;
+    border-radius: 6px;
+  }
+  .crate[data-gl='on'] .crate__card:hover { background: rgba(244, 241, 234, 0.05); }
+  .crate[data-gl='on'] .crate__thumb { grid-row: 1 / 4; box-shadow: 0 0 0 1px rgba(244, 241, 234, 0.2); }
+  .crate[data-gl='on'] .crate__name b { font-size: 1rem; }
 
   /* ---------------- the hover tag ---------------- */
+  .crate__tag[hidden] { display: none; }
   .crate__tag {
     position: absolute;
     left: 0;
@@ -278,69 +336,152 @@ const ogImage = og ? new URL(og.src, Astro.site).href : undefined;
     translate: -50% -100%;
     transition: opacity 0.2s var(--ease);
   }
-  .crate__tag b { font-family: var(--font-display); font-weight: 900; font-size: 1rem; color: #f4f1ea; }
+  .crate__tag b { font-weight: 800; font-size: 1rem; color: var(--ink-hi); }
   .crate__tag span { font-size: 0.56rem; letter-spacing: 0.24em; color: var(--fg-dim); }
   .crate__tag .crate__tagMeta { letter-spacing: 0.12em; color: #8fb2ff; }
 
-  /* ---------------- the deck under a case you pulled out ---------------- */
-  .crate__deck {
+  /* ---------------- the liner ---------------- */
+  .crate__liners { position: relative; z-index: 3; }
+  /* without the crate the liner opens above the list */
+  .crate:not([data-gl='on']) .crate__liners { order: -1; }
+  .crate:not([data-gl='on']) .liner { margin-bottom: clamp(1rem, 3vh, 2rem); max-width: 46rem; }
+
+  .liner[hidden] { display: none; }
+  .liner {
+    display: grid;
+    gap: 0.8rem;
+    align-content: start;
+    padding: clamp(1rem, 2.4vw, 1.5rem);
+    background: linear-gradient(180deg, rgba(14, 16, 32, 0.96), rgba(7, 9, 18, 0.96));
+    border: 1px solid rgba(244, 241, 234, 0.14);
+    border-radius: 6px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  }
+  .liner__head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: center; }
+  .liner__jacket { width: clamp(5.5rem, 22vw, 9rem); height: auto; aspect-ratio: 1; border-radius: 2px; box-shadow: 0 0 0 1px rgba(244, 241, 234, 0.2); }
+  .crate[data-gl='on'] .liner__jacket { display: none; }
+  .crate[data-gl='on'] .liner__head { grid-template-columns: minmax(0, 1fr); }
+  .liner__no { font-size: 0.56rem; letter-spacing: 0.18em; color: var(--gold); }
+  .liner__title { margin: 0.25rem 0 0; font-size: clamp(1.6rem, 3vw, 2.2rem); font-weight: 800; letter-spacing: 0.06em; line-height: 1.15; color: var(--ink-hi); }
+  .liner__en { font-size: 0.62rem; letter-spacing: 0.5em; color: var(--gold); margin-top: 0.3rem; }
+  .liner__hint { font-size: 0.56rem; letter-spacing: 0.14em; color: var(--fg-faint); }
+  .crate:not([data-gl='on']) .liner__hint { display: none; }
+
+  .liner__screen {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    min-height: 200px;
+    background: #000;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .liner__poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .liner__play {
     position: absolute;
     left: 50%;
-    bottom: clamp(0.4rem, 2vh, 1.2rem);
-    z-index: 3;
-    translate: -50% 0;
-    display: grid;
-    justify-items: center;
-    gap: 0.6rem;
-    width: min(100%, 36rem);
-  }
-  .crate__deckHint { font-size: 0.58rem; letter-spacing: 0.14em; color: var(--fg-faint); text-align: center; }
-  .crate__bar {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    max-width: 100%;
-    padding: 0.35rem;
-    background: color-mix(in srgb, #0b0f1e 80%, transparent);
-    border: 1px solid rgba(244, 241, 234, 0.14);
-    border-radius: 999px;
-    backdrop-filter: blur(10px);
-  }
-  .crate__btn {
+    top: 50%;
+    translate: -50% -50%;
     display: inline-flex;
     align-items: center;
-    gap: 0.35rem;
-    height: 2.4rem;
-    padding: 0 0.9rem;
+    gap: 0.45rem;
+    height: 2.8rem;
+    padding: 0 1.2rem 0 0.95rem;
     border: 0;
     border-radius: 999px;
+    background: var(--ink-hi);
+    color: #07080f;
+    font-size: 0.66rem;
+    letter-spacing: 0.16em;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    cursor: pointer;
+  }
+  .liner__play svg { width: 1.1rem; height: 1.1rem; fill: currentColor; }
+  .liner__play:hover { background: #fff; }
+  .liner__play:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .liner__player { position: absolute; inset: 0; }
+  .liner__player :global(iframe) { width: 100%; height: 100%; border: 0; display: block; }
+  .liner__screen[data-on] .liner__poster,
+  .liner__screen[data-on] .liner__play { display: none; }
+  .liner__blocked { font-size: 0.78rem; line-height: 1.6; color: var(--amber, #e8a31a); }
+  .liner__blocked[hidden] { display: none; }
+
+  .liner__label { font-size: 0.56rem; letter-spacing: 0.2em; color: var(--fg-faint); margin-top: 0.3rem; }
+  .liner__tracks { list-style: none; margin: -0.3rem 0 0; padding: 0; display: grid; }
+  .liner__tracks a {
+    display: grid;
+    grid-template-columns: 2.2rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0.6rem;
+    padding: 0.55rem 0.5rem;
+    border-radius: 4px;
+    color: var(--fg-dim);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+  }
+  .liner__tracks a:hover { background: rgba(244, 241, 234, 0.05); color: var(--ink-hi); }
+  .liner__tracks a:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 1px; }
+  .liner__tracks a[aria-current='true'] { color: var(--ink-hi); border-left-color: var(--gold); background: rgba(217, 180, 90, 0.07); }
+  .liner__n { font-size: 0.6rem; letter-spacing: 0.1em; color: var(--gold); }
+  .liner__name { font-size: 0.98rem; }
+  .liner__ver { margin-left: 0.5em; font-size: 0.72rem; color: var(--fg-dim); }
+  .liner__ver::before { content: '('; }
+  .liner__ver::after { content: ')'; }
+  .liner__len { font-size: 0.6rem; letter-spacing: 0.08em; color: var(--fg-faint); }
+
+  .liner__note { font-family: var(--font-serif-authored, serif); font-size: 0.92rem; line-height: 1.8; color: var(--fg-dim); }
+  .liner__credits { font-size: 0.56rem; line-height: 1.9; letter-spacing: 0.06em; color: var(--fg-faint); }
+  .liner__credits a { color: var(--fg-dim); }
+
+  .liner__foot { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.4rem; }
+  .liner__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    height: 2.4rem;
+    padding: 0 1rem;
+    border-radius: 999px;
     background: rgba(244, 241, 234, 0.08);
-    color: #f4f1ea;
+    color: var(--ink-hi);
     font-size: 0.58rem;
     letter-spacing: 0.14em;
     text-decoration: none;
     white-space: nowrap;
-    cursor: pointer;
   }
-  .crate__btn:hover { background: rgba(244, 241, 234, 0.16); }
-  .crate__btn:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; }
-  .crate__btn--play { width: 2.4rem; padding: 0; justify-content: center; background: #f4f1ea; color: #07080f; }
-  .crate__btn--play:hover { background: #fff; }
-  .crate__btn--play svg { width: 1.05rem; height: 1.05rem; fill: currentColor; }
-  .crate__btn--play .i-pause,
-  .crate__btn--play[aria-pressed='true'] .i-play { display: none; }
-  .crate__btn--play[aria-pressed='true'] .i-pause { display: inline; }
-  .crate__now { display: grid; min-width: 0; padding: 0 0.4rem; line-height: 1.2; }
-  .crate__now b { font-family: var(--font-display); font-weight: 900; font-size: 0.9rem; color: #f4f1ea; overflow: hidden; text-overflow: ellipsis; }
-  .crate__time { font-size: 0.56rem; letter-spacing: 0.12em; color: var(--fg-dim); }
+  .liner__btn:hover { background: rgba(244, 241, 234, 0.16); }
+  .liner__btn:focus-visible { outline: 1.5px solid var(--accent); outline-offset: 2px; }
+
+  /* wide: the liner stands at the right of the stage, the case centres in the rest */
+  @media (min-width: 900px) {
+    .crate[data-gl='on'] .crate__liners {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: min(30rem, 40%);
+      height: var(--stage-h);
+    }
+    .crate[data-gl='on'] .liner {
+      max-height: 100%;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      color-scheme: dark;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(244, 241, 234, 0.22) transparent;
+    }
+  }
+  /* narrow: the liner comes up over the lower part of the stage; the case is above it */
+  @media (max-width: 899.98px) {
+    .crate[data-gl='on'] .crate__liners:has(.liner:not([hidden])) { margin-top: calc(-0.42 * var(--stage-h)); }
+    .liner__screen { margin-inline: calc(-1 * clamp(1rem, 2.4vw, 1.5rem)); border-radius: 0; }
+  }
+  @media (max-width: 640px) {
+    .crate:not([data-gl='on']) .crate__list { grid-template-columns: minmax(0, 1fr); }
+    .crate:not([data-gl='on']) .crate__card { grid-template-columns: 6rem minmax(0, 1fr); column-gap: 1rem; align-items: center; }
+    .crate:not([data-gl='on']) .crate__thumb { grid-row: 1 / 4; }
+    .liner { padding-inline: var(--pad); margin-inline: calc(-1 * var(--pad)); border-radius: 0; border-inline: 0; }
+    .liner__screen { margin-inline: calc(-1 * var(--pad)); }
+  }
 
   .crate__foot { max-width: 1240px; margin: clamp(1rem, 4vh, 2.5rem) auto 0; padding-top: 1.4rem; border-top: 1px solid var(--line); }
   .crate__back { font-size: 0.66rem; letter-spacing: 0.14em; color: var(--fg-dim); }
   .crate__back:hover { color: var(--accent); }
-
-  @media (max-width: 640px) {
-    .crate__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .crate__btn--close span:last-child { display: none; }
-    .crate__now { display: none; }
-  }
 </style>

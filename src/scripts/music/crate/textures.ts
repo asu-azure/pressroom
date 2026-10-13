@@ -1,9 +1,10 @@
 /**
- * Every texture the crate needs, drawn on a canvas at run time, so the page ships no image
- * files of its own: the sparkle, the soft shadow, the disc's printed face, the grooves that
- * make a CD's underside throw light streaks, the COMING sticker and the wood of the crate.
+ * The crate's textures. Drawn on a canvas at run time: the sparkle, the soft shadow, the disc's
+ * printed face round its clear hub, the grooves that make a CD's underside throw light streaks,
+ * and the veil. Pictures (jackets, spines, the booklet) come from
+ * src/assets/music through imageTexture.
  */
-import type { CanvasTexture } from 'three';
+import type { CanvasTexture, Texture } from 'three';
 
 type Three = typeof import('three');
 
@@ -137,65 +138,12 @@ export function grooveMap(THREE: Three): CanvasTexture {
   return t;
 }
 
-/** A round sticker with one word on it (COMING). */
-export function stickerTexture(THREE: Three, word: string): CanvasTexture {
-  const S = 256;
-  const [c, g] = pad(S);
-  const m = S / 2;
-  g.fillStyle = '#f4d35e';
-  g.beginPath();
-  g.arc(m, m, m - 4, 0, Math.PI * 2);
-  g.fill();
-  g.lineWidth = 3;
-  g.strokeStyle = 'rgba(22,20,15,0.5)';
-  g.beginPath();
-  g.arc(m, m, m - 16, 0, Math.PI * 2);
-  g.stroke();
-  g.fillStyle = '#16140f';
-  g.font = `700 ${Math.round(S * 0.17)}px 'JetBrains Mono', ui-monospace, monospace`;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.fillText(word, m, m + 2);
-  const t = new THREE.CanvasTexture(c);
+/** A picture as a texture (a jacket, the spine atlas, the booklet's inside): sRGB, mipmapped. */
+export function imageTexture(THREE: Three, img: TexImageSource): Texture {
+  const t = new THREE.Texture(img as HTMLImageElement);
   t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-/** Pine boards for the crate: long grain, a few knots, sanded pale. Tiles along U. */
-export function woodTexture(THREE: Three): CanvasTexture {
-  const W = 512;
-  const H = 128;
-  const [c, g] = pad(W, H);
-  g.fillStyle = '#c4a47c';
-  g.fillRect(0, 0, W, H);
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 70; i++) {
-    const y = rnd() * H;
-    const a = 0.05 + rnd() * 0.12;
-    g.strokeStyle = rnd() > 0.5 ? `rgba(92,56,26,${a})` : `rgba(236,200,150,${a})`;
-    g.lineWidth = 0.6 + rnd() * 2.2;
-    g.beginPath();
-    g.moveTo(0, y);
-    for (let x = 0; x <= W; x += 32) g.lineTo(x, y + Math.sin(x / 90 + i) * 2.5 * rnd());
-    g.stroke();
-  }
-  for (let k = 0; k < 3; k++) {
-    const x = rnd() * W;
-    const y = rnd() * H;
-    const knot = g.createRadialGradient(x, y, 0, x, y, 9);
-    knot.addColorStop(0, 'rgba(70,40,18,0.7)');
-    knot.addColorStop(1, 'rgba(70,40,18,0)');
-    g.fillStyle = knot;
-    g.beginPath();
-    g.ellipse(x, y, 14, 6, 0, 0, Math.PI * 2);
-    g.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.wrapS = THREE.RepeatWrapping;
-  t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;
+  t.needsUpdate = true;
   return t;
 }
 

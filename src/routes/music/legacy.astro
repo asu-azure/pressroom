@@ -1,0 +1,16 @@
+---
+/**
+ * /music/<slug> → the crate, opened on that CD (/music?cd=<slug>), permanently. Each song had a
+ * page of its own until 14 Oct 2026 (the keychain, the playlist, the karaoke — tag
+ * starfall-songpage-v1); links to it, and the QR printed on STARFALL's keychain
+ * (/music/starfall?scan=1), keep working. The old query (scan, from, t) means nothing to a CD and
+ * is dropped. An unknown slug is an empty 404, the site's 404 page.
+ */
+import { cdPath, releaseBySlug } from '../../data/music';
+
+export const prerender = false;
+
+const r = releaseBySlug(Astro.params.slug);
+if (!r) return new Response(null, { status: 404, statusText: 'Not found' });
+return Astro.redirect(cdPath(r.slug), 301);
+---

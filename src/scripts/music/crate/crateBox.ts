@@ -1,91 +1,72 @@
 /**
- * The wooden crate, built from boards: a slatted floor, two slatted long sides (the gap lets you
- * see the cases inside), and two solid ends with a hand hole. Pine, drawn on a canvas
- * (textures.ts). Units are centimetres; the floor's top is y = 0, the row runs along x.
+ * What the CDs stand on: a slab of dark lacquer with a gold line inlaid round its top, a soft light
+ * spilling out from under it, no box — the cases are the thing (Jun, 14 Oct 2026, over a navy box
+ * set and a clear acrylic stand; the wooden crate of 11 Oct "isn't pretty"). Units are centimetres;
+ * the plinth's top is y = 0, the row runs along x. `crateSize` is the footprint the row and the
+ * camera are framed on.
  */
-import type { BufferGeometry, Group } from 'three';
+import type { Group } from 'three';
 import { merge } from './jewel';
-import { shadowTexture, woodTexture } from './textures';
+import { shadowTexture } from './textures';
 
 type Three = typeof import('three');
 
-/** Crate measurements around a row of `n` cases. */
+/** The row's measurements around `n` cases (the plinth reaches past them on every side). */
 export function crateSize(n: number) {
   const spacing = 2.05;
-  const length = n * spacing + 1.4; // inside, along the row
+  const length = n * spacing + 1.4; // along the row
   return { spacing, length, width: 14.8, height: 8.2, board: 0.8 };
 }
 
-export function buildCrate(THREE: Three, n: number): Group {
-  const { length: L, width: W, height: H, board: t } = crateSize(n);
-  const TILE = 1 / 14; // one pass of the grain per 14 cm
-
-  // a board along x (or turned), its UVs scaled so the grain tiles instead of stretching
-  const plank = (lx: number, ly: number, lz: number, x: number, y: number, z: number) => {
-    const g = new THREE.BoxGeometry(lx, ly, lz).toNonIndexed();
-    const uv = g.getAttribute('uv');
-    const long = Math.max(lx, lz);
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * long * TILE, uv.getY(i) * Math.min(ly, 4) * TILE);
-    g.translate(x, y, z);
-    return g;
-  };
-
-  const parts: BufferGeometry[] = [];
-  // the floor: three boards with hairline gaps
-  const fw = W / 3;
-  for (let k = 0; k < 3; k++) parts.push(plank(L + 2 * t, t, fw - 0.12, 0, -t / 2, -W / 2 + fw * (k + 0.5)));
-  // the long sides: a low board and a high one, a gap between
-  const low = H * 0.42;
-  const high = H * 0.44;
-  for (const s of [-1, 1]) {
-    const z = s * (W / 2 + t / 2);
-    parts.push(plank(L + 2 * t, low, t, 0, low / 2, z));
-    parts.push(plank(L + 2 * t, high, t, 0, H - high / 2, z));
-  }
-  // the ends: one board each with a hand hole near the top, fitted between the long sides
-  {
-    const w = W;
-    const s = new THREE.Shape();
-    s.moveTo(-w / 2, 0);
-    s.lineTo(w / 2, 0);
-    s.lineTo(w / 2, H + 0.4);
-    s.lineTo(-w / 2, H + 0.4);
-    s.closePath();
-    const hole = new THREE.Path();
-    const hw = 3.2;
-    const hh = 0.7;
-    const hy = H - 1.6;
-    hole.absarc(-hw + hh, hy, hh, Math.PI / 2, (Math.PI * 3) / 2, false);
-    hole.absarc(hw - hh, hy, hh, -Math.PI / 2, Math.PI / 2, false);
-    hole.closePath();
-    s.holes.push(hole);
-    for (const side of [-1, 1]) {
-      const g = new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: true, bevelSize: 0.06, bevelThickness: 0.06, bevelSegments: 1, curveSegments: 10 });
-      const uv = g.getAttribute('uv');
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * TILE, uv.getY(i) * TILE);
-      g.rotateY(Math.PI / 2);
-      g.translate(side * (L / 2 + t) + (side < 0 ? 0 : -t), 0, 0);
-      parts.push(g.index ? g.toNonIndexed() : g);
-    }
-  }
-
-  const wood = woodTexture(THREE);
-  const crate = new THREE.Mesh(
-    merge(parts)!,
-    new THREE.MeshStandardMaterial({ map: wood, roughness: 0.8, metalness: 0, color: 0xcfc6b8, envMapIntensity: 0.6 }),
-  );
-  parts.forEach((g) => g.dispose());
-
-  // a soft shadow on the "floor" the crate stands on
-  const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry((L + 2 * t) * 1.7, (W + 2 * t) * 1.9),
-    new THREE.MeshBasicMaterial({ color: 0x000000, alphaMap: shadowTexture(THREE), transparent: true, opacity: 0.6, depthWrite: false }),
-  );
-  shadow.rotation.x = -Math.PI / 2;
-  shadow.position.y = -t - 0.02;
-  shadow.renderOrder = -1;
-
-  const g = new THREE.Group();
-  g.add(shadow, crate);
+/** A box `lx × ly × lz` centred at (x, y, z). */
+function block(THREE: Three, lx: number, ly: number, lz: number, x: number, y: number, z: number) {
+  const g = new THREE.BoxGeometry(lx, ly, lz).toNonIndexed();
+  g.translate(x, y, z);
   return g;
+}
+
+export function buildCrate(THREE: Three, n: number): Group {
+  const { length: L, width: W } = crateSize(n);
+  const ph = 1.4;
+  const PL = L + 5;
+  const PW = W + 3.5;
+  const group = new THREE.Group();
+
+  const plinth = new THREE.Mesh(
+    new THREE.BoxGeometry(PL, ph, PW),
+    new THREE.MeshPhysicalMaterial({ color: 0x121832, roughness: 0.3, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.12, envMapIntensity: 1.1 }),
+  );
+  plinth.position.y = -ph / 2;
+
+  // the gold line, a little in from the top edge
+  const inlayParts = [
+    ...[-1, 1].map((s) => block(THREE, PL - 1.2, 0.05, 0.12, 0, 0.005, s * (PW / 2 - 0.6))),
+    ...[-1, 1].map((s) => block(THREE, 0.12, 0.05, PW - 1.2, s * (PL / 2 - 0.6), 0.005, 0)),
+  ];
+  const inlay = new THREE.Mesh(
+    merge(inlayParts)!,
+    new THREE.MeshStandardMaterial({ color: 0xd2ad5a, metalness: 1, roughness: 0.28, envMapIntensity: 1.3 }),
+  );
+  inlayParts.forEach((g) => g.dispose());
+
+  // under it: a shadow, and a cool light spilling out round its foot so it stands off the night
+  const floor = (scale: [number, number], color: number, opacity: number, additive: boolean) => {
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(PL * scale[0], PW * scale[1]),
+      new THREE.MeshBasicMaterial({
+        color,
+        alphaMap: shadowTexture(THREE),
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      }),
+    );
+    m.rotation.x = -Math.PI / 2;
+    m.position.y = -ph - 0.02;
+    m.renderOrder = -1;
+    return m;
+  };
+  group.add(floor([1.5, 1.7], 0x000000, 0.55, false), floor([1.35, 1.5], 0x4a66d8, 0.32, true), plinth, inlay);
+  return group;
 }

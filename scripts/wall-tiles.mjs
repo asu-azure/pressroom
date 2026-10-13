@@ -5,7 +5,7 @@
  *   node scripts/wall-tiles.mjs
  *
  * A PNG, not an SVG turbulence filter: SVG images are rasterised on the main
- * thread (see the keychain's star tiles). Seeded, so re-running it is a no-op.
+ * thread. Seeded, so re-running it is a no-op.
  */
 import sharp from 'sharp';
 import { mkdirSync } from 'node:fs';

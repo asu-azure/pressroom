@@ -22,20 +22,6 @@ const t = copy[DEFAULT_LANG];
 
 cacheShell(Astro);
 
-// The soundtrack keychain at the end of the shelf (KeyChain.svelte), when music is on.
-// Imported only then, so with music off the build carries none of its art or data. The
-// env read is spelled out (not MUSIC) so the build folds it to a constant and drops the imports.
-const ost = import.meta.env.PUBLIC_MUSIC === 'true'
-  ? await (async () => {
-      const [{ songKeychain, songLength, songData }, { songBySlug }] = await Promise.all([
-        import('../lib/keychainServer'),
-        import('../data/songs'),
-      ]);
-      const song = songBySlug('starfall')!;
-      return { data: await songKeychain(song, Astro.site, 480), length: songLength(song), movements: songData(song).movements.length };
-    })()
-  : null;
-
 // How many stages the shelf will hold, so its placeholder is already the final
 // height (no jump when the books arrive). A count only; a failure keeps 2.
 let bookCount = 2;
@@ -45,7 +31,7 @@ try {
 } catch {
   /* the placeholder is a guess, never a blocker */
 }
-const shelfCount = bookCount + (ost ? 1 : 0);
+const shelfCount = bookCount;
 ---
 
 <Base>
@@ -110,7 +96,7 @@ const shelfCount = bookCount + (ost ? 1 : 0);
         holds its place: book-shaped blanks on a plank, the size of the real
         stages, which keeps the teaser below from jumping when the books arrive. */}
     <div id="shelf">
-      <Library client:only="svelte" ost={ost} expect={shelfCount}>
+      <Library client:only="svelte" expect={shelfCount}>
         <div slot="fallback" class="shelf-ph" aria-hidden="true">
           <div class="shelf-ph__head"><span class="mono shelf-ph__k">01 — 本棚</span><span class="shelf-ph__rule"></span></div>
           <p class="mono shelf-ph__hint">.</p>

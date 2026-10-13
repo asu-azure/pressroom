@@ -16,7 +16,7 @@
 
 import { MUSIC } from '../lib/features';
 
-/** Motif top line: the first two phrases of IV. Motif in starfall.json (motif.test.ts keeps it honest). */
+/** Motif top line: the first two phrases of ナガレボシ's IV. Hallway Echo (motif.test.ts keeps it honest). */
 export const MOTIF = [79, 79, 79, 79, 80, 79, 72, 75, 74, 70, 79, 79, 79, 79, 80, 79, 72, 75, 74, 71];
 /** The hook's harmony: A♭maj7 when a book opens, Cm(add9) — where the hook lands — when a lock opens. */
 export const CHORDS = { open: [56, 60, 63, 67], unlock: [60, 63, 67, 74] } as const;

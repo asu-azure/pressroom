@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import data from '../../data/ost/starfall.json';
+import data from './motif.fixture.json';
 import { MOTIF, CHORDS } from '../sound';
 
-// The UI sounds hardcode the motif so no page needs the JSON to play a note.
-// If the song is re-exported with a changed hook (scripts/import-ost.mjs starfall), this
-// is what notices.
+// The UI sounds hardcode the motif so no page needs data to play a note. The fixture is the
+// motif's right hand as the song's last import had it (starfall.json, v07k), kept when the song
+// page and its data came down (14 Oct 2026; tag starfall-songpage-v1 has the importer).
 describe('UI sound motif', () => {
   it('is the top line of IV. Hallway Echo, note for note', () => {
     const top = new Map<string, number>();

@@ -6,7 +6,7 @@
    Used twice with the same classes: by index.astro's `fallback` (before the
    island hydrates) and by Library.svelte while it fetches. Every number here
    mirrors Library.svelte (.lib, .lib__head, .lib__hint, .lib__grid) and the
-   stage/label of WorkCard / KeyChain — change them together.
+   stage/label of WorkCard — change them together.
    ============================================================ */
 :root { --shelf-label-h: 7rem; }
 

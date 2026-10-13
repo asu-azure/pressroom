@@ -3,15 +3,20 @@
  * seat, the hub rosette and the hinge knuckles), a lid on a hinge, and the disc — its printed
  * face on top, a rainbow underside below. Units are centimetres; the case faces +z (the lid).
  *
- * Every case shares one kit of geometries and materials; a case only owns its disc face.
+ * Every case shares one kit of geometries and materials; a case owns only its jacket, its disc
+ * face and the spine geometry that picks its column out of the shared spine atlas.
+ *
+ * A CD case holds paper too: the jacket under the clear lid (it swings with the lid, and the inside
+ * of the booklet shows when the lid lies open) and the spine card inside the hinge wall, which is
+ * what faces you in the crate, so the titles there tell the CDs apart (all three share one picture).
  *
  * The plastic is not three's `transmission` (an extra pass per frame, and a clear case would hide
  * the clear cases behind it). It is a thin transparent body whose reflections are NOT dimmed by its
  * opacity, plus a Fresnel term that thickens it at grazing angles. Bevels and an edge outline
  * catch the light, which is what makes a jewel case read as glass.
  */
-import type { BufferGeometry, Group, Material, MeshPhysicalMaterial, Points, ShaderMaterial, Texture } from 'three';
-import { DISC, discFace, grooveMap, sparkleTexture, stickerTexture } from './textures';
+import type { BufferGeometry, Group, Material, MeshPhysicalMaterial, MeshStandardMaterial, Points, ShaderMaterial, Texture } from 'three';
+import { DISC, discFace, grooveMap, sparkleTexture } from './textures';
 
 type Three = typeof import('three');
 
@@ -23,6 +28,10 @@ const HINGE = { x: -CASE.w / 2 + 0.12, z: 0.33 };
 const DISC_AT = { x: 0.3, y: 0, z: -0.04 };
 /** How far the lid swings open (rad). */
 const LID_OPEN = 2.72;
+/** The jacket: a 12 cm booklet under the lid, nudged off the hinge tabs. */
+const JACKET = { size: 12, x: -HINGE.x + 0.15, z: 0.035 };
+/** The spine card, inside the tray's hinge wall: 0.62 deep, 12.6 tall. */
+const SPINE = { x: -CASE.w / 2 + 0.17, z: -0.1, w: 0.62, h: 12.6 };
 
 export interface JewelKit {
   THREE: Three;
@@ -33,13 +42,18 @@ export interface JewelKit {
   discTop: BufferGeometry;
   discBottom: BufferGeometry;
   discRim: BufferGeometry;
-  sticker: BufferGeometry;
+  jacket: BufferGeometry;
+  spine: BufferGeometry;
   plastic: Material;
   lidPlastic: Material;
   line: Material;
   silver: MeshPhysicalMaterial;
   rimSilver: MeshPhysicalMaterial;
-  comingSticker: Material;
+  /** the inside of the booklet (one picture for every case) and the spine atlas */
+  inner: MeshStandardMaterial;
+  spines: MeshStandardMaterial;
+  /** how many columns the spine atlas has */
+  spineColumns: number;
   sparkle: Texture;
 }
 
@@ -48,10 +62,13 @@ export interface Jewel {
   /** the hinge pivot; its child is the lid */
   lid: Group;
   disc: Group;
-  kind: 'song' | 'coming' | 'blank';
+  kind: 'cd' | 'blank';
   /** 0 = shut, 1 = open */
   setOpen(v: number): void;
-  setFace(img: CanvasImageSource): void;
+  /** the jacket under the lid (the case owns the texture from here on) */
+  setJacket(tex: Texture): void;
+  /** the disc's print; the clear hub is drawn over its middle */
+  setDisc(img: CanvasImageSource): void;
   dispose(): void;
 }
 
@@ -209,7 +226,7 @@ function diffraction(m: MeshPhysicalMaterial, strength = 1.6) {
   m.customProgramCacheKey = () => 'crate-diffraction';
 }
 
-export function jewelKit(THREE: Three): JewelKit {
+export function jewelKit(THREE: Three, spineColumns = 4): JewelKit {
   const { w, h, r } = CASE;
   const { mergeGeometries } = THREE_UTILS;
   const z0 = -CASE.d / 2;
@@ -297,7 +314,13 @@ export function jewelKit(THREE: Three): JewelKit {
   const discRim = new THREE.CylinderGeometry(DISC.r, DISC.r, 0.12, 128, 1, true);
   discRim.rotateX(Math.PI / 2);
 
-  const sticker = new THREE.CircleGeometry(1.15, 40);
+  // the paper: the jacket faces up under the lid; the spine card faces out through the hinge wall
+  // (−x), its width running along z, so a column of the atlas reads top to bottom on a standing case
+  const jacket = new THREE.PlaneGeometry(JACKET.size, JACKET.size);
+  const spine = new THREE.PlaneGeometry(SPINE.w, SPINE.h);
+  spine.rotateY(-Math.PI / 2);
+  // printed paper: matte, a little sheen, dark until its picture arrives
+  const paper = (color: number) => new THREE.MeshStandardMaterial({ color, roughness: 0.68, metalness: 0, envMapIntensity: 0.55 });
 
   const silver = new THREE.MeshPhysicalMaterial({
     color: 0xd7dbe2,
@@ -321,13 +344,16 @@ export function jewelKit(THREE: Three): JewelKit {
     discTop,
     discBottom,
     discRim,
-    sticker,
+    jacket,
+    spine,
     plastic: glass(THREE, 0.035, 0.55),
     lidPlastic: glass(THREE, 0.02, 0.45),
     line: new THREE.LineBasicMaterial({ color: 0xf2f5ff, transparent: true, opacity: 0.32, depthWrite: false }),
     silver,
     rimSilver: new THREE.MeshPhysicalMaterial({ color: 0xc9ced6, metalness: 1, roughness: 0.3 }),
-    comingSticker: new THREE.MeshBasicMaterial({ map: stickerTexture(THREE, 'COMING'), transparent: true }),
+    inner: paper(0x0b0d1a),
+    spines: paper(0x0b0d1a),
+    spineColumns,
     sparkle: sparkleTexture(THREE),
   };
 }
@@ -345,7 +371,7 @@ export async function loadThree(): Promise<Three> {
   return THREE;
 }
 
-export function buildJewel(kit: JewelKit, kind: Jewel['kind']): Jewel {
+export function buildJewel(kit: JewelKit, kind: Jewel['kind'], spineColumn = -1): Jewel {
   const { THREE } = kit;
   const root = new THREE.Group();
 
@@ -365,31 +391,42 @@ export function buildJewel(kit: JewelKit, kind: Jewel['kind']): Jewel {
   const disc = new THREE.Group();
   disc.position.set(DISC_AT.x, DISC_AT.y, DISC_AT.z);
   let face: MeshPhysicalMaterial | null = null;
-  if (kind !== 'blank') {
-    face =
-      kind === 'song'
-        ? new THREE.MeshPhysicalMaterial({
-            map: discFace(THREE, null),
-            // a printed label is nearly matte: a glossy one turned into a white glare over the
-            // cover whenever a case faced the key light
-            roughness: 0.62,
-            metalness: 0,
-            specularIntensity: 0.3,
-            clearcoat: 0.12,
-            clearcoatRoughness: 0.3,
-          })
-        : null;
+  let jacket: MeshStandardMaterial | null = null;
+  let spineGeo: BufferGeometry | null = null;
+  if (kind === 'cd') {
+    face = new THREE.MeshPhysicalMaterial({
+      map: discFace(THREE, null),
+      // a printed label is nearly matte: a glossy one turned into a white glare over the
+      // cover whenever a case faced the key light
+      roughness: 0.62,
+      metalness: 0,
+      specularIntensity: 0.3,
+      clearcoat: 0.12,
+      clearcoatRoughness: 0.3,
+    });
     disc.add(
-      new THREE.Mesh(kit.discTop, face ?? kit.silver),
+      new THREE.Mesh(kit.discTop, face),
       new THREE.Mesh(kit.discBottom, kit.silver),
       new THREE.Mesh(kit.discRim, kit.rimSilver),
     );
-  }
-  if (kind === 'coming') {
-    const s = new THREE.Mesh(kit.sticker, kit.comingSticker);
-    s.position.set(-HINGE.x + CASE.w / 2 - 2.4, CASE.h / 2 - 2.4, 0.5 - HINGE.z);
-    s.renderOrder = 4;
-    lid.add(s);
+    // the jacket under the lid, and the inside of the booklet on its back
+    jacket = new THREE.MeshStandardMaterial({ color: 0x0b0d1a, roughness: 0.68, metalness: 0, envMapIntensity: 0.55 });
+    const front = new THREE.Mesh(kit.jacket, jacket);
+    front.position.set(JACKET.x, 0, JACKET.z);
+    const back = new THREE.Mesh(kit.jacket, kit.inner);
+    back.rotation.y = Math.PI;
+    back.position.set(JACKET.x, 0, JACKET.z - 0.005);
+    lid.add(front, back);
+    // the spine card, its own column of the shared atlas
+    if (spineColumn >= 0) {
+      spineGeo = kit.spine.clone();
+      const uv = spineGeo.getAttribute('uv');
+      for (let k = 0; k < uv.count; k++) uv.setX(k, (spineColumn + uv.getX(k)) / kit.spineColumns);
+      uv.needsUpdate = true;
+      const s = new THREE.Mesh(spineGeo, kit.spines);
+      s.position.set(SPINE.x, 0, SPINE.z);
+      root.add(s);
+    }
   }
 
   root.add(tray, trayLines, disc, lid);
@@ -404,7 +441,15 @@ export function buildJewel(kit: JewelKit, kind: Jewel['kind']): Jewel {
       // the disc lifts off the hub a little as the lid clears it
       disc.position.z = DISC_AT.z + Math.max(0, v - 0.35) * 0.9;
     },
-    setFace(img) {
+    setJacket(tex) {
+      if (!jacket) return void tex.dispose();
+      const old = jacket.map;
+      jacket.map = tex;
+      jacket.color.set(0xffffff);
+      jacket.needsUpdate = !old;
+      old?.dispose();
+    },
+    setDisc(img) {
       if (!face) return;
       const old = face.map;
       face.map = discFace(THREE, img);
@@ -413,6 +458,9 @@ export function buildJewel(kit: JewelKit, kind: Jewel['kind']): Jewel {
     dispose() {
       face?.map?.dispose();
       face?.dispose();
+      jacket?.map?.dispose();
+      jacket?.dispose();
+      spineGeo?.dispose();
     },
   };
 }

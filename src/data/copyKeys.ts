@@ -32,7 +32,7 @@ import type { Lang } from '../lib/lang';
  *
  * ⚠ A new section or slot with no `page` will not appear in the Studio at all.
  */
-export type PageId = 'asu' | 'home' | 'music' | 'ost' | 'lookbook';
+export type PageId = 'asu' | 'home' | 'music' | 'lookbook';
 
 export interface PageGroup {
   id: PageId;
@@ -60,15 +60,9 @@ export const PAGE_GROUPS: PageGroup[] = [
   },
   {
     id: 'music',
-    label: 'MUSIC — THE RACK',
+    label: 'MUSIC',
     href: '/music',
-    note: 'Every song as a keychain on a rail. Only live while music is switched on (PUBLIC_MUSIC).',
-  },
-  {
-    id: 'ost',
-    label: 'STARFALL — SONG PAGE',
-    href: '/music/starfall',
-    note: 'ナガレボシ / STARFALL: the keychain you scan, the playlist, the video. The scan and back labels are shared by every song page.',
+    note: 'Every song as a CD standing on a plinth; pick one up and it plays from YouTube. Only live while music is switched on (PUBLIC_MUSIC).',
   },
   {
     id: 'lookbook',
@@ -116,14 +110,13 @@ export const SECTIONS: CopySection[] = [
   { id: 'teaser',  page: 'home', label: 'Homepage banner', note: 'The dark "Who is Asu Azure?" band on the shelf, below the book grid.' },
   { id: 'meta',    page: 'home', label: 'Page metadata', note: 'Browser tab and link previews. Not visible on the page itself.' },
 
-  // --- /lookbook — the six acts, in their own scroll order
-  { id: 'musicRack',  page: 'music', label: 'The crate', note: 'The heading above the CD crate, the labels on a case you hover, and the buttons under a case you pull out.' },
+  // --- /music — the crate, then each CD's liner, front of the crate first
+  { id: 'musicCrate',     page: 'music', label: 'The CDs', note: 'The heading above the CDs, and the words around a CD you pick up (its liner: tracklist, player, credits).' },
+  { id: 'musicStarfall',  page: 'music', label: 'CD 01 — ナガレボシ', note: 'The note and credits in its liner.' },
+  { id: 'musicTailwind',  page: 'music', label: 'CD 02 — オイカゼ', note: 'The note and credits in its liner.' },
+  { id: 'musicLightward', page: 'music', label: 'CD 03 — ヒカリノホウヘ', note: 'The note and credits in its liner.' },
 
-  { id: 'ostHero',    page: 'ost', label: 'Keychain', note: 'Beside the keychain on the first screen, and the scan button.' },
-  { id: 'ostList',    page: 'ost', label: 'Playlist header', note: 'The small labels around the player after a scan.' },
-  { id: 'ostMv',      page: 'ost', label: 'The music video', note: 'The line above the video, the button on it, and the note under it.' },
-  { id: 'ostNotes',   page: 'ost', label: 'Liner notes', note: 'One short line per movement, in the booklet under the video.' },
-  { id: 'ostCredits', page: 'ost', label: 'Credits', note: 'The closing lines of the page.' },
+  // --- /lookbook — the six acts, in their own scroll order
 
   { id: 'actFilm',    page: 'lookbook', label: 'Act I — Film', note: 'Letterboxed opening, four cycling photographs.' },
   { id: 'actScatter', page: 'lookbook', label: 'Act II — Scatter', note: 'Words that blow apart as you scroll.' },
@@ -485,159 +478,101 @@ export const COPY_FIELDS: CopyField[] = [
     defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
   },
 
-  // ---------------- /ost — the soundtrack ----------------
+  // ---------------- /music — the crate ----------------
   {
-    key: 'ost.kicker', section: 'ostHero', label: 'Small label', type: 'line',
-    hint: 'Uppercase mono, above the title.',
-    defaults: { en: 'SOUNDTRACK · 扉の向こうはヒマワリ畑', th: 'เพลงประกอบ · 扉の向こうはヒマワリ畑', ja: 'サウンドトラック · 扉の向こうはヒマワリ畑' },
+    key: 'music.kicker', section: 'musicCrate', label: 'Small label', type: 'line',
+    hint: 'Uppercase mono, above MUSIC.',
+    defaults: { en: 'ORIGINAL SONGS · ASU AZURE', th: 'เพลงออริจินัล · ASU AZURE', ja: 'オリジナル曲 · ASU AZURE' },
   },
   {
-    key: 'ost.lede', section: 'ostHero', label: 'Short paragraph', type: 'line',
-    hint: 'One sentence under the title.',
+    key: 'music.lede', section: 'musicCrate', label: 'Short paragraph', type: 'line',
+    hint: 'Under MUSIC. Also the description in link previews.',
     defaults: {
-      en: 'A nocturne in sixteen movements, from a clear afternoon to the night the stars fall.',
-      th: 'บทเพลงราตรีสิบหกท่อน ตั้งแต่บ่ายวันฟ้าใสจนถึงคืนที่ดาวร่วง',
-      ja: '晴れた午後から、星が降る夜までの十六の楽章。',
+      en: 'Songs from the world of 扉の向こうはヒマワリ畑, one CD each. Pick one up to listen.',
+      th: 'เพลงจากโลกของ 扉の向こうはヒマワリ畑 เพลงละหนึ่งแผ่น หยิบขึ้นมาฟังได้เลย',
+      ja: '『扉の向こうはヒマワリ畑』の世界から生まれた曲たち。一曲一枚のCDです。手に取って聴いてください。',
     },
   },
   {
-    key: 'ost.scan', section: 'ostHero', label: 'Scan button', type: 'line',
-    defaults: { en: 'SCAN', th: 'สแกน', ja: 'スキャン' },
+    key: 'music.hint', section: 'musicCrate', label: 'Hint', type: 'line',
+    hint: 'The small line under the paragraph.',
+    defaults: { en: 'SWEEP ACROSS THE CDs · TAP ONE TO PICK IT UP', th: 'ลากผ่านแผ่นซีดีได้ · แตะเพื่อหยิบขึ้นมา', ja: 'ケースの上をなぞって · タップして手に取る' },
   },
   {
-    key: 'ost.scanHint', section: 'ostHero', label: 'Hint under the button', type: 'line',
+    key: 'music.track', section: 'musicCrate', label: 'One track', type: 'line',
+    hint: 'After the number on a CD with one track: "1 TRACK · 5:11".',
+    defaults: { en: 'TRACK', th: 'เพลง', ja: '曲' },
+  },
+  {
+    key: 'music.tracks', section: 'musicCrate', label: 'Several tracks', type: 'line',
+    hint: 'After the number on a CD with more than one: "3 TRACKS · 12:54".',
+    defaults: { en: 'TRACKS', th: 'เพลง', ja: '曲' },
+  },
+  {
+    key: 'music.open', section: 'musicCrate', label: 'Above the player', type: 'line',
+    hint: 'How to handle the case once it is out of the crate.',
+    defaults: { en: 'TAP THE CASE TO PLAY · DRAG TO TURN IT', th: 'แตะกล่องเพื่อฟัง · ลากเพื่อหมุน', ja: 'ケースをタップで再生 · ドラッグで回す' },
+  },
+  {
+    key: 'music.listen', section: 'musicCrate', label: 'Play button', type: 'line',
+    hint: 'On the video still, before anything loads from YouTube.',
+    defaults: { en: 'LISTEN', th: 'ฟัง', ja: '聴く' },
+  },
+  {
+    key: 'music.tapPlayer', section: 'musicCrate', label: 'When it does not start', type: 'line',
+    hint: 'Under the player, only when the browser would not let the song start by itself (often on iPhone).',
     defaults: {
-      en: 'Tap the sound wave on the keychain to open the playlist.',
-      th: 'แตะคลื่นเสียงบนพวงกุญแจ เพื่อเปิดเพลย์ลิสต์',
-      ja: 'キーホルダーの音の波をタップすると、プレイリストが開きます。',
+      en: 'If it does not start, press ▶ in the player.',
+      th: 'ถ้าเพลงไม่เล่นเอง กด ▶ ในเครื่องเล่นได้เลย',
+      ja: 'うまく再生されないときは、プレーヤーの▶を押してください。',
     },
   },
   {
-    key: 'ost.playlist', section: 'ostList', label: 'Small label', type: 'line',
-    hint: 'Above the title in the player.',
-    defaults: { en: 'PLAYLIST', th: 'เพลย์ลิสต์', ja: 'プレイリスト' },
+    key: 'music.tracklist', section: 'musicCrate', label: 'Tracklist heading', type: 'line',
+    defaults: { en: 'TRACKLIST', th: 'รายชื่อเพลง', ja: '収録曲' },
   },
   {
-    key: 'ost.scanned', section: 'ostList', label: 'After a scan', type: 'line',
-    hint: 'Flashes briefly when the playlist opens from the QR or a scan.',
-    defaults: { en: 'SCANNED', th: 'สแกนแล้ว', ja: 'スキャン完了' },
+    key: 'music.credits', section: 'musicCrate', label: 'Credits heading', type: 'line',
+    defaults: { en: 'CREDITS', th: 'เครดิต', ja: 'クレジット' },
   },
   {
-    key: 'ost.keychain', section: 'ostList', label: 'Back to the keychain', type: 'line',
-    hint: 'The arrow is added automatically.',
-    defaults: { en: 'KEYCHAIN', th: 'พวงกุญแจ', ja: 'キーホルダー' },
+    key: 'music.onYouTube', section: 'musicCrate', label: 'To YouTube', type: 'line',
+    hint: 'Opens the track on YouTube, from where it was playing. The arrow is added automatically.',
+    defaults: { en: 'OPEN ON YOUTUBE', th: 'เปิดในยูทูป', ja: 'YouTubeで開く' },
   },
   {
-    key: 'ost.notesKicker', section: 'ostNotes', label: 'Booklet heading', type: 'line',
-    defaults: { en: 'LINER NOTES', th: 'บันทึกประกอบเพลง', ja: 'ライナーノーツ' },
+    key: 'music.close', section: 'musicCrate', label: 'Put the case back', type: 'line',
+    hint: 'The button that puts the case back with the others.',
+    defaults: { en: 'PUT IT BACK', th: 'วางคืน', ja: '元に戻す' },
   },
   {
-    key: 'ost.notesHint', section: 'ostNotes', label: 'Hint under the heading', type: 'line',
-    defaults: { en: 'Tap a movement to play from there.', th: 'แตะท่อนไหน ก็เริ่มเล่นจากตรงนั้น', ja: '楽章を押すと、そこから再生します。' },
-  },
-  {
-    key: 'ost.m1', section: 'ostNotes', label: 'I. Prologue', type: 'line',
-    defaults: { en: 'Dust turning in a beam of light. A door left slightly open.', th: 'ฝุ่นลอยในลำแสง ประตูบานหนึ่งแง้มค้างไว้', ja: '光の中に舞う埃。少しだけ開いたままの扉。' },
-  },
-  {
-    key: 'ost.m2', section: 'ostNotes', label: 'II. Blue Margin', type: 'line',
-    defaults: { en: 'Blue at the edge of the page. A quiet with room for one.', th: 'สีฟ้าตรงขอบกระดาษ ความเงียบที่มีที่พอแค่คนเดียว', ja: 'ページの余白の青。ひとり分だけの静けさ。' },
-  },
-  {
-    key: 'ost.m3', section: 'ostNotes', label: 'III. Long Shadows', type: 'line',
-    defaults: { en: 'The shadows stretch out. The gold stays longer than that afternoon did.', th: 'เงาทอดยาวออกไป สีทองค้างอยู่นานกว่าบ่ายวันนั้น', ja: '影が伸びていく。金色は、あの午後よりも長く残る。' },
-  },
-  {
-    key: 'ost.m4', section: 'ostNotes', label: 'IV. Hallway Echo', type: 'line',
-    defaults: { en: 'A voice sent down the corridor comes back as an echo.', th: 'เสียงเรียกที่ส่งไปสุดทางเดิน ย้อนกลับมาเป็นเสียงสะท้อน', ja: '廊下の向こうへ投げた声が、こだまになって戻ってくる。' },
-  },
-  {
-    key: 'ost.m5', section: 'ostNotes', label: 'V. Second Hand', type: 'line',
-    defaults: { en: 'Every second takes a little something with it.', th: 'ทุกวินาทีพาอะไรบางอย่างไปด้วยทีละนิด', ja: '一秒ごとに、何かが少しずつ持っていかれる。' },
-  },
-  {
-    key: 'ost.m6', section: 'ostNotes', label: 'VI. Sodium Light', type: 'line',
-    defaults: { en: 'Orange light on an empty road, and its low hum.', th: 'แสงสีส้มบนถนนที่ไม่มีใคร กับเสียงหึ่งต่ำ ๆ ของมัน', ja: '誰もいない道のオレンジの灯り。その低いうなり。' },
-  },
-  {
-    key: 'ost.m7', section: 'ostNotes', label: 'VII. Rain on Glass', type: 'line',
-    defaults: { en: 'The rain writes something on the glass, then wipes it away again.', th: 'ฝนเขียนอะไรบางอย่างบนกระจก แล้วก็ลบทิ้งไปอีก', ja: '雨がガラスに何かを書いては、また消していく。' },
-  },
-  {
-    key: 'ost.m8', section: 'ostNotes', label: 'VIII. Roll Call', type: 'line',
-    defaults: { en: 'One voice, then another, and then the room is full.', th: 'เสียงหนึ่ง อีกเสียงหนึ่ง แล้วก็เต็มห้อง', ja: 'ひとつの声、またひとつ。やがて部屋がいっぱいになる。' },
-  },
-  {
-    key: 'ost.m9', section: 'ostNotes', label: 'IX. Semper ad Lucem', type: 'line',
-    defaults: { en: 'Every face turns the same way, toward where the light is.', th: 'ทุกใบหน้าหันไปทางเดียวกัน ทางที่มีแสง', ja: 'みんなの顔が、同じ方を向く。光のある方へ。' },
-  },
-  {
-    key: 'ost.m10', section: 'ostNotes', label: 'X. Continue?', type: 'line',
-    defaults: { en: 'Three lives left. The screen asks whether you’ll go on.', th: 'เหลืออีกสามชีวิต หน้าจอถามว่าจะเล่นต่อไหม', ja: '残りは三機。画面が、まだ続けるかと訊いてくる。' },
-  },
-  {
-    key: 'ost.m11', section: 'ostNotes', label: 'XI. Cold Hands', type: 'line',
-    defaults: { en: 'Winter lights, and fingertips that won’t get warm.', th: 'แสงไฟหน้าหนาว กับปลายนิ้วที่ไม่ยอมอุ่นขึ้นสักที', ja: '冬の灯り。いつまでも温まらない指先。' },
-  },
-  {
-    key: 'ost.m12', section: 'ostNotes', label: 'XII. Undertow', type: 'line',
-    defaults: { en: 'Still on the surface. Underneath, a current.', th: 'ผิวน้ำนิ่งสนิท แต่ข้างใต้มีกระแสน้ำ', ja: '水面は静か。その下に、流れがある。' },
-  },
-  {
-    key: 'ost.m13', section: 'ostNotes', label: 'XIII. One Breath', type: 'line',
-    defaults: { en: 'Hold it, let it go. Somewhere, a small light.', th: 'กลั้นไว้ แล้วปล่อยออกมา ที่ไหนสักแห่งมีแสงดวงเล็ก ๆ', ja: '息をとめて、吐く。どこかに、小さな灯り。' },
-  },
-  {
-    key: 'ost.m14', section: 'ostNotes', label: 'XIV. Starfall', type: 'line',
-    defaults: { en: 'Stars fall all night without a sound, and the years go with them.', th: 'ดาวร่วงทั้งคืนโดยไม่มีเสียง แล้วปีก็ไหลตามไปด้วย', ja: '星が音もなく降りつづける。年月も、いっしょに流れていく。' },
-  },
-  {
-    key: 'ost.m15', section: 'ostNotes', label: 'XV. Sunrise', type: 'line',
-    defaults: { en: 'The edge of the sky turns pale, and the dark slowly lets go.', th: 'ขอบฟ้าเริ่มซีดลง แล้วความมืดก็ค่อย ๆ คลายมือ', ja: '空の端が白んで、夜がゆっくりと手をほどく。' },
-  },
-  {
-    key: 'ost.m16', section: 'ostNotes', label: 'XVI. Epilogue', type: 'line',
-    defaults: { en: 'Beyond the door, yellow as far as the eye can see.', th: 'หลังประตูบานนั้น มีแต่สีเหลืองไปจนสุดสายตา', ja: '扉の向こうは、見渡すかぎりの黄色。' },
-  },
-  {
-    key: 'ost.mvKicker', section: 'ostMv', label: 'Label', type: 'line',
-    hint: 'Above the video.',
-    defaults: { en: 'MUSIC VIDEO', th: 'มิวสิกวิดีโอ', ja: 'ミュージックビデオ' },
-  },
-  {
-    key: 'ost.mvNote', section: 'ostMv', label: 'Note', type: 'line',
-    defaults: {
-      en: 'The cards and the words below follow the video. Press a card to go to its movement.',
-      th: 'การ์ดกับเนื้อเพลงข้างล่างจะเลื่อนตามวิดีโอ กดการ์ดใบไหนก็ข้ามไปท่อนนั้นได้',
-      ja: '下のカードと歌詞は、映像に合わせて進みます。カードを押すと、その楽章へ。',
-    },
-  },
-  {
-    key: 'ost.mvPlay', section: 'ostMv', label: 'The button on the video', type: 'line',
-    defaults: { en: 'WATCH THE MV', th: 'ดู MV', ja: 'MVを観る' },
-  },
-  {
-    key: 'ost.songOnly', section: 'ostList', label: 'Beside PLAY', type: 'line',
-    hint: 'PLAY plays the song alone, without the video (a video playing stops, the song goes on from there).',
-    defaults: { en: 'JUST THE SONG', th: 'ฟังเพลงอย่างเดียว', ja: '曲だけ聴く' },
-  },
-  {
-    key: 'ost.credits', section: 'ostCredits', label: 'Credit line', type: 'line',
-    hint: 'Alias only — never a real name. As the MV credits it, plus the Chopin it quotes.',
-    defaults: {
-      en: 'MUSIC · LYRICS · STORY & ILLUSTRATION · MOVIE — ASU AZURE  /  JAPANESE PROOFREADING, LYRICS & DIALOGUE — なぎ  /  QUOTES CHOPIN, NOCTURNE OP. 48 NO. 1',
-      th: 'ดนตรี · เนื้อร้อง · เรื่องและภาพ · วิดีโอ — ASU AZURE  /  ตรวจภาษาญี่ปุ่นของเนื้อร้องและบทพูด — なぎ  /  ยกท่อนจากนอคเทิร์น Op. 48 No. 1 ของโชแปง',
-      ja: '作曲・作詞・原作・イラスト・映像 — ASU AZURE  /  日本語監修（歌詞・台詞）— なぎ  /  引用：ショパン《夜想曲 作品48-1》',
-    },
-  },
-  {
-    key: 'ost.back', section: 'musicRack', label: 'Back-to-shelf link', type: 'line',
-    hint: 'At the foot of the crate. The arrow is added automatically.',
+    key: 'music.back', section: 'musicCrate', label: 'Back-to-shelf link', type: 'line',
+    hint: 'At the foot of the page. The arrow is added automatically.',
     defaults: { en: 'BACK TO THE SHELF', th: 'กลับไปที่ชั้นหนังสือ', ja: '本棚へ戻る' },
   },
+
+  // ---------------- CD 01 — ナガレボシ ----------------
   {
-    key: 'ost.creditsVoices', section: 'ostCredits', label: 'Singing voices', type: 'line',
-    hint: 'Every NEUTRINO voice in the choir (eleven since the v07j mix). Credit is optional for most of them, but listing them all is the owner\'s choice (4 Oct). Kotonoha Akane / Aoi, Yogatari Tobari and JSUT were taken out of the choir: their terms need permission.',
+    key: 'music.starfall.note', section: 'musicStarfall', label: 'Note', type: 'line',
+    hint: 'One or two sentences at the top of its liner.',
+    defaults: {
+      en: 'The song I wrote for my own manga, 扉の向こうはヒマワリ畑.',
+      th: 'เพลงที่แต่งให้มังงะของตัวเองเรื่อง 扉の向こうはヒマワリ畑',
+      ja: '自作の漫画『扉の向こうはヒマワリ畑』のために書いた曲です。',
+    },
+  },
+  {
+    key: 'music.starfall.credits', section: 'musicStarfall', label: 'Credit line', type: 'line',
+    hint: 'Alias only — never a real name. As the YouTube description credits it.',
+    defaults: {
+      en: 'MUSIC · LYRICS · COVER ILLUSTRATION — ASU AZURE  /  JAPANESE PROOFREADING — なぎ  /  INSPIRED BY CHOPIN: NOCTURNE OP. 48 NO. 1, ÉTUDES OP. 10 NO. 1, OP. 10 NO. 12, OP. 25 NO. 11, OP. 25 NO. 12',
+      th: 'ดนตรี · เนื้อร้อง · ภาพปก — ASU AZURE  /  ตรวจภาษาญี่ปุ่น — なぎ  /  ได้แรงบันดาลใจจากโชแปง นอคเทิร์น Op. 48 No. 1 และเอทูด Op. 10 No. 1, Op. 10 No. 12, Op. 25 No. 11, Op. 25 No. 12',
+      ja: '作曲・作詞・カバーイラスト — ASU AZURE  /  日本語校正 — なぎ  /  インスピレーション：ショパン《夜想曲 作品48-1》《練習曲 作品10-1・10-12・25-11・25-12》',
+    },
+  },
+  {
+    key: 'music.starfall.voices', section: 'musicStarfall', label: 'Singing voices', type: 'line',
+    hint: "Every NEUTRINO voice in the choir (eleven since the v07j mix). Credit is optional for most of them, but listing them all is the owner's choice (4 Oct). Kotonoha Akane / Aoi, Yogatari Tobari and JSUT were taken out of the choir: their terms need permission.",
     defaults: {
       en: 'VOICES — NEUTRINO (Merrow, Reina, NAKUMO, Soma, Runo, Tohoku Zunko, Tohoku Kiritan, Tohoku Itako, Shikoku Metan, No.7, Yoko)',
       th: 'เสียงร้องสังเคราะห์ด้วย NEUTRINO (Merrow · Reina · NAKUMO · Soma · Runo · Tohoku Zunko · Tohoku Kiritan · Tohoku Itako · Shikoku Metan · No.7 · Yoko)',
@@ -645,64 +580,53 @@ export const COPY_FIELDS: CopyField[] = [
     },
   },
   {
-    key: 'ost.creditsCorpora', section: 'ostCredits', label: 'Voice databases', type: 'line',
-    hint: 'Yoko\'s database is CC BY 3.0, which requires this attribution; the licence link is added after it automatically.',
+    key: 'music.starfall.corpora', section: 'musicStarfall', label: 'Voice databases', type: 'line',
+    hint: "Yoko's database is CC BY 3.0, which requires this attribution; the licence link is added after it automatically.",
     defaults: {
       en: 'Yoko is trained on “NIT SONG070 F001” © Nagoya Institute of Technology. Licence:',
       th: 'เสียง Yoko ฝึกจากฐานข้อมูล “NIT SONG070 F001” © Nagoya Institute of Technology สัญญาอนุญาต:',
       ja: '謡子：名古屋工業大学「NIT SONG070 F001」。ライセンス：',
     },
   },
-  {
-    key: 'ost.backRack', section: 'ostCredits', label: 'Back-to-rack link', type: 'line',
-    hint: 'At the foot of every song page. The arrow is added automatically.',
-    defaults: { en: 'ALL SONGS', th: 'เพลงทั้งหมด', ja: 'すべての曲' },
-  },
 
-  // ---------------- /music — the rack ----------------
+  // ---------------- CD 02 — オイカゼ ----------------
   {
-    key: 'music.kicker', section: 'musicRack', label: 'Small label', type: 'line',
-    hint: 'Uppercase mono, above MUSIC.',
-    defaults: { en: 'ORIGINAL SONGS · ASU AZURE', th: 'เพลงออริจินัล · ASU AZURE', ja: 'オリジナル曲 · ASU AZURE' },
-  },
-  {
-    key: 'music.lede', section: 'musicRack', label: 'Short paragraph', type: 'line',
-    hint: 'Under MUSIC. Also the description in link previews.',
+    key: 'music.tailwind.note', section: 'musicTailwind', label: 'Note', type: 'line',
+    hint: 'One or two sentences at the top of its liner.',
     defaults: {
-      en: 'Songs from the world of 扉の向こうはヒマワリ畑, one CD each in the crate. Pull one out to listen.',
-      th: 'เพลงจากโลกของ 扉の向こうはヒマワリ畑 เพลงละหนึ่งแผ่นในลัง หยิบออกมาฟังได้เลย',
-      ja: '『扉の向こうはヒマワリ畑』の世界から生まれた曲たち。箱の中に一曲一枚のCD。取り出して聴いてください。',
+      en: "The school band's song in my manga 扉の向こうはヒマワリ畑: a tailwind that gently pushes someone dear from behind.",
+      th: 'เพลงของวงดนตรีโรงเรียนในมังงะเรื่อง 扉の向こうはヒマワリ畑 เป็นเพลงที่เหมือนลมส่ง ค่อย ๆ ดันหลังคนสำคัญจากข้างหลัง',
+      ja: '自作の漫画『扉の向こうはヒマワリ畑』に登場する、学校のバンドの曲です。大切な人の背中を、うしろからそっと押す追い風のような曲です。',
     },
   },
   {
-    key: 'music.hint', section: 'musicRack', label: 'Hint', type: 'line',
-    hint: 'The small line under the paragraph.',
-    defaults: { en: 'SWEEP ACROSS THE CRATE · TAP A CD TO PULL IT OUT', th: 'ลากผ่านลังได้ · แตะซีดีเพื่อหยิบออกมา', ja: 'ケースの上をなぞって · CDをタップして取り出す' },
+    key: 'music.tailwind.credits', section: 'musicTailwind', label: 'Credit line', type: 'line',
+    hint: 'Alias only — never a real name. The proofreading and the voices are for the sung tracks (01, 02). Dvořák must stay credited.',
+    defaults: {
+      en: 'MUSIC · LYRICS · COVER ILLUSTRATION — ASU AZURE  /  JAPANESE PROOFREADING — なぎ (01, 02)  /  VOCALS — Riku 2, Mai 2 (Synthesizer V) (01, 02)  /  QUOTES DVOŘÁK: SYMPHONY NO. 9 “FROM THE NEW WORLD”, IV AND II (LARGO)',
+      th: 'ดนตรี · เนื้อร้อง · ภาพปก — ASU AZURE  /  ตรวจภาษาญี่ปุ่น — なぎ (01, 02)  /  เสียงร้อง — Riku 2, Mai 2 (Synthesizer V) (01, 02)  /  ยกทำนองจากซิมโฟนีหมายเลข 9 “From the New World” ของดโวชาก ท่อนที่ 4 และท่อนที่ 2 (ลาร์โก)',
+      ja: '作曲・作詞・カバーイラスト — ASU AZURE  /  日本語校正 — なぎ（01・02）  /  歌 — Riku 2、Mai 2（Synthesizer V）（01・02）  /  引用：ドヴォルザーク《交響曲第9番「新世界より」》第4楽章・第2楽章（ラルゴ）',
+    },
+  },
+
+  // ---------------- CD 03 — ヒカリノホウヘ ----------------
+  {
+    key: 'music.lightward.note', section: 'musicLightward', label: 'Note', type: 'line',
+    hint: 'One or two sentences at the top of its liner. A homage made for fun, not a battle song.',
+    defaults: {
+      en: "A homage to OCTOPATH TRAVELER, made for fun: the game that got me studying arrangement. ナガレボシ's main motif, rebuilt into a new piece.",
+      th: 'เพลงที่ทำเล่น ๆ เพื่อคารวะ OCTOPATH TRAVELER เกมที่ทำให้เริ่มเรียนการเรียบเรียงดนตรีอย่างจริงจัง โดยนำโมทีฟหลักของ ナガレボシ มาเรียบเรียงใหม่เป็นอีกเพลง',
+      ja: 'OCTOPATH TRAVELERへのオマージュとして、遊びで作った曲です。本格的に編曲を学びはじめるきっかけになった作品への敬意をこめて、「ナガレボシ」のメインモチーフを組み直しました。',
+    },
   },
   {
-    key: 'music.listen', section: 'musicRack', label: 'Under a song', type: 'line',
-    hint: 'The link under each song that is out. The arrow is added automatically.',
-    defaults: { en: 'LISTEN', th: 'ฟัง', ja: '聴く' },
-  },
-  {
-    key: 'music.coming', section: 'musicRack', label: 'A song not out yet', type: 'line',
-    hint: 'Songs not out yet sit in the crate as clear cases with a COMING sticker and no title.',
-    defaults: { en: 'COMING SOON', th: 'เร็ว ๆ นี้', ja: 'COMING SOON' },
-  },
-  {
-    key: 'music.open', section: 'musicRack', label: 'Under a case you pulled out', type: 'line',
-    hint: 'How to handle the case once it is out of the crate.',
-    defaults: { en: 'TAP THE CASE TO OPEN IT · DRAG TO TURN IT', th: 'แตะกล่องเพื่อเปิด · ลากเพื่อหมุน', ja: 'ケースをタップで開く · ドラッグで回す' },
-  },
-  {
-    key: 'music.toSong', section: 'musicRack', label: 'To the song page', type: 'line',
-    hint: 'The button under a case you pulled out. The song goes on from where it was.',
-    defaults: { en: 'SONG PAGE', th: 'ไปหน้าเพลง', ja: '曲のページへ' },
-  },
-  {
-    key: 'music.close', section: 'musicRack', label: 'Put the case back', type: 'line',
-    hint: 'The button that puts the case back in the crate.',
-    defaults: { en: 'BACK IN THE CRATE', th: 'เก็บเข้าลัง', ja: '箱に戻す' },
+    key: 'music.lightward.credits', section: 'musicLightward', label: 'Credit line', type: 'line',
+    hint: "Alias only — never a real name (the composer named here is the game's, in Japanese as the owner wants).",
+    defaults: {
+      en: 'MUSIC · COVER ILLUSTRATION — ASU AZURE  /  INSPIRED BY OCTOPATH TRAVELER (MUSIC: 西木康智)',
+      th: 'ดนตรี · ภาพปก — ASU AZURE  /  ได้แรงบันดาลใจจาก OCTOPATH TRAVELER (ดนตรีโดย 西木康智)',
+      ja: '作曲・カバーイラスト — ASU AZURE  /  インスピレーション：OCTOPATH TRAVELER（音楽：西木康智）',
+    },
   },
 ];
 
