@@ -1,24 +1,10 @@
-# Song data for the music pages
+# Data for /ost/tobira
 
-## <slug>.json — /music/<slug> (starfall.json → /music/starfall)
-
-Imported, never hand-edited: `node scripts/import-ost.mjs <slug> [--audio]`. Each slug's sources
-are in `scripts/songs.import.mjs`: the MV player's build of the song (`timeline.json` in
-`../music/visualizer/player2/songs/<id>/`, the music repo) and the master in the song's `final/`
-folder. Kept: duration, movements, lyrics (chunks with kana), accent hits, the keychain's 48-bar
-wave and the motif's right hand (for `motif.test.ts`). `--audio` also copies the master to
-`public/ost/<slug>.mp3`. No title (the catalogue, `src/data/songs.ts`, owns titles) and no credits:
-the music project's notes use a personal name that must not reach this repo.
-
-## perd-pratu.json — /ost/tobira (the moving score, unlisted)
-
-## starfall.json — /ost (the CD single)
-
-Imported, never hand-edited: `node scripts/import-ost.mjs [--audio]` reads the MV player's
-build (`../music/music/visualizer/player2/songs/starfall-mv/timeline.json`) and keeps only title,
-duration, movements, choir lyrics (chunks with kana), accent hits and the motif's right hand
-(for `motif.test.ts`). `--audio` also copies the MP3 to `public/ost/starfall.mp3`. The importer
-copies no credits: the music project's notes use a personal name that must not reach this repo.
+The songs of the music section have no data here any more: since 14 Oct 2026 they play from YouTube
+(`src/data/music.ts`). The song page's imported timelines (`starfall.json`: movements, karaoke
+lyrics, accent hits, the keychain wave) and their importer (`scripts/import-ost.mjs`) are in the tag
+`starfall-songpage-v1`. The UI sounds' motif check keeps its notes in
+`src/scripts/ost/motif.fixture.json`.
 
 ## perd-pratu.json — /ost/tobira (the moving score, unlisted)
 

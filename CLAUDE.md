@@ -11,10 +11,11 @@ browser at upload time), arranges pages (drag-drop order, RTL/LTR, forced two-pa
 attaches margin notes readers can see. Readers browse a public library and read with their choice
 of single/double layout and scroll/flip mode. Public read, author-only write.
 
-**The visitor journey is shelf first, artist second.** `/` is the bookshelf; **two** entry points
-lead to `/asu` — the artist teaser, which now sits **after** the grid (a visitor who has just looked
-through the work is the one ready to ask who made it), and a footer link — plus the site header on
-every public page. `/asu` always offers a route back.
+**The visitor journey is the work first, the artist second.** `/` is the bookshelf (01), then — when
+music is on — the songs as CDs (02, see the `/music` section), then the artist teaser; **two** entry
+points lead to `/asu` — the teaser, which sits **after** the work (a visitor who has just looked
+through it is the one ready to ask who made it), and a footer link — plus the site header on every
+public page. `/asu` always offers a route back.
 
 The teaser is **ink**, not the cream spread it used to be: below the grid a tone flip would land as
 a bright slab between two dark blocks. Its proof-sheet decor is retoned in `index.astro`'s scoped
@@ -123,8 +124,9 @@ text. See `src/lib/richtext.ts` and its tests.
 - Serif narrates (Fraunces), grotesk punches (Space Grotesk), mono micro-labels (JetBrains Mono
   `.mono`). Preloads are exactly those three. One cobalt accent `#2742f0`; warm counterpoint is
   sunflower amber `#e8a31a`. Proof-sheet decor (crop marks, registration marks, ruler ticks) is
-  the house flavour. Stack Sans Headline is `/ost`-only and declared in `ost-fonts.css`.
-- **Site header** (`.topbar` in `Base.astro`): PRESSROOM · SHELF · ASU AZURE · OST ♪ · sound toggle.
+  the house flavour. Stack Sans Headline is `/ost/tobira`-only and declared in `ost-fonts.css`.
+- **Site header** (`.topbar` in `Base.astro`): PRESSROOM · BOOKS · MUSIC ♪ · ASU AZURE · sound toggle
+  (the homepage's order; MUSIC and the toggle only while music is on).
   Opaque, same on ink and paper, height published as `--topbar-h`. Pages that own their whole
   screen pass `topbar={false}` (`/ost`, Studio) or `chromeless` (reader). Fixed page chrome that sat
   at the very top (LangBar, `/asu` language bar, the overview back chip) reads `--chrome-top`.
@@ -177,8 +179,9 @@ is dropped while the canvas is live (`.is-pressed`).
   hidden and the plates print from blank. A 2.5 s failsafe removes it, and every failure path
   (no WebGL, shader error, lost context, undecodable image) removes it too — the `<img>` is always
   the real picture. Reduced motion never sets it.
-- No frame loop at rest; paused off-screen; DPR capped at 1.5. This is the site's only WebGL
-  context — don't add one to `/asu` (see below).
+- No frame loop at rest; paused off-screen; DPR capped at 1.5. This is the homepage's only WebGL
+  context (the other on the site is `/music`'s CDs) — don't add one to `/asu` (see below), and the
+  homepage's music section is a still for this reason.
 
 ### The shelf's books (`WorkCard.svelte` + `src/scripts/book3d.ts`)
 
@@ -628,151 +631,103 @@ act-character → craft → act-select → act-3d → act-grid → contact.
 
 ## Music features are behind a flag (`PUBLIC_MUSIC`)
 
-**Live since 4 Oct 2026** (the owner's call): `PUBLIC_MUSIC=true` is set in the Vercel project for
-Production and Preview. The flag still gates everything musical — `/music`, `/music/<slug>`,
-`/ost` (a redirect), `/ost/tobira`, the soundtrack keychain on the shelf, the `MUSIC ♪` links, the
-SOUND switch and the UI sounds — so removing the variable and redeploying takes it all down again.
+**Off in production since 14 Oct 2026** (the owner's call): the music section was live from 4 Oct;
+on 14 Oct `PUBLIC_MUSIC` was taken off Vercel's **Production** (it stays on **Preview**, so the
+`music` branch's preview deploys show the CDs) while the section was rebuilt. **To release: add
+`PUBLIC_MUSIC=true` to Production first, then merge `music` into `main`** (a merge builds with
+whatever env is set). The flag gates everything musical — `/music`, `/music/<slug>` and `/ost`
+(redirects), `/ost/tobira`, the homepage's 02 section, the `MUSIC ♪` links, the SOUND switch and the
+UI sounds — so removing the variable and redeploying (without the build cache) takes it all down.
 `src/lib/features.ts` exports `MUSIC` (`import.meta.env.PUBLIC_MUSIC === 'true'`); every entry point
 checks it.
 
 - **The music pages live in `src/routes/`, not `src/pages/`.** `astro.config.mjs` injects them only
-  when the flag is on, so with it off they are real 404s. Don't move them. The homepage imports the
-  shelf keychain behind `import.meta.env.PUBLIC_MUSIC === 'true'` spelled out (not `MUSIC`), so the
+  when the flag is on, so with it off they are real 404s. Don't move them. The homepage builds its
+  music section behind `import.meta.env.PUBLIC_MUSIC === 'true'` spelled out (not `MUSIC`), so the
   build folds it away and a music-off build carries none of its art.
-- **Music work happens on the `music` branch** (its own worktree, `../pressroom-music`), cut from
-  `main` on 4 Oct 2026 so the music could ship without the reader work then waiting on
-  `press-proof`. Later that day `main` caught up with `press-proof` (the reader work went out) and
-  `main` was merged into `music`. Release = merge `music` into `main` (first done that night,
-  fast-forward to f94bbf8). If `press-proof` gets ahead of `main` again with unreleased work, don't
+- **Music work happens on the `music` branch** (its own worktree, `../pressroom-music`). Release =
+  merge `music` into `main`. If `press-proof` gets ahead of `main` again with unreleased work, don't
   merge it into `music`: take `main` instead.
-- With the flag off, the build also deletes `ost/` (the MP3s in `public/ost/`) from the output.
-- Local work: `PUBLIC_MUSIC=true` in `.env`. A Vercel env change needs a redeploy (without the build
-  cache) — no code change.
+- With the flag off, the build also deletes `ost/` (`/ost/tobira`'s MP3 in `public/ost/`) from the output.
+- Local work: `PUBLIC_MUSIC=true` in `.env`.
 
-## `/music` — the rack, and the song catalogue
+## `/music` — every song is a CD (`src/routes/music/index.astro` + `src/scripts/music/crate/`)
 
-`src/data/songs.ts` is the catalogue: one entry per keychain, in rack order — slug, status
-(`out` | `coming`), titles, data/audio/art stems, the copy-key prefix, the MV (YouTube id + offset),
-the sky per movement (`moods`, with day/night for the star field), the falling-stars movement and
-the lock-screen album. Timing (length, movements, lyrics, hits, wave) always comes from the song's
-imported JSON. `src/lib/keychainServer.ts` resolves a song's data, art and keychain (QR →
-`/music/<slug>?scan=1`).
+Every song is on YouTube (14 Oct 2026), and not every song has words, so the music section is one
+page of CDs that play from there, instead of a page per song (the ナガレボシ keychain / playlist /
+karaoke page came down that day — **tag `starfall-songpage-v1`** has it, the keychain, the MP3 and the
+importer, if a song with words wants it back). The code still says "crate": the CDs stood in a
+wooden one until the owner found it "not pretty" and picked the plinth.
 
-- **`/music`** (`src/routes/music/index.astro` + `src/scripts/ost/rack.ts`): every song hangs on a
-  metal rail as its keychain. Songs not out yet are **blank clear charms with a COMING sticker and no
-  title** (Jun, 4 Oct; `keychainHtml(null)`, one layer per face so they are cheap). The markup waits
-  in a `<template>` per stage and charms are hung one at a time when the page is quiet
-  (`src/scripts/hangWhenQuiet.ts`), with a dashed outline holding each place. A tapped charm takes
-  `view-transition-name: kc-hero` into the song page's keychain.
-- **`/music/<slug>`** is the song page below; an unknown or coming slug returns an empty 404 (a
-  rewrite to `/404` is forbidden — it is prerendered). **`/ost` 301s to `/music/starfall`** with its
-  query, forever: links and any printed QR from before the move.
-- Words: the `music` page group in `copyKeys.ts`. A new song's own words go under `song.<slug>.*`;
-  STARFALL keeps its `ost.*` keys because Studio overrides are stored by key and `loadCopy()` drops
-  unknown ones.
-
-## `/music/starfall` — 「ナガレボシ · STARFALL」: a keychain you scan, then the playlist
-
-The song's title is **ナガレボシ** (all katakana) and **STARFALL** — never the Thai title again (the
-owner's call; the cover art itself still carries the old Thai lettering until it is redrawn).
-A CD album and a spinning disc read as foreign to younger visitors, so the soundtrack is merch
-they know: an **acrylic keychain**. `src/routes/music/song.astro` + `src/scripts/ost/song.ts` (one page
-and script for every song; the song arrives as the `#song-data` payload), two views on one page
-(`data-state` on `main`, mirrored in the URL):
-
-1. **KEY** — the keychain hangs in the night (`src/lib/keychain.ts` markup, `src/styles/keychain.css`,
-   physics `src/scripts/dangle.ts`): a **verlet ball chain** (`src/lib/rope.ts`, tested — 12 links
-   pinned at the hook, folds when slack, straight when taut) with the charm a **pendulum on the
-   jump ring**, driven by the ring's acceleration and tugging it back; a twist spring shows the
-   back. Brushed by the pointer, held and flung, swayed by scrolling; nothing runs at rest. The
-   **jump ring passes through the plate's hole in 3D** (turned ~58° inside the charm's preserve-3d
-   context, so the acrylic depth-sorts it: threaded, not stuck on). The owner rejected a rigid
-   chain that "looked like a rod" and a ring that "looked pasted on". Clear 5 mm plate, art on
-   a white underlay, a **star holo** film — two screens of tiny four-point stars lit by rainbows
-   that slide with the tilt, over faint diffraction lines (`--kc-hx/--kc-hy` from the physics), a **waveform "sound
-   code"** (48 bars of the mix's accent energy) and, on the back, a **real QR** (the `qrcode`
-   package, server-side only — `src/lib/keychainServer.ts`) that opens `/music/starfall?scan=1`. The design
-   can go to print as it is.
-2. **Scan** — tapping the wave (or SCAN): a viewfinder closes on the code, a line reads it, the
-   bars light; a two-note chime only if SOUND is on. Then a **same-document view transition**
-   (`html[data-vt='scan']`) opens the playlist in a circle out of the scanned point while the
-   printed art flies to the playlist cover (`ost-art`) and the title to its title (`ost-title`).
-   `history.pushState('?scan=1')`, so Back returns to the keychain (`unscan` shuts the circle).
-3. **LIST** — the playlist: a compact line (small cover, title, PLAY for the song alone, scrubber
-   with movement ticks), then **the MV, wide** (column width, never taller than 80svh), the 16
-   movement cards under it, now playing (movement + karaoke choir line: JA with ruby and a per-chunk
-   wipe, TH under it), the song list opening onto its 16 movements with liner notes (click seeks), the
-   credits, the way back to the rack. `?scan=1` renders this view server-side (the QR's landing) with
-   a brief SCANNED flash.
-
-- **Sky per movement** in the LIST view (the song's `moods`, registered `@property` colours); the KEY view stays
-  night. Stars are one fixed 2D canvas; accents brighten it; in **XIV. Starfall** strong accents
-  launch falling stars. Reduced motion: still sky, still keychain, no finder animation.
-- Every word around it is author copy — the `ost` page group in `copyKeys.ts` (keychain, playlist
-  header, liner notes, MV, credits), trilingual, previewable in the Studio. So the page is
-  `prerender = false` + `loadCopy()` + `cacheShell()`, like `/asu`.
-- **The MV is the page's big thing** (Jun, 4 Oct: the night classroom with the four silhouettes
-  "didn't work" and is gone, like the rabbit choir before it). Click-to-load: the poster is the MV's
-  title frame, and ▶ sits above the title lettered across its middle; nothing loads from YouTube
-  before that press. Then a YouTube IFrame API player (`src/scripts/music/youtube.ts`, youtube-nocookie)
-  and **the page's one clock follows the video**: ScoreClock eases toward the player's time
-  (`clock.toward`), which YouTube reports in steps, so between reports it runs on; after a seek it
-  holds a moment, because the player still reports the old place. So the cards, karaoke, scrubber,
-  sky, falling stars and mini transport all follow the video with no code of their own.
-  - **Two sources, never together** (`source` in `song.ts`): PLAY (`data-play-song`) is always the song
-    alone — pressed while the video plays, the video pauses and the MP3 goes on from the same moment;
-    pressing play inside the YouTube player takes over from the MP3 the same way. The mini
-    transport's button (`data-play-any`) pauses / resumes whichever is current. Seeks go to the
-    current one.
-  - **The card strip**: one card per movement (`public/ost/<slug>/cards/NN.webp`, the MV's own section
-    cards, and the 384×216 copies the strip loads, `cards/thumb/` — `node scripts/card-thumbs.mjs
-    <slug>`). The one playing is lit with a progress bar, and the strip scrolls itself to it unless the
-    visitor touched it in the last 4 s or the mouse is over it. A card before anything has played
-    starts **the video** there; afterwards it seeks whatever is current. The liner-notes entries do the
-    same but start the song.
-  - `mv.youtube` is `dXiG141rI4w` (5 Oct: the v07k upload; before it `AFSvZn9lL0Q` with v07j and `XpEp6WpBBC8` with the old choir and
-    credits). It is unlisted (Jun dropped the premiere), so it plays now. To test the sync with another video,
-    swap in any embeddable id locally (`M7lc1UVf-VE`, the IFrame API's sample) and swap
-    it back. A song with no `mv` has no video, just the strip.
-- **Cover:** F2 of `music-repo/_work/cover_options` (Jun, 4 Oct) → `src/assets/ost/starfall-cover.jpg`;
-  the video's poster is the MV's title frame (`starfall-screen.jpg`). The old Thai-lettered covers are
-  gone from this branch.
-- The MP3 (9.9 MB) is `preload="metadata"`; the full download starts when a visitor reaches for PLAY.
-  `?t=<sec>` starts the clock there. Mini transport appears when the player is out of view.
-
-### The data — `src/data/ost/<slug>.json`
-
-Imported, never hand-edited: `node scripts/import-ost.mjs <slug> [--audio]`. Each slug's sources are
-in `scripts/songs.import.mjs` (STARFALL: the MV player's `timeline.json` in
-`../music/visualizer/player2/songs/starfall-mv/` (the music repo, a sibling checkout), the master in the
-song folder `../music-files/starfall/final/`, a sibling folder outside git). It keeps only duration, movements, lyrics (chunks with kana), accent
-hits, the keychain `wave`, and the motif's right hand (`motifMovement`, for `motif.test.ts`).
-`--audio` copies the master to `public/ost/<slug>.mp3`. **The music project's notes name the
-composer personally — none of that may reach this repo;** the importer copies no credits and no
-title (titles are the catalogue's). Cover art is `src/assets/ost/<stem>-{night,day}.jpg` (3000²,
-encoded through `astro:assets`); STARFALL's still carries the old Thai lettering until it is redone.
-
-**Performance, measured (production build, Intel UHD 610, cold):** the charm's first raster cost a
-~0.5 s frame. SVG images are rasterised on the main thread, so the star screens are **PNG mask
-tiles** (`public/kc/stars-{a,b}.png`, regenerate with `node scripts/holo-tiles.mjs`) and the QR is
-a **PNG** (`qrcode.toDataURL`, `image-rendering: pixelated`); no blurred inset shadows. What's left
-is the GPU's one-off cost for many translucent 3D layers, so the shelf hangs its keychain only when
-that can't be felt: after load, in view, ~1.8 s in, and not within 0.5 s of a scroll.
-
-### The shelf keychain (`src/components/library/KeyChain.svelte`)
-
-The soundtrack hangs from a hook at the end of the shelf after the books, on the same plank, with
-the same markup and physics as `/ost`; `index.astro` passes its art and QR to `Library` as the
-`ost` prop (null when music is off). Click goes to `/music/starfall`. The NOW PLAYING staff band and
-the CD jewel case are **gone**.
+- **The catalogue is `src/data/music.ts`**: one `Release` per CD, front of the row first —
+  ナガレボシ / STARFALL, オイカゼ / TAILWIND (the song, its 90秒サイズ and its Instrumental, like a
+  Japanese single: the owner's grouping), ヒカリノホウヘ / LIGHTWARD. A track is a YouTube id, a
+  version label (JA/EN), the length and whether it is sung. **Lengths are YouTube's own** —
+  `getDuration()` before playing (311/341/92/341/358 s → 5:11, 5:41, 1:32, 5:41, 5:58); the files are
+  up to a second shorter than YouTube's transcode, and rounding them either way is wrong for one.
+  `SLOTS` (10) fills the row with empty clear cases for the wave. No COMING cases, no MV (owner).
+  `data/music.test.ts` checks the order, ids, lengths, pictures, credits and the owner's word rules.
+- **Pictures** (`src/assets/music/`, served through `lib/musicArt.ts`) are drawn by
+  `music/_work/yt_cover/jackets.py` in the music repo, in the YouTube stills' design (dark stock,
+  the series logo, Shippori Mincho B1, the Sky illustration): `<slug>-jacket.jpg` (layout C, the
+  owner's pick: art inset lower right, title set vertically in the margin), `<slug>-disc.jpg` (the
+  art, title at the top of the printed ring — the hub covers the inner 38 %), `spines.jpg` (one
+  64 × 1300 column per CD, in order — one texture for every spine), `inner.jpg` (the booklet's
+  inside), `posters/<videoId>.jpg` (the uploads' own stills), and `crate-still.png` (below). Re-run
+  `python jackets.py final <src/assets/music> --layout C --disc art` when a CD is added (add it to
+  `RELEASES` there too). Titles in the HTML stay as printed and use `.authored`.
+- **The scene**: the CDs stand in a row on a dark lacquered plinth with a gold line inlaid round
+  its top and a cool light under it (`crateBox.ts`; chosen over a navy box set and a clear acrylic
+  stand). Each case (`jewel.ts`) has its jacket under the clear lid (it swings with the lid), the
+  booklet's inside on its back, a spine card inside the hinge wall — which is what faces you in the
+  row, so the titles there tell the CDs apart (all three share one picture) — and the disc print.
+  Sweep across the row and the cases rise in a wave (`row.ts`, `wave.ts`); the hover tag says
+  "3 曲 · 12:54". Tap one and it flies into your hands (`hero.ts`), the row veiled behind it.
+- **The liner** (`liner.ts`, one `<section class="liner">` per CD written by the server): CD number,
+  title, the YouTube still with ▶ 聴く, the tracklist (rows are YouTube links; JS plays them in
+  place), the note and credits (`music.<slug>.note/credits`, ナガレボシ's voices and the CC BY line
+  for 謡子), 「YouTubeで開く」 (with `&t=` from the moment playing) and ✕. Wide screens: it stands at
+  the stage's right and the held case centres in the rest (`hero.setInset`); under 900 px it comes up
+  over the stage's lower 42 % and the player runs edge to edge (≥ 200 px tall).
+- **YouTube** (`scripts/music/youtube.ts`, IFrame API on youtube-nocookie): **nothing loads from
+  YouTube until the visitor asks** — a tap on the case, ▶ on the still, or a track. The player is
+  scrolled at least 60 % into view first (YouTube only lets a mostly-visible player start by itself),
+  is never covered and never muted to get round autoplay. **The player is the truth** (`deck.ts`,
+  tested): the disc spins while it plays, the lid opens if someone pressed play inside the player, a
+  CD's next track follows the one that ended, buffering leaves the disc alone. A tap on the case
+  pauses / resumes. A refused autoplay (Safari, often) gets `music.tapPlayer` under the player — one
+  press on the player's own ▶. Switching tracks is `loadVideoById` on the same iframe; putting the
+  case back destroys the player.
+- **The address**: `?cd=<slug>` is the CD in your hands (Back and ✕ and Esc put it back). The server
+  reads it too: that liner is open in the HTML (no JavaScript needed), and the title, `og:image` (the
+  jacket) and canonical are the CD's. **`/music/<slug>` 301s to `/music?cd=<slug>`** (`legacy.astro`;
+  `scan`, `from`, `t` are dropped), and **`/ost` 301s to `/music?cd=starfall`** in one hop — the QR
+  printed on STARFALL's keychain (`/music/starfall?scan=1`) lands on its CD. Unknown slug → 404.
+- **Without WebGL** (`data-gl="off"`, also `?gl=0`): the list is cards, a card opens the same liner
+  above them (with its jacket in place of the 3D case). With WebGL the list is the index under the
+  row (hover lifts a case) and the keyboard's way in: Tab lifts, Enter takes out and focuses ▶.
+- **Reduced motion**: no wave or bounce (the case pointed at stands up), no sway or twinkles, the
+  fly is instant, the disc doesn't spin.
+- **Frames**: the loop stops when nothing moves; a held case sways and twinkles for 6 s after the
+  last touch, then rests (no frames) unless its disc spins. three.js is a lazy chunk only this page
+  loads. Test harness note: an automation tab that Windows treats as hidden gets no
+  `requestAnimationFrame` — add `?tick=timer` (dev only) to drive the loop from a timer.
+- **The homepage's 02 section** (`pages/index.astro`, `.tunes`, copy `home.music.*`): "02 — 音楽"
+  under the shelf, before the artist teaser — a still of the CDs on their plinth and the three CDs,
+  each opening its CD here. A still, because the hero already runs the page's WebGL (the press run).
+  `python scripts/crate-still.py` renders it from the real scene with the dev server running
+  (transparent PNG, cropped to what was drawn); re-run it when the row's look changes.
+- Words: the `music` page group in `copyKeys.ts` (`music.*`, one section per CD) and `home.music.*`
+  in the `home` group, trilingual, previewable in the Studio. The page is `prerender = false` +
+  `loadCopy()` + `cacheShell()`.
 
 ## `/ost/tobira` — 「扉の向こう」 as a moving score (unlisted)
 
-The previous soundtrack page, kept like `/lookbook`: nothing links to it. `src/routes/ost-tobira.astro`
+The first soundtrack page, kept like `/lookbook`: nothing links to it. `src/routes/ost-tobira.astro`
 with `src/scripts/ost/{main,score,render}.ts` and `src/data/ost/perd-pratu.json`.
 
 - **Sync comes from the data.** A notehead is centred on its onset, so it touches the line exactly
-  when it sounds; `ScoreClock` (`clock.ts`, shared with `/ost`) eases toward `audio.currentTime`.
+  when it sounds; `ScoreClock` (`clock.ts`) eases toward `audio.currentTime`.
 - `score.ts` turns MIDI into notation (spelling against four flats, accidentals held to the bar,
   stems, beams); `render.ts` draws SMuFL glyphs on one canvas, metrics in staff spaces.
 - Page-only faces in `src/styles/ost-fonts.css`: `'OST JP'` (its own subset — re-subset it when
@@ -788,15 +743,15 @@ an octave up, one lowpass, 4 ms attack, short exponential decay. **No sample fil
 - **Off by default.** The switch is SOUND in the site header, and a SOUND row in the reader's
   settings panel. The choice lives in `localStorage['pr:sound']`, read at module load.
 - The `AudioContext` is only created inside a gesture. `navigator.audioSession.type = 'ambient'`
-  where supported. Silent in a hidden tab; ducked while `pr:music` says a song is playing.
-  Both song pages (`data-no-sfx`) opt out entirely.
+  where supported. Silent in a hidden tab. `/music` and `/ost/tobira` (`data-no-sfx`) opt out
+  entirely.
 - **Hooks are attributes**, delegated from Base: `data-sfx="note"` (hover → the next note of the
   hook), `data-sfx="open"` (press → A♭maj7), `data-sfx="tap"`. Direct calls: page turn →
   `sfx.tick()`, ここすき → `sfx.sparkle()`, a correct lock password → `sfx.chord('unlock')`
   (Cm(add9), where the hook lands).
-- `MOTIF` and `CHORDS` are hardcoded so no page needs the JSON to play a note.
-  **`src/scripts/ost/motif.test.ts` checks them against `starfall.json`** — a re-export that moves
-  the hook fails the test instead of drifting silently.
+- `MOTIF` and `CHORDS` are hardcoded so no page needs data to play a note.
+  **`src/scripts/ost/motif.test.ts` checks them against `motif.fixture.json`** — the motif's right
+  hand as the song's last import had it (v07k), kept when the song page and its data came down.
 
 ## The artist signature stamp
 
@@ -1066,9 +1021,10 @@ chip) even while the book is locked.
 - **The shelf's book grid is still `client:only`, and must open at its final height.** The fallback
   (`index.astro`, before hydration) and Library's own loading state render the same placeholders
   (`src/styles/shelf-ph.css`): the shelf head, the hidden hint line, and one stage + label per
-  item, counted on the server (`library_cards()` + the keychain). Book and keychain labels have a
-  fixed `--shelf-label-h`. Measured: fallback, loading and real shelf are the same height (745 px
-  desktop, 952 px at 390) — this used to be a ~480 px jump (CLS 0.09), the stutter on entry.
+  item, counted on the server (`library_cards()`; the soundtrack keychain that ended the shelf is
+  gone since 14 Oct 2026). Book labels have a fixed `--shelf-label-h`. Measured: fallback, loading
+  and real shelf are the same height (754 / 756 px desktop with two books) — this used to be a
+  ~480 px jump (CLS 0.09), the stutter on entry.
   Change the numbers in `shelf-ph.css` with Library's. `Library.svelte` still registers
   ScrollTrigger at module scope, which is why it isn't SSR'd.
 - **`src/styles/motion-kit.css`** holds small class-triggered motions adapted from
