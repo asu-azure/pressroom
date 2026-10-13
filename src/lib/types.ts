@@ -122,6 +122,14 @@ export interface Work {
   series_kind?: 'main' | 'side' | null;
   series_label?: string | null; // the arc name, e.g. 夜光虫編
   novel_langs?: string[]; // languages its prose exists in as text (supabase/novel.sql)
+  credits?: Credit[]; // people besides the author, in the 奥付 (supabase/credits.sql)
+}
+
+/** One credit: the role in each chrome language, and the name as the person writes it. */
+export interface Credit {
+  ja: string;
+  en?: string;
+  name: string;
 }
 
 export type BookFormat = 'manga' | 'novel' | 'illust';

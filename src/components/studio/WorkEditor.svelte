@@ -8,7 +8,7 @@
   import CoverCropper from './CoverCropper.svelte';
   import CharacterProfileEditor from './CharacterProfileEditor.svelte';
   import { toPageRec } from '../../lib/storagePaths';
-  import type { Work, PageRow, Chapter, Character, CoverCrop, BookFormat } from '../../lib/types';
+  import type { Work, PageRow, Chapter, Character, CoverCrop, BookFormat, Credit } from '../../lib/types';
 
   const CAST_COLORS = ['#2742f0', '#e8a31a', '#18c4d6', '#d6455f', '#6aa0ff', '#4caf7d', '#b06ad6'];
 
@@ -59,6 +59,7 @@
     release_label: '',
     released_on: '', // YYYY-MM-DD, the first release (supabase/release-date.sql)
     cwText: '', // content notes, one per line (Japanese items carry 、 — commas won't do)
+    credits: [] as Required<Credit>[], // supabase/credits.sql
     series_title: '',
     series_order: '',
     series_kind: '' as '' | 'main' | 'side',
@@ -67,6 +68,8 @@
 
   /** works.released_on exists (supabase/release-date.sql has been run). */
   const hasReleaseDate = $derived(Boolean(work && 'released_on' in work));
+  /** works.credits exists (supabase/credits.sql has been run). */
+  const hasCredits = $derived(Boolean(work && 'credits' in work));
 
   /** Existing series names, so a second book joins the first by picking it. */
   let seriesTitles = $state<string[]>([]);
@@ -183,6 +186,7 @@
       release_label: work.release_label ?? '',
       released_on: work.released_on ?? '',
       cwText: (work.content_warnings ?? []).join('\n'),
+      credits: (Array.isArray(work.credits) ? work.credits : []).map((c) => ({ ja: c.ja ?? '', en: c.en ?? '', name: c.name ?? '' })),
       series_title: work.series_title ?? '',
       series_order: work.series_order == null ? '' : String(work.series_order),
       series_kind: work.series_kind ?? '',
@@ -233,6 +237,14 @@
         // it): naming a missing column would fail the whole save
         ...(hasReleaseDate ? { released_on: meta.released_on || null } : {}),
         content_warnings: meta.cwText.split('\n').map((t) => t.trim()).filter(Boolean),
+        // same guard as released_on: only once credits.sql has added the column
+        ...(hasCredits
+          ? {
+              credits: meta.credits
+                .map((c) => ({ ja: c.ja.trim(), ...(c.en.trim() ? { en: c.en.trim() } : {}), name: c.name.trim() }))
+                .filter((c) => c.ja && c.name),
+            }
+          : {}),
         series_title: meta.series_title.trim() || null,
         series_order: meta.series_order.trim() === '' || !Number.isFinite(Number(meta.series_order)) ? null : Number(meta.series_order),
         series_kind: meta.series_kind || null,
@@ -431,6 +443,26 @@
         <span class="mono">CONTENT NOTES / 内容に関する注意 (ONE PER LINE — SHOWN ABOVE THE READ BUTTON)</span>
         <textarea rows="3" bind:value={meta.cwText} placeholder={'家庭内暴力\n自傷への言及'}></textarea>
       </label>
+      <div class="we__field we__field--wide">
+        <span class="mono">CREDITS / クレジット (SHOWN NEXT TO THE TRANSLATION — ROLE IN JAPANESE, ROLE IN ENGLISH, NAME)</span>
+        {#if hasCredits}
+          {#each meta.credits as credit, i (i)}
+            <div class="we__credit">
+              <input type="text" bind:value={credit.ja} placeholder="日本語校正" aria-label="Role in Japanese" />
+              <input type="text" bind:value={credit.en} placeholder="Japanese proofreading" aria-label="Role in English" />
+              <input type="text" bind:value={credit.name} placeholder="なぎ" aria-label="Name" />
+              <button type="button" class="we__coverBtn mono" onclick={() => (meta.credits = meta.credits.filter((_, j) => j !== i))}>
+                REMOVE
+              </button>
+            </div>
+          {/each}
+          <button type="button" class="we__coverBtn mono" onclick={() => (meta.credits = [...meta.credits, { ja: '', en: '', name: '' }])}>
+            + ADD CREDIT
+          </button>
+        {:else}
+          <span class="mono we__hint">RUN supabase/credits.sql TO ENABLE</span>
+        {/if}
+      </div>
 
       <!-- Series — books sharing a series name link to each other -->
       <label class="we__field we__field--wide">
@@ -642,6 +674,11 @@
   .we__hint {
     color: var(--fg-faint);
     font-size: 0.6rem;
+  }
+  .we__credit {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+    gap: 0.5rem;
   }
   .we__field input,
   .we__field select,
